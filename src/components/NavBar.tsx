@@ -7,7 +7,11 @@ import { Button } from '@/components/ui/button';
 
 export default function NavBar() {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+
+  if (status === "loading") {
+    return <div className="h-16 bg-stone-900/90 backdrop-blur-md border-b border-stone-800" />;
+  }
 
   const navItems = [
     { name: 'Discover', href: '/routes' },

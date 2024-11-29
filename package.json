@@ -29,7 +29,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.303.0",
     "mapbox-gl": "^3.8.0",
-    "next": "^14.2.18",
+    "next": "^15.0.3",
     "next-auth": "^5.0.0-beta.3",
     "react": "^18",
     "react-dom": "^18",

@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { SearchBox } from './SearchBox';
+import dynamic from 'next/dynamic';
+
+const Map = dynamic(() => import('./Map'), { ssr: false });
 
 interface Location {
   coordinates: [number, number];

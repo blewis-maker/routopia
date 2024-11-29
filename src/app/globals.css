@@ -37,27 +37,23 @@ body {
 
 .custom-marker {
   position: relative;
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
+  animation: bounce 1.5s ease-in-out infinite;
 }
 
-.marker-dot {
-  width: 24px;
-  height: 24px;
-  background: #2dd4bf;
-  border: 4px solid white;
-  border-radius: 50%;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+.custom-marker img {
+  width: 100%;
+  height: 100%;
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  animation: bounce 1.5s ease-in-out infinite;
 }
 
 .marker-pulse {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   background: rgba(45, 212, 191, 0.4);
   border-radius: 50%;
   position: absolute;
