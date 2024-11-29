@@ -1,0 +1,27 @@
+<svg width="40" height="40" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="roadGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2DD4BF;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#14b8a6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0d9488;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <path d="M20,80 Q30,70 35,55 T50,30 T65,45 T80,20"
+        stroke="url(#roadGradient)"
+        stroke-width="12"
+        fill="none"
+        stroke-linecap="round"
+        filter="drop-shadow(0 0 2px rgba(45, 212, 191, 0.3))"/>
+  <circle cx="25" cy="20" r="2.5" fill="#2DD4BF">
+    <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="75" cy="30" r="2.5" fill="#14b8a6">
+    <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="85" cy="70" r="2.5" fill="#0d9488">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="45" cy="60" r="2.5" fill="#2DD4BF">
+    <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/>
+  </circle>
+</svg>
