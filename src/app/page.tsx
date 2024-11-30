@@ -6,6 +6,7 @@ import SignUpModal from '@/components/SignUpModal';
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isButtonHovered, setIsButtonHovered] = useState(false);
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -28,35 +29,41 @@ export default function Home() {
       </video>
 
       {/* Dark overlay */}
-      <div 
-        className="absolute inset-0 z-0 bg-black/60"
-      />
+      <div className="absolute inset-0 z-0 bg-black/60" />
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen text-white px-4">
-        <div className="flex items-center mb-6">
+        <div className="flex items-center mb-8">
           <img 
             src="/routopia-logo.png"
             alt="Routopia"
-            className="h-16 w-16 mr-4 filter brightness-100 saturate-100"
+            className={`h-16 w-16 mr-4 transition-all duration-300 ${
+              isButtonHovered ? 'animate-logo-active-large' : ''
+            }`}
             width={64}
             height={64}
           />
-          <h1 className="text-6xl font-bold">
+          <h1 className="text-5xl font-bold leading-tight">
             Your AI Route
-            <div className="bg-gradient-to-r from-teal-400 to-emerald-400 text-transparent bg-clip-text">
+            <div className="bg-gradient-to-r from-teal-400 to-emerald-400 text-transparent bg-clip-text whitespace-nowrap leading-normal">
               Planning Companion
             </div>
           </h1>
         </div>
         
-        <p className="text-xl mb-8 text-center max-w-2xl">
+        <p className="text-xl mb-8 text-center max-w-2xl text-stone-200">
           Plan your next adventure with AI-powered inspiration.
         </p>
 
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 px-8 rounded-lg transition-colors shadow-lg hover:shadow-teal-500/25"
+          onMouseEnter={() => setIsButtonHovered(true)}
+          onMouseLeave={() => setIsButtonHovered(false)}
+          className="bg-teal-600 hover:bg-teal-500 
+            text-white font-bold py-3 px-8 rounded-lg 
+            transition-all duration-300 hover:-translate-y-0.5 
+            shadow-lg hover:shadow-teal-500/25
+            animate-pulse-teal"
         >
           Get Started
         </button>

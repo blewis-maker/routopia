@@ -1,5 +1,5 @@
 {
+  "/routes/page": "app/routes/page.js",
   "/page": "app/page.js",
-  "/routopia/page": "app/routopia/page.js",
-  "/routes/page": "app/routes/page.js"
+  "/routopia/page": "app/routopia/page.js"
 }
