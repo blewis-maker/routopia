@@ -1,8 +1,6 @@
 {
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/api/test-setup/route": "app/api/test-setup/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/test-setup/page": "app/test-setup/page.js",
   "/routopia/page": "app/routopia/page.js",
-  "/page": "app/page.js"
+  "/test-setup/page": "app/test-setup/page.js"
 }
