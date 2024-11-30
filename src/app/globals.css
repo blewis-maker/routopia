@@ -32,8 +32,8 @@
 
 .custom-marker {
   position: relative;
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   animation: bounce 1.5s ease-in-out infinite;
 }
 
@@ -47,8 +47,8 @@
 }
 
 .marker-pulse {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   background: rgba(45, 212, 191, 0.4);
   border-radius: 50%;
   position: absolute;

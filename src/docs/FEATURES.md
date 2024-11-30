@@ -3,13 +3,13 @@
 ## Core Components
 
 ### Navigation System
-- 🚧 Fixed position header with blur effect
+- ✅ Fixed position header with blur effect
 - Components:
-  - 🚧 Logo with SVG icon
-  - 🚧 Gradient text effect for "Routopia"
-  - ⬜ Navigation links (Discover, Routes, Profile)
+  - ✅ Logo with SVG icon
+  - ✅ Gradient text effect for "Routopia"
+  - ✅ Navigation links (Discover, Routes, Profile)
   - ⬜ Activity type selector
-  - 🚧 Sign In/Profile button
+  - ✅ Sign In/Profile button
 
 ### Map System (`src/components/map/`)
 - ✅ Interactive Mapbox integration
@@ -47,11 +47,19 @@
 
 ## Pages
 
-### Landing Page (`src/app/page.tsx`)
-- ✅ Activity showcase
-- ⬜ Quick route creation
-- ⬜ Recent routes display
-- ⬜ Weather integration
+### Routopia Main Page (`src/app/routopia/`)
+- ✅ Basic page structure
+- ✅ Map integration
+- ✅ Route list sidebar
+- ⬜ Activity overview
+- ⬜ Recent routes
+- ⬜ Weather widget
+
+### Dashboard (`src/app/dashboard/`)
+- ✅ Basic dashboard structure
+- ⬜ Activity overview
+- ⬜ Recent routes
+- ⬜ Weather widget
 
 ### Route Planning (`src/app/routes/`)
 - ⬜ Activity-specific views
@@ -74,6 +82,9 @@
 - ⬜ Email provider
 - ✅ Protected routes
 - ✅ User sessions
+- ✅ Auth middleware
+- ✅ Sign in modal
+- ✅ Dashboard redirect
 
 ### AI Integration
 - ⬜ Natural language processing
@@ -121,15 +132,16 @@
 - Initial schema
 - Landing page design
 - Sign-in modal structure
-
-🚧 In Progress:
 - Basic navigation
 - Auth system setup
 - Google OAuth integration
 - User sessions
-- Apple OAuth integration
-- Email authentication
-- Route planning interface
+- Protected routes
+- Dashboard redirect
+- Auth middleware
+
+🚧 In Progress:
+- Dashboard features
 - Activity type selection
 - Real-time monitoring
 
