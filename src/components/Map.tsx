@@ -34,69 +34,71 @@ export default function Map({
   const mapInstance = useRef<mapboxgl.Map | null>(null);
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
 
-  // Initialize map
   useEffect(() => {
     if (!mapContainer.current || mapInstance.current) return;
 
-    // Default to London coordinates if no startLocation
-    const defaultLocation: [number, number] = [-0.127758, 51.507351];
-    
-    console.log('Initializing map...');
     const map = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/dark-v11',
-      center: startLocation?.coordinates || defaultLocation,
       zoom: 15,
-      pitch: 45,
+      pitch: 0,
       bearing: 0
     });
 
-    // Create a custom marker element
-    const el = document.createElement('div');
-    el.className = 'custom-marker';
-    
-    el.innerHTML = `
-      <img src="/Routopia Logo.svg" alt="Location Marker" />
-      <div class="marker-pulse"></div>
+    const markerEl = document.createElement('div');
+    markerEl.className = 'marker';
+    markerEl.innerHTML = `
+      <div class="marker-inner">
+        <img src="/logo.svg" alt="Location" />
+      </div>
     `;
 
-    // Create the marker with the custom element
-    const marker = new mapboxgl.Marker({
-      element: el,
+    locationMarker.current = new mapboxgl.Marker({
+      element: markerEl,
       anchor: 'center'
-    })
-    .setLngLat(startLocation?.coordinates || defaultLocation)
-    .addTo(map);
+    });
 
-    // Add navigation controls
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-    map.addControl(new mapboxgl.GeolocateControl({
+    const nav = new mapboxgl.NavigationControl({
+      showCompass: false
+    });
+    map.addControl(nav, 'top-right');
+
+    const geolocate = new mapboxgl.GeolocateControl({
       positionOptions: {
         enableHighAccuracy: true
       },
-      trackUserLocation: true,
-      showAccuracyCircle: true,
-      showUserLocation: true,
-      fitBoundsOptions: {
-        maxZoom: 15
-      }
-    }));
+      trackUserLocation: false,
+      showAccuracyCircle: false,
+      showUserLocation: false
+    });
+    map.addControl(geolocate);
 
-    // Smooth fly to user location on initial load
-    map.once('load', () => {
+    geolocate.on('geolocate', (e: any) => {
+      const { latitude, longitude } = e.coords;
+      
+      if (locationMarker.current) {
+        locationMarker.current
+          .setLngLat([longitude, latitude])
+          .addTo(map);
+      }
+
       map.flyTo({
-        center: startLocation?.coordinates || defaultLocation,
+        center: [longitude, latitude],
         zoom: 15,
-        speed: 0.8,
-        curve: 1,
+        pitch: 0,
+        bearing: 0,
+        duration: 1500,
         essential: true
       });
+    });
+
+    map.once('load', () => {
+      geolocate.trigger();
     });
 
     mapInstance.current = map;
 
     return () => {
-      console.log('Cleaning up map');
       if (locationMarker.current) {
         locationMarker.current.remove();
       }
@@ -108,6 +110,41 @@ export default function Map({
   return (
     <div className="relative w-full h-full">
       <div ref={mapContainer} className="absolute inset-0" />
+      <style jsx global>{`
+        .marker {
+          width: 32px;
+          height: 32px;
+          cursor: pointer;
+        }
+
+        .marker-inner {
+          width: 100%;
+          height: 100%;
+          position: relative;
+          animation: bounce 1s infinite ease-in-out;
+        }
+
+        .marker-inner img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          filter: brightness(0) invert(1);
+          filter: drop-shadow(0 0 8px rgba(0, 200, 150, 0.6));
+        }
+
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
+        }
+
+        .mapboxgl-ctrl-top-right {
+          right: 270px !important;
+        }
+
+        .mapboxgl-ctrl-compass {
+          display: none !important;
+        }
+      `}</style>
     </div>
   );
 }
