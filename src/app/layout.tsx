@@ -1,4 +1,5 @@
 import { AuthProvider } from '@/components/AuthProvider';
+import { Providers } from './providers';
 import NavBar from '@/components/NavBar';
 import { Metadata } from 'next';
 import './globals.css';
@@ -37,10 +38,12 @@ export default function RootLayout({
         <link rel="manifest" href="/site.webmanifest" />
       </head>
       <body className="bg-stone-900">
-        <AuthProvider>
-          <NavBar />
-          <main>{children}</main>
-        </AuthProvider>
+        <Providers>
+          <AuthProvider>
+            <NavBar />
+            <main>{children}</main>
+          </AuthProvider>
+        </Providers>
       </body>
     </html>
   );

@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{\"components\\\\RoutePanel.tsx -> ./Map\":{\"id\":\"components\\\\RoutePanel.tsx -> ./Map\",\"files\":[\"static/chunks/_app-pages-browser_src_components_Map_tsx.js\"]},\"components\\\\RoutesWrapper.tsx -> @/components/Map\":{\"id\":\"components\\\\RoutesWrapper.tsx -> @/components/Map\",\"files\":[\"static/chunks/_app-pages-browser_src_components_Map_tsx.js\"]}}"
+self.__REACT_LOADABLE_MANIFEST="{}"
