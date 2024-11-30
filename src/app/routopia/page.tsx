@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { UserAvatar } from '@/components/UserAvatar';
+import GPTTest from '@/components/ai/GPTTest';
 
 // Define the Location type
 interface Location {
@@ -50,6 +51,11 @@ export default function RoutopiaPage() {
         <div className="p-4">
           <h2 className="text-lg font-semibold mb-4">My Routes</h2>
           {/* Route list will go here */}
+          
+          {/* Add GPTTest here in the sidebar */}
+          <div className="mt-4">
+            <GPTTest />
+          </div>
         </div>
       </div>
 
