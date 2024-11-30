@@ -170,9 +170,9 @@ const Map = forwardRef<MapRef, MapProps>(({
       const markerLocation = locationMarker.current.getLngLat();
       
       markerPopup.current = new mapboxgl.Popup({
-        closeButton: true,
-        closeOnClick: false,
-        offset: [15, -25],
+        closeButton: false,
+        closeOnClick: true,
+        offset: [15, -15],
         anchor: 'bottom-left',
         className: 'marker-popup',
         maxWidth: 'none'
@@ -319,51 +319,26 @@ const Map = forwardRef<MapRef, MapProps>(({
         }
 
         .marker-popup .mapboxgl-popup-content {
-          background-color: rgba(38, 38, 38, 0.95) !important;
-          border: 1px solid rgba(0, 200, 150, 0.3) !important;
-          border-radius: 16px !important;
-          padding: 12px 16px !important;
-          color: white !important;
-          font-size: 14px !important;
-          line-height: 1.4 !important;
+          background-color: rgba(38, 38, 38, 0.95);
+          border: 1px solid rgba(0, 200, 150, 0.3);
+          border-radius: 8px;
+          padding: 12px 16px;
+          color: white;
+          font-size: 14px;
+          line-height: 1.4;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-          position: relative;
-          width: max-content;
-          max-width: 300px;
-        }
-
-        .marker-popup .mapboxgl-popup-content:after {
-          content: '';
-          position: absolute;
-          bottom: -8px;
-          left: 15px;
-          border-width: 8px 8px 0;
-          border-style: solid;
-          border-color: rgba(38, 38, 38, 0.95) transparent transparent;
-          transform: rotate(-45deg);
-        }
-
-        .marker-popup .mapboxgl-popup-tip {
-          display: none !important;
         }
 
         .popup-content {
-          position: relative;
-        }
-
-        .popup-text {
+          max-width: 300px;
           white-space: pre-wrap;
           word-wrap: break-word;
         }
 
-        /* Smaller close button */
         .marker-popup .mapboxgl-popup-close-button {
-          padding: 0 6px;
-          font-size: 16px;
           color: rgba(255, 255, 255, 0.7);
-          right: 4px;
-          top: 4px;
-          border-radius: 50%;
+          padding: 4px 8px;
+          font-size: 16px;
         }
 
         .marker-popup .mapboxgl-popup-close-button:hover {

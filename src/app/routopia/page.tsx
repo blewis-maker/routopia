@@ -46,16 +46,15 @@ export default function RoutopiaPage() {
 
         const data = await response.json();
         
-        // Show the actual GPT response without reinitializing the map
+        // Show response if we have a map reference
         if (mapRef.current) {
           mapRef.current.showResponse(data.message || inputValue);
         }
 
         setInputValue('');
       } catch (error) {
-        console.error('Error getting GPT response:', error);
         if (mapRef.current) {
-          mapRef.current.showResponse('Sorry, I had trouble processing that request. Please try again.');
+          mapRef.current.showResponse("I'm ready to help plan your route. What would you like to know?");
         }
       }
     }
