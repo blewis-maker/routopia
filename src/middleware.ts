@@ -1,9 +1,26 @@
-import { withAuth } from "next-auth/middleware"
+import { auth } from '@/lib/auth'
 
-export default withAuth({
-  callbacks: {
-    authorized: ({ token }) => !!token
-  },
+export default auth((req) => {
+  const isAuthenticated = !!req.auth
+  
+  // Add your protected routes
+  const protectedPaths = [
+    '/routes',
+    '/profile',
+    '/api/chat',
+    '/api/routes',
+  ]
+
+  // Check if the current path starts with any protected path
+  const isProtectedPath = protectedPaths.some(path => 
+    req.nextUrl.pathname.startsWith(path)
+  )
+
+  if (isProtectedPath && !isAuthenticated) {
+    return Response.redirect(new URL('/?signin=true', req.url))
+  }
+
+  return null
 })
 
 export const config = {
