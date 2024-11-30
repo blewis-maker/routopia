@@ -33,7 +33,7 @@ export default function Home() {
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen text-white">
-        <div className="flex items-center space-x-4 mb-8">
+        <div className="flex flex-col items-center mb-8">
           <img 
             src="/routopia-logo.png"
             alt="Routopia"
@@ -41,11 +41,9 @@ export default function Home() {
             width={64}
             height={64}
           />
-          <div className="flex flex-col items-start">
-            <h1 className="text-5xl font-bold">Your AI Route</h1>
-            <div className="text-5xl font-bold bg-gradient-to-r from-teal-400 to-emerald-400 text-transparent bg-clip-text">
-              Planning Companion
-            </div>
+          <h1 className="text-5xl font-bold">Your AI Route</h1>
+          <div className="text-5xl font-bold bg-gradient-to-r from-teal-400 to-emerald-400 text-transparent bg-clip-text leading-relaxed py-2">
+            Planning Companion
           </div>
         </div>
         
@@ -57,20 +55,13 @@ export default function Home() {
           onClick={() => setIsModalOpen(true)}
           onMouseEnter={() => setIsButtonHovered(true)}
           onMouseLeave={() => setIsButtonHovered(false)}
-          className="text-xl font-semibold px-8 py-3
-            relative group
+          className="text-xl font-semibold px-8 py-3 rounded-lg
+            bg-gradient-to-r from-teal-400 to-emerald-400
+            text-white
             transform transition-all duration-300
-            animate-logo-hover"
+            hover:scale-105 shadow-lg"
         >
-          <span className="relative z-10 text-white font-bold">
-            Start Exploring
-          </span>
-          <div className="absolute inset-0 rounded-2xl
-            bg-gradient-to-r from-teal-400/20 to-emerald-400/20
-            blur-sm transition-all duration-300
-            group-hover:from-teal-400/30 group-hover:to-emerald-400/30
-            border border-teal-400/20 group-hover:border-teal-400/40"
-          />
+          Start Exploring
         </button>
       </div>
 
