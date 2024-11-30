@@ -28,26 +28,26 @@ export default function GPTTest() {
   };
 
   return (
-    <div className="p-4 space-y-4">
-      <h2 className="text-xl font-bold">RouteGPT Test</h2>
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-white">RouteGPT Test</h2>
       <div className="space-y-2">
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          className="w-full p-2 border rounded"
+          className="w-full p-2 bg-stone-800 text-white border border-stone-700 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           placeholder="Enter a route planning question..."
         />
         <button
           onClick={testGPT}
           disabled={loading}
-          className="px-4 py-2 bg-blue-500 text-white rounded disabled:bg-gray-400"
+          className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-500 disabled:bg-stone-700 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? 'Testing...' : 'Test GPT'}
         </button>
       </div>
       {response && (
-        <div className="p-4 bg-gray-100 rounded">
-          <pre className="whitespace-pre-wrap">{response}</pre>
+        <div className="p-4 bg-stone-800 border border-stone-700 rounded">
+          <pre className="whitespace-pre-wrap text-white text-sm">{response}</pre>
         </div>
       )}
     </div>

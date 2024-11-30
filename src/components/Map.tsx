@@ -22,7 +22,6 @@ interface MapProps {
   endLocation: Location | null;
   waypoints: Location[];
   onLocationSelect: (location: Location, type: 'start' | 'end' | 'waypoint') => void;
-  onPlanRoute: () => void;
 }
 
 export default function Map({ 
@@ -30,7 +29,6 @@ export default function Map({
   endLocation, 
   waypoints, 
   onLocationSelect,
-  onPlanRoute 
 }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<mapboxgl.Map | null>(null);
@@ -107,30 +105,9 @@ export default function Map({
     };
   }, [startLocation]);
 
-  const handleLocationSelect = (location: Location, type: 'start' | 'end' | 'waypoint') => {
-    if (!mapInstance.current) return;
-
-    mapInstance.current.flyTo({
-      center: location.coordinates,
-      zoom: 14,
-      essential: true
-    });
-
-    onLocationSelect(location, type);
-  };
-
   return (
     <div className="relative w-full h-full">
       <div ref={mapContainer} className="absolute inset-0" />
-      
-      <div className="absolute top-4 left-4 z-10">
-        <button
-          onClick={onPlanRoute}
-          className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-white rounded-md shadow-lg"
-        >
-          Plan Route
-        </button>
-      </div>
     </div>
   );
 }
