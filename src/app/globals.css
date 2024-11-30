@@ -3,20 +3,15 @@
 @tailwind utilities;
 @import 'mapbox-gl/dist/mapbox-gl.css';
 
-:root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 0, 0, 0;
-  --background-end-rgb: 0, 0, 0;
-}
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 20 14.3% 4.1%;
+  }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    rgb(var(--background-end-rgb))
-  )
-  rgb(var(--background-start-rgb));
+  body {
+    @apply bg-stone-950 text-stone-50;
+  }
 }
 
 .mapboxgl-map {

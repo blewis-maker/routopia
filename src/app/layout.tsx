@@ -1,26 +1,6 @@
-import { Providers } from './providers';
+import '@/app/globals.css';
 import NavBar from '@/components/NavBar';
-import { Metadata } from 'next';
-import './globals.css';
-
-export const metadata: Metadata = {
-  title: 'Routopia - AI Route Planning Companion',
-  description: 'Plan your next adventure with AI-powered inspiration.',
-  icons: {
-    icon: [
-      {
-        url: '/favicon.ico',
-        sizes: 'any',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      }
-    ],
-    apple: '/apple-touch-icon.png',
-  },
-  manifest: '/site.webmanifest'
-};
+import { AuthProvider } from '@/components/AuthProvider';
 
 export default function RootLayout({
   children,
@@ -29,15 +9,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
-        <Providers>
-          <div className="flex flex-col min-h-screen">
-            <NavBar />
-            <main className="flex-1 pt-16 relative">
-              {children}
-            </main>
-          </div>
-        </Providers>
+      <body className="min-h-screen bg-stone-950">
+        <AuthProvider>
+          <NavBar />
+          <main className="pt-16">
+            {children}
+          </main>
+        </AuthProvider>
       </body>
     </html>
   );

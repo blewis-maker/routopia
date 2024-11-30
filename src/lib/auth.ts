@@ -1,31 +1,31 @@
-import type { NextAuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
-import { getServerSession } from "next-auth/next"
-import { NextResponse } from "next/server"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
+import NextAuth from "next-auth";
+import type { NextAuthConfig } from "next-auth";
+import Google from "next-auth/providers/google";
 
-export const authOptions: NextAuthOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
+export const authConfig = {
   providers: [
-    GoogleProvider({
+    Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
+  callbacks: {
+    jwt({ token, account }) {
+      if (account) {
+        token.accessToken = account.access_token;
+      }
+      return token;
+    },
+    session({ session, token }) {
+      if (session?.user) {
+        session.user.id = token.sub;
+      }
+      return session;
+    },
+  },
   pages: {
     signIn: '/',
-    error: '/',
   },
-}; 
+} satisfies NextAuthConfig;
 
-export async function authenticatedRoute(handler: Function) {
-  return async function (req: Request) {
-    const session = await getServerSession(authOptions)
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    return handler(req, session)
-  }
-} 
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig); 

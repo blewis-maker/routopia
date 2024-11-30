@@ -23,22 +23,35 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
       setIsLoading(true);
       setError(null);
       
-      console.log('Starting Google sign in...');
+      console.log('Starting Google sign in process...');
       const result = await signIn('google', {
         redirect: false,
         callbackUrl: '/routes'
       });
-      console.log('Sign in result:', result);
+      
+      console.log('Full sign in response:', {
+        ok: result?.ok,
+        error: result?.error,
+        status: result?.status,
+        url: result?.url
+      });
 
       if (result?.error) {
         setError(result.error);
-        console.error('Sign in error:', result.error);
+        console.error('Sign in error details:', result.error);
       } else if (result?.ok && result.url) {
-        console.log('Sign in successful, redirecting to:', result.url);
-        router.push(result.url);
+        console.log('Sign in successful, attempting redirect to:', result.url);
+        try {
+          await router.push(result.url);
+          console.log('Redirect completed');
+        } catch (routerError) {
+          console.error('Router push failed:', routerError);
+        }
+      } else {
+        console.warn('Unexpected result state:', result);
       }
     } catch (error) {
-      console.error('Sign in error:', error);
+      console.error('Sign in process error:', error);
       setError('An error occurred during sign in. Please try again.');
     } finally {
       setIsLoading(false);
