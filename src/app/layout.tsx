@@ -18,7 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-stone-950">
+      <body>
         <AuthProvider>
           <NavBar />
           <main className="pt-16">

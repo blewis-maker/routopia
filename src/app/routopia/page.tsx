@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
+import { UserAvatar } from '@/components/UserAvatar';
 
 // Define the Location type
 interface Location {
@@ -52,7 +53,7 @@ export default function RoutopiaPage() {
         </div>
       </div>
 
-      {/* Main Map Area - Changed positioning */}
+      {/* Main Map Area */}
       <div className="absolute inset-0 ml-64">
         <Map 
           startLocation={startLocation}

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { UserMenu } from './UserMenu';
+import { UserAvatar } from './UserAvatar';
 
 // Dynamically import SignUpModal to avoid SSR issues
 const SignUpModal = dynamic(() => import('./SignUpModal'), {
@@ -49,7 +49,7 @@ export default function NavBar() {
                 <Link href="/routes" className="text-stone-300 hover:text-white">
                   Routes
                 </Link>
-                <UserMenu />
+                <UserAvatar />
               </>
             ) : (
               <button

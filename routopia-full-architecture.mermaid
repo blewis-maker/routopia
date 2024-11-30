@@ -1,0 +1,98 @@
+graph TB
+    subgraph User Interface
+        UI[Web/Mobile Interface]
+        Chat[AI Chat Interface]
+        Maps[Map View]
+        Updates[Real-time Updates]
+    end
+
+    subgraph Authentication
+        Auth[Auth System]
+        Session[Session Manager]
+        UserMgmt[User Management]
+    end
+
+    subgraph AI Agent Core
+        NLP[Intent Parser]
+        Agent[Trip Planning Agent]
+        Context[Context Manager]
+        Monitor[Activity Monitor]
+        Alert[Alert System]
+    end
+
+    subgraph Database
+        Users[(Users)]
+        Routes[(Routes)]
+        Activities[(Activities)]
+        Chat_History[(Chat History)]
+        Performance[(Performance Data)]
+    end
+
+    subgraph Route Types
+        Car[Car Routes]
+        Bike[Bike Routes]
+        Ski[Ski Routes]
+    end
+
+    subgraph External Services
+        Weather[Weather API]
+        Places[Google/Yelp API]
+        Trails[AllTrails API]
+        Traffic[Traffic API]
+        Training[Training Peaks]
+    end
+
+    subgraph Real-time Systems
+        EventBus[Event Bus]
+        Cache[Route Cache]
+        Updates_Queue[Updates Queue]
+    end
+
+    %% User Flow
+    UI --> Auth
+    Auth --> UserMgmt
+    UserMgmt --> Users
+
+    %% AI Flow
+    Chat --> NLP
+    NLP --> Agent
+    Agent --> Context
+    Context --> Monitor
+    Monitor --> Alert
+    Alert --> Updates
+
+    %% Data Flow
+    Agent --> Routes
+    Routes --> Car & Bike & Ski
+    Monitor --> Performance
+    Chat --> Chat_History
+
+    %% External Integration
+    Weather & Places & Trails & Traffic --> Monitor
+    Training --> Activities
+
+    %% Real-time Updates
+    Monitor --> EventBus
+    EventBus --> Updates_Queue
+    Updates_Queue --> Updates
+
+    %% Database Relations
+    Users --> Routes
+    Users --> Activities
+    Routes --> Performance
+
+    classDef ui fill:#e1f5fe,stroke:#01579b
+    classDef auth fill:#fff3e0,stroke:#e65100
+    classDef ai fill:#f3e5f5,stroke:#4a148c
+    classDef data fill:#e8f5e9,stroke:#2e7d32
+    classDef route fill:#fff8e1,stroke:#ff6f00
+    classDef external fill:#f3e5f5,stroke:#6a1b9a
+    classDef realtime fill:#e8eaf6,stroke:#283593
+
+    class UI,Chat,Maps,Updates ui
+    class Auth,Session,UserMgmt auth
+    class NLP,Agent,Context,Monitor,Alert ai
+    class Users,Routes,Activities,Chat_History,Performance data
+    class Car,Bike,Ski route
+    class Weather,Places,Trails,Traffic,Training external
+    class EventBus,Cache,Updates_Queue realtime
