@@ -1,10 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import SignUpModal from '@/components/SignUpModal';
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('signin') === 'true') {
+      setIsModalOpen(true);
+    }
+  }, [searchParams]);
 
   return (
     <div className="relative min-h-screen">

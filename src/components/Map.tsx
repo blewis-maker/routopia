@@ -39,13 +39,15 @@ export default function Map({
   // Initialize map
   useEffect(() => {
     if (!mapContainer.current || mapInstance.current) return;
-    if (!startLocation) return;
 
+    // Default to London coordinates if no startLocation
+    const defaultLocation: [number, number] = [-0.127758, 51.507351];
+    
     console.log('Initializing map...');
     const map = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/dark-v11',
-      center: startLocation.coordinates,
+      center: startLocation?.coordinates || defaultLocation,
       zoom: 15,
       pitch: 45,
       bearing: 0
@@ -65,7 +67,7 @@ export default function Map({
       element: el,
       anchor: 'center'
     })
-    .setLngLat(startLocation.coordinates)
+    .setLngLat(startLocation?.coordinates || defaultLocation)
     .addTo(map);
 
     // Add navigation controls
@@ -85,7 +87,7 @@ export default function Map({
     // Smooth fly to user location on initial load
     map.once('load', () => {
       map.flyTo({
-        center: startLocation.coordinates,
+        center: startLocation?.coordinates || defaultLocation,
         zoom: 15,
         speed: 0.8,
         curve: 1,

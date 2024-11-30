@@ -2,95 +2,170 @@
 
 ## Core Components
 
-### Navigation (`src/components/Navigation.tsx`)
+### Navigation System
 - Fixed position header with blur effect
-- Responsive design
-- Dynamic route highlighting
+- Dynamic route type highlighting (Car/Bike/Ski)
 - Components:
   - Logo with SVG icon
   - Gradient text effect for "Routopia"
-  - Navigation links (Discover, Routes, About)
-  - Sign In button
+  - Navigation links (Discover, Routes, Profile)
+  - Activity type selector
+  - Sign In/Profile button
 
-### Map (`src/components/Map.tsx`)
+### Map System (`src/components/map/`)
 - Interactive Mapbox integration
-- Dark theme styling
+- Multi-mode visualization
+- Components:
+  - MapView.tsx (base map component)
+  - RouteLayer.tsx (route visualization)
+  - ElevationLayer.tsx (for ski/bike routes)
+  - POIMarkers.tsx (nodes/points of interest)
+  - WeatherOverlay.tsx
 - Features:
-  - Route planning button
-  - Location search
-  - Route visualization
-  - Waypoint management
-- State Management:
-  - Start location
-  - End location
-  - Waypoints array
-  - Search panel visibility
+  - Activity-specific styling
+  - Elevation profile display
+  - Real-time condition overlays
+  - Multi-route visualization
 
-### SearchBox (`src/components/SearchBox.tsx`)
-- Mapbox Geocoding API integration
-- Debounced search
+### AI Assistant System (`src/components/ai/`)
+- Chat interface for route planning
+- Components:
+  - ChatInterface.tsx
+  - SuggestionBubble.tsx
+  - ContextDisplay.tsx
+  - PreferenceManager.tsx
 - Features:
-  - Auto-complete suggestions
-  - Loading indicator
-  - Error handling
-  - Result selection
+  - Natural language route planning
+  - Contextual suggestions
+  - Weather/condition alerts
+  - Budget-aware recommendations
 
-### RoutePanel (`src/components/RoutePanel.tsx`)
-- Route planning interface
+### Route Management (`src/components/routes/`)
+- Route type-specific interfaces
+- Components:
+  - RouteBuilder.tsx
+  - RouteDetails.tsx
+  - ActivityMetrics.tsx
+  - NodeManager.tsx
 - Features:
-  - Start location input
-  - End location input
-  - Waypoint management
-  - Close/Cancel functionality
+  - Multi-point route planning
+  - Activity-specific parameters
+  - Real-time monitoring
+  - Route history and saving
+
+### Activity Tracking (`src/components/activity/`)
+- Performance monitoring
+- Components:
+  - PerformanceMetrics.tsx
+  - ActivityHistory.tsx
+  - TrainingIntegration.tsx
+  - DeviceSync.tsx
 
 ## Pages
 
 ### Landing Page (`src/app/page.tsx`)
-- Full-screen design
-- Components:
-  - Background image with overlay
-  - Main heading with gradient effect
-  - Subheading
-  - "Get Started" CTA button
+- Activity showcase
+- Quick route creation
+- Recent routes display
+- Weather integration
 
-### Map Page (`src/app/map/page.tsx`)
-- Full-height map view
-- Integrated map component
-- Proper navigation spacing
+### Route Planning (`src/app/routes/`)
+- Activity-specific views
+- Real-time conditions
+- AI assistance integration
+- Route customization
 
-## Utility Systems
+### Profile Dashboard (`src/app/profile/`)
+- User preferences
+- Activity history
+- Saved routes
+- Device management
 
-### Asset Management
-- Type-safe asset tracking
-- Usage monitoring
-- Duplicate detection
-- File path validation
+## Systems
 
-### Theme Configuration
-- Color schemes
-- Spacing constants
-- Map styling defaults
+### AI Integration
+- Natural language processing
+- Context awareness
+- Real-time monitoring
+- Alert system
+- Integration points:
+  - Route planning
+  - Weather alerts
+  - Traffic monitoring
+  - POI suggestions
 
-## Current Working State
-Last Updated: [Current Date]
+### External Integrations
+- Weather services
+- Traffic monitoring
+- Device connectivity:
+  - Hammerhead
+  - Training Peaks
+  - Strava
+- POI Services:
+  - Google Places
+  - Yelp
+  - AllTrails
 
-✅ Working Features:
-- Navigation bar with proper styling
-- Landing page layout and design
-- Basic map initialization
-- Location search functionality
-- Route planning UI
+### State Management
+- User context
+- Route state
+- Activity monitoring
+- Real-time updates
+
+## Route Types
+
+### Car Routes
+- Features:
+  - Traffic monitoring
+  - POI integration
+  - Budget-aware stops
+  - Real-time alerts
+
+### Bike Routes
+- Features:
+  - Training integration
+  - Elevation profiles
+  - Performance tracking
+  - Weather optimization
+
+### Ski Routes
+- Features:
+  - Resort integration
+  - Trail mapping
+  - Condition monitoring
+  - Performance tracking
+
+## Development Status
+
+✅ Implemented:
+- Basic navigation
+- Map integration
+- Initial route planning
+- Location search
 
 🚧 In Progress:
-- Route visualization
-- Waypoint management
-- Direction calculations
-
-## Known Issues
-- [List any known issues or bugs here]
+- AI chat integration
+- Activity-specific routes
+- Real-time monitoring
+- External API integration
 
 ## Development Guidelines
-1. Test new features in isolation before integration
-2. Document new components and features in this file
-3. Update the "Current Working State" section when making changes
-4. Note any breaking changes or updates in the "Known Issues" section 
+1. Component Development:
+   - Test in isolation
+   - Document props and state
+   - Include usage examples
+   
+2. AI Integration:
+   - Test context awareness
+   - Validate suggestions
+   - Monitor performance
+
+3. Route Type Development:
+   - Implement core features first
+   - Add type-specific features
+   - Test transitions
+
+4. Documentation:
+   - Update feature list
+   - Document API integrations
+   - Note breaking changes

@@ -14,8 +14,8 @@ export default function NavBar() {
   }
 
   const navItems = [
-    { name: 'Discover', href: '/routes' },
-    { name: 'Routes', href: '/saved' },
+    { name: 'Discover', href: '/dashboard' },
+    { name: 'Routes', href: '/routes' },
     { name: 'About', href: '/about' }
   ];
 
@@ -53,7 +53,7 @@ export default function NavBar() {
               </Link>
             ) : (
               <Link
-                href="/sign-in"
+                href="/?signin=true"
                 className="ml-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-md text-sm font-medium transition-colors"
               >
                 Sign In

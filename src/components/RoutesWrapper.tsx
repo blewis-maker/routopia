@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Location } from '@/types';
 import { RoutePanel } from './RoutePanel';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -24,18 +24,22 @@ export default function RoutesWrapper() {
   const [startLocation, setStartLocation] = useState<Location | null>(null);
   const [endLocation, setEndLocation] = useState<Location | null>(null);
   const [waypoints, setWaypoints] = useState<Location[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  if (status === "loading") {
+  useEffect(() => {
+    if (status === "authenticated") {
+      setIsLoading(false);
+    } else if (status === "unauthenticated") {
+      router.push('/?signin=true');
+    }
+  }, [status, router]);
+
+  if (isLoading || status === "loading") {
     return (
       <div className="h-screen flex items-center justify-center bg-stone-900">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-teal-500"></div>
       </div>
     );
-  }
-
-  if (status === "unauthenticated") {
-    router.push('/sign-in');
-    return null;
   }
 
   const handleLocationSelect = (location: Location, type: 'start' | 'end' | 'waypoint') => {
