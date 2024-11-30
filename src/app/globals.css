@@ -103,7 +103,7 @@
   }
 }
 
-.animate-bounce-subtle {
+.animate-bounce-subtle:hover {
   animation: bounce-subtle 1s ease-in-out infinite;
 }
 
@@ -159,4 +159,22 @@
 
 .animate-logo-active-large {
   animation: bounce-subtle 1s ease-in-out infinite, logo-pulse-large 2s infinite;
+}
+
+@keyframes text-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 0 rgba(45, 212, 191, 0));
+  }
+  50% {
+    filter: drop-shadow(0 0 2px rgba(45, 212, 191, 0.6))
+           drop-shadow(0 0 4px rgba(16, 185, 129, 0.4));
+  }
+}
+
+.animate-text-glow:hover {
+  animation: text-glow 2s ease-in-out infinite;
+}
+
+.animate-logo-hover:hover {
+  animation: bounce-subtle 1s ease-in-out infinite, text-glow 2s ease-in-out infinite;
 }

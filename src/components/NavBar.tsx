@@ -15,33 +15,26 @@ const SignUpModal = dynamic(() => import('./SignUpModal'), {
 export default function NavBar() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLogoHovered, setIsLogoHovered] = useState(false);
-  const pathname = usePathname();
-  const isHomePage = pathname === '/';
   const { status } = useSession();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-stone-900/80 backdrop-blur-md border-b border-stone-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
           <Link 
-            href="/" 
-            className="flex items-center space-x-2"
+            href="/"
+            className="flex items-center"
             onMouseEnter={() => setIsLogoHovered(true)}
             onMouseLeave={() => setIsLogoHovered(false)}
           >
-            <img 
-              src="/routopia-logo.png" 
-              alt="Routopia" 
-              className={`h-8 w-8 transition-all duration-300 ${
-                isLogoHovered ? 'animate-logo-active' : ''
-              }`}
+            <img
+              src="/routopia-logo.png"
+              alt="Routopia"
+              className={`h-8 w-8 mr-2 ${isLogoHovered ? 'animate-logo-active' : ''}`}
               width={32}
               height={32}
             />
-            <span className={`text-2xl font-bold bg-gradient-to-r from-teal-400 to-emerald-400 text-transparent bg-clip-text transition-all duration-300 ${
-              isLogoHovered ? 'scale-105' : ''
-            }`}>
+            <span className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">
               Routopia
             </span>
           </Link>
@@ -61,7 +54,10 @@ export default function NavBar() {
             ) : (
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="bg-teal-600 hover:bg-teal-500 px-4 py-2 rounded-lg text-white transition-all duration-300"
+                className="text-lg font-semibold
+                  text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400
+                  transform transition-all duration-300
+                  animate-logo-hover"
               >
                 Log In
               </button>

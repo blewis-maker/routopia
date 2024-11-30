@@ -33,7 +33,10 @@ export function AuthButtons() {
       )}
       <button
         onClick={handleGoogleSignIn}
-        className="flex items-center justify-center px-4 py-2 border border-stone-700 rounded-lg hover:bg-stone-800 transition-colors"
+        className="flex items-center justify-center px-6 py-3 rounded-lg font-semibold text-lg
+          bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300
+          transform transition-all duration-200 hover:scale-[1.02] hover:shadow-lg
+          hover:shadow-teal-500/25"
       >
         <img src="/google-icon.svg" alt="Google" className="w-6 h-6 mr-3" />
         <span>Continue with Google</span>
