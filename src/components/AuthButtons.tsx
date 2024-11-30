@@ -9,7 +9,7 @@ export function AuthButtons() {
   const handleGoogleSignIn = async () => {
     try {
       const result = await signIn('google', {
-        callbackUrl: '/routes',
+        callbackUrl: '/routopia',
         redirect: false,
       });
       

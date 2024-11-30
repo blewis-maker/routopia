@@ -31,7 +31,7 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
       if (result?.error) {
         setError(result.error);
       } else if (result?.ok && result.url) {
-        router.push('/routopia');
+        router.push(result.url);
       }
     } catch (error) {
       setError('An error occurred during sign in');

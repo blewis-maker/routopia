@@ -3,10 +3,18 @@ import { auth } from '@/lib/auth'
 export default auth((req) => {
   const isAuthenticated = !!req.auth
   
+  // Redirect authenticated users from home to routopia
+  if (req.nextUrl.pathname === '/') {
+    if (isAuthenticated) {
+      return Response.redirect(new URL('/routopia', req.url))
+    }
+  }
+  
   const protectedPaths = [
     '/routopia',
     '/routes',
     '/profile',
+    '/settings',
     '/api/chat',
     '/api/routes',
   ]
@@ -24,10 +32,13 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    "/routopia/:path*",
-    "/routes/:path*",
-    "/profile/:path*",
-    "/api/chat/:path*",
-    "/api/routes/:path*",
+    '/',
+    '/dashboard/:path*',
+    '/routopia/:path*',
+    '/routes/:path*',
+    '/profile/:path*',
+    '/settings/:path*',
+    '/api/chat/:path*',
+    '/api/routes/:path*',
   ],
 }

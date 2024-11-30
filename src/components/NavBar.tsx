@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { UserMenu } from './UserMenu';
 
 // Dynamically import SignUpModal to avoid SSR issues
 const SignUpModal = dynamic(() => import('./SignUpModal'), {
@@ -15,6 +17,7 @@ export default function NavBar() {
   const [isLogoHovered, setIsLogoHovered] = useState(false);
   const pathname = usePathname();
   const isHomePage = pathname === '/';
+  const { status } = useSession();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-stone-900/80 backdrop-blur-md border-b border-stone-800">
@@ -45,7 +48,7 @@ export default function NavBar() {
 
           {/* Navigation Links */}
           <div className="flex items-center space-x-4">
-            {!isHomePage && (
+            {status === "authenticated" ? (
               <>
                 <Link href="/discover" className="text-stone-300 hover:text-white">
                   Discover
@@ -53,21 +56,16 @@ export default function NavBar() {
                 <Link href="/routes" className="text-stone-300 hover:text-white">
                   Routes
                 </Link>
-                <Link href="/about" className="text-stone-300 hover:text-white">
-                  About
-                </Link>
+                <UserMenu />
               </>
+            ) : (
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="bg-teal-600 hover:bg-teal-500 px-4 py-2 rounded-lg text-white transition-all duration-300"
+              >
+                Log In
+              </button>
             )}
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className={`${
-                isHomePage 
-                  ? 'bg-gradient-to-r from-teal-400 to-emerald-400 text-transparent bg-clip-text font-bold hover:from-teal-300 hover:to-emerald-300 transition-all duration-300 animate-text-pulse'
-                  : 'bg-teal-600 hover:bg-teal-500 px-4 py-2 rounded-lg text-white transition-all duration-300 hover:-translate-y-0.5 shadow-lg hover:shadow-teal-500/25 animate-pulse-teal'
-              }`}
-            >
-              {isHomePage ? 'Log In' : 'Profile'}
-            </button>
           </div>
         </div>
       </div>
