@@ -36,13 +36,17 @@ export default function Home() {
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen text-white px-4">
         <div className="flex items-center mb-6">
           <img 
-            src="/icon.svg" 
-            alt=""
-            className="h-12 w-12 mr-3"
+            src="/routopia-logo.png"
+            alt="Routopia"
+            className="h-16 w-16 mr-4 filter brightness-100 saturate-100"
+            width={64}
+            height={64}
           />
           <h1 className="text-6xl font-bold">
             Your AI Route
-            <div className="text-emerald-400">Planning Companion</div>
+            <div className="bg-gradient-to-r from-teal-400 to-emerald-400 text-transparent bg-clip-text">
+              Planning Companion
+            </div>
           </h1>
         </div>
         
@@ -52,7 +56,7 @@ export default function Home() {
 
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 px-8 rounded-lg transition-colors"
+          className="bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 px-8 rounded-lg transition-colors shadow-lg hover:shadow-teal-500/25"
         >
           Get Started
         </button>

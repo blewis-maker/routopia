@@ -2,65 +2,70 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import dynamic from 'next/dynamic';
+import { useState } from 'react';
+
+// Dynamically import SignUpModal to avoid SSR issues
+const SignUpModal = dynamic(() => import('./SignUpModal'), {
+  ssr: false,
+});
 
 export default function NavBar() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const pathname = usePathname();
-  const { data: session, status } = useSession();
-
-  if (status === "loading") {
-    return <div className="h-16 bg-stone-900/90 backdrop-blur-md border-b border-stone-800" />;
-  }
-
-  const navItems = [
-    { name: 'Discover', href: '/dashboard' },
-    { name: 'Routes', href: '/routes' },
-    { name: 'About', href: '/about' }
-  ];
+  const isHomePage = pathname === '/';
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-40 bg-stone-900/90 backdrop-blur-md border-b border-stone-800">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-stone-900/80 backdrop-blur-md border-b border-stone-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center space-x-3">
-            <img src="/logo.svg" alt="Routopia" className="h-8 w-8 hover:opacity-80 transition-opacity" />
-            <span className="text-2xl font-bold bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">
+        <div className="flex justify-between items-center h-16">
+          {/* Logo */}
+          <Link href="/" className="flex items-center space-x-2">
+            <img 
+              src="/routopia-logo.png" 
+              alt="Routopia" 
+              className="h-8 w-8 filter brightness-100 saturate-100"
+              width={32}
+              height={32}
+            />
+            <span className="text-2xl font-bold bg-gradient-to-r from-teal-400 to-emerald-400 text-transparent bg-clip-text">
               Routopia
             </span>
           </Link>
 
-          <div className="hidden md:flex items-center space-x-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  pathname === item.href
-                    ? 'bg-stone-800 text-white'
-                    : 'text-stone-300 hover:bg-stone-800 hover:text-white'
-                }`}
-              >
-                {item.name}
-              </Link>
-            ))}
-            {session ? (
-              <Link
-                href="/profile"
-                className="ml-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-md text-sm font-medium transition-colors"
-              >
-                Profile
-              </Link>
-            ) : (
-              <Link
-                href="/?signin=true"
-                className="ml-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-md text-sm font-medium transition-colors"
-              >
-                Sign In
-              </Link>
+          {/* Navigation Links */}
+          <div className="flex items-center space-x-4">
+            {!isHomePage && (
+              <>
+                <Link href="/discover" className="text-stone-300 hover:text-white">
+                  Discover
+                </Link>
+                <Link href="/routes" className="text-stone-300 hover:text-white">
+                  Routes
+                </Link>
+                <Link href="/about" className="text-stone-300 hover:text-white">
+                  About
+                </Link>
+              </>
             )}
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className={`${
+                isHomePage 
+                  ? 'text-stone-200 hover:text-teal-400'
+                  : 'bg-teal-600 hover:bg-teal-500 px-4 py-2 rounded-lg text-white'
+              }`}
+            >
+              {isHomePage ? 'Log In' : 'Profile'}
+            </button>
           </div>
         </div>
       </div>
+
+      <SignUpModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+      />
     </nav>
   );
 } 
