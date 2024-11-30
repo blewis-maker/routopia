@@ -9,6 +9,7 @@ export function UserAvatar() {
   const { data: session, update } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const closeTimeout = useRef<NodeJS.Timeout>();
@@ -34,31 +35,48 @@ export function UserAvatar() {
 
     try {
       setIsUploading(true);
+      setError(null);
       
       const formData = new FormData();
       formData.append('file', file);
       
+      console.log('Uploading file:', {
+        name: file.name,
+        type: file.type,
+        size: file.size
+      });
+
       const response = await fetch('/api/upload-avatar', {
         method: 'POST',
         body: formData,
       });
 
-      if (!response.ok) throw new Error('Upload failed');
+      const data = await response.json();
 
-      const { imageUrl } = await response.json();
+      if (!response.ok) {
+        console.error('Upload failed:', data);
+        throw new Error(data.details || data.error || 'Upload failed');
+      }
 
+      console.log('Upload successful:', data);
+
+      // Update the session with the new avatar URL
       await update({
         ...session,
         user: {
           ...session?.user,
-          image: imageUrl,
+          image: data.imageUrl,
         },
       });
 
     } catch (error) {
-      console.error('Error uploading avatar:', error);
+      console.error('Error details:', error);
+      setError(error instanceof Error ? error.message : 'Failed to upload avatar');
     } finally {
       setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''; // Reset file input
+      }
     }
   };
 
@@ -75,21 +93,20 @@ export function UserAvatar() {
         ${isOpen ? 'border-teal-500 scale-105' : 'border-stone-700 hover:border-stone-500'}
         ${isUploading ? 'opacity-50' : ''}
         relative group cursor-pointer
-      `}
-        onClick={() => fileInputRef.current?.click()}
-      >
+      `}>
         <Image
           src={session?.user?.image || defaultAvatar}
           alt="Profile"
           width={40}
           height={40}
-          className="w-full h-full rounded-full object-cover transition-transform duration-300 group-hover:scale-110"
+          className="w-full h-full object-cover"
         />
         
-        {/* Hover overlay */}
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <span className="text-white text-xs">Change</span>
-        </div>
+        {isUploading && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div className="animate-spin h-5 w-5 border-2 border-white rounded-full border-t-transparent"></div>
+          </div>
+        )}
 
         <input
           ref={fileInputRef}
@@ -97,8 +114,19 @@ export function UserAvatar() {
           className="hidden"
           accept="image/*"
           onChange={handleImageUpload}
+          onClick={(e) => {
+            // Reset file input value when clicking
+            (e.target as HTMLInputElement).value = '';
+          }}
         />
       </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="absolute top-12 right-0 z-50 bg-red-500 text-white px-3 py-2 rounded shadow-lg text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Dropdown Menu */}
       <div 
@@ -135,7 +163,7 @@ export function UserAvatar() {
           </Link>
           <button
             onClick={() => signOut({ callbackUrl: '/' })}
-            className="block w-full text-left px-4 py-2 text-sm text-stone-200 hover:bg-stone-700 transition-colors duration-150"
+            className="block w-full text-left px-4 py-2 text-sm text-stone-200 hover:bg-stone-700 transition-colors duration-150 border-t border-stone-700"
           >
             Log Out
           </button>

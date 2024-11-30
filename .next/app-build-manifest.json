@@ -21,6 +21,11 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/upload-avatar/route.js"
     ],
+    "/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/page.js"
+    ],
     "/_not-found/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
