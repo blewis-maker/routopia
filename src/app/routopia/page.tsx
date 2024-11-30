@@ -1,9 +1,10 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { UserAvatar } from '@/components/UserAvatar';
-import GPTTest from '@/components/ai/GPTTest';
+import Map from '@/components/Map';
+import type { MapRef } from '@/components/Map';
 
 // Define the Location type
 interface Location {
@@ -22,21 +23,41 @@ const Map = dynamic(() => import('@/components/Map'), {
 });
 
 export default function RoutopiaPage() {
+  const mapRef = useRef<MapRef>(null);
+  const [inputValue, setInputValue] = useState('');
   const [startLocation, setStartLocation] = useState<Location | null>(null);
   const [endLocation, setEndLocation] = useState<Location | null>(null);
   const [waypoints, setWaypoints] = useState<Location[]>([]);
 
-  const handleLocationSelect = (location: Location, type: 'start' | 'end' | 'waypoint') => {
-    switch (type) {
-      case 'start':
-        setStartLocation(location);
-        break;
-      case 'end':
-        setEndLocation(location);
-        break;
-      case 'waypoint':
-        setWaypoints([...waypoints, location]);
-        break;
+  const handleChatSubmit = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      
+      if (!inputValue.trim()) return;
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: inputValue }),
+        });
+
+        const data = await response.json();
+        
+        // Show the actual GPT response without reinitializing the map
+        if (mapRef.current) {
+          mapRef.current.showResponse(data.message || inputValue);
+        }
+
+        setInputValue('');
+      } catch (error) {
+        console.error('Error getting GPT response:', error);
+        if (mapRef.current) {
+          mapRef.current.showResponse('Sorry, I had trouble processing that request. Please try again.');
+        }
+      }
     }
   };
 
@@ -47,7 +68,14 @@ export default function RoutopiaPage() {
         <div className="p-4">
           <h2 className="text-lg font-semibold text-white mb-4">RouteGPT Test</h2>
           <div className="mt-4">
-            <GPTTest />
+            <textarea
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleChatSubmit}
+              className="w-full p-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none resize-none mb-4"
+              placeholder="Enter your route planning question and press Enter..."
+              rows={3}
+            />
           </div>
         </div>
       </div>
@@ -55,10 +83,13 @@ export default function RoutopiaPage() {
       {/* Main Map Area */}
       <div className="absolute inset-0">
         <Map 
-          startLocation={startLocation}
-          endLocation={endLocation}
-          waypoints={waypoints}
-          onLocationSelect={handleLocationSelect}
+          ref={mapRef}
+          startLocation={startLocation?.coordinates || null}
+          endLocation={endLocation?.coordinates || null}
+          waypoints={waypoints.map(wp => wp.coordinates)}
+          onLocationSelect={(coords) => {
+            // Handle location selection logic here
+          }}
         />
       </div>
 
