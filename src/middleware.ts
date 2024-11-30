@@ -7,6 +7,7 @@ export default auth((req) => {
   const protectedPaths = [
     '/routes',
     '/profile',
+    '/dashboard',
     '/api/chat',
     '/api/routes',
   ]
@@ -27,6 +28,7 @@ export const config = {
   matcher: [
     "/routes/:path*",
     "/profile/:path*",
+    "/dashboard/:path*",
     "/api/chat/:path*",
     "/api/routes/:path*",
   ],
