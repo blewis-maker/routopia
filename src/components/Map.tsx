@@ -76,23 +76,37 @@ const Map = forwardRef<MapRef, MapProps>(({
   // Load recent locations from database
   useEffect(() => {
     const loadRecentLocations = async () => {
-      if (!session?.user?.id) return;
+      if (!session?.user?.id) {
+        console.log('No user session, skipping recent locations load');
+        return;
+      }
 
       try {
-        const response = await fetch(`/api/users/${session.user.id}/recent-locations`);
+        console.log('Fetching recent locations for user:', session.user.id);
         
-        // Add response type check
+        const response = await fetch(`/api/users/${session.user.id}/recent-locations`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+          credentials: 'include' // Important for auth cookies
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to load recent locations:', response.status, errorText);
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
+          console.error('Invalid content type:', contentType);
           throw new Error('Invalid response type from server');
         }
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
         const data = await response.json();
-        
+        console.log('Received recent locations:', data);
+
         if (data.startLocations) {
           setRecentStartLocations(data.startLocations.map((loc: any) => ({
             place_name: loc.place_name,
@@ -100,7 +114,7 @@ const Map = forwardRef<MapRef, MapProps>(({
             timestamp: new Date(loc.timestamp).getTime()
           })));
         }
-        
+
         if (data.destLocations) {
           setRecentDestinations(data.destLocations.map((loc: any) => ({
             place_name: loc.place_name,

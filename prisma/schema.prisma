@@ -27,28 +27,29 @@ enum RouteStatus {
 
 // Base models
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  name          String?
-  emailVerified DateTime?
-  image         String?
-  createdAt     DateTime  @default(now())
-  preferences   Json?     // Stores user preferences as JSON
-  skillLevels   Json?     // Different activity skill levels
-  routes        Route[]
-  activities    ActivityHistory[]
-  devices       Device[]
-  trainingPlans TrainingPlan[]
-  chatHistory   ChatInteraction[]
-  chats         Chat[]
-  accounts      Account[]
-  sessions      Session[]
+  id              String            @id @default(uuid())
+  email           String            @unique
+  name            String?
+  emailVerified   DateTime?
+  image           String?
+  createdAt       DateTime          @default(now())
+  preferences     Json? // Stores user preferences as JSON
+  skillLevels     Json? // Different activity skill levels
+  routes          Route[]
+  activities      ActivityHistory[]
+  devices         Device[]
+  trainingPlans   TrainingPlan[]
+  chatHistory     ChatInteraction[]
+  chats           Chat[]
+  accounts        Account[]
+  sessions        Session[]
+  recentLocations RecentLocation[]
 
   @@map("users")
 }
 
 model Route {
-  id               String           @id @default(uuid())
+  id               String                 @id @default(uuid())
   userId           String
   name             String
   routeType        RouteType
@@ -56,9 +57,9 @@ model Route {
   plannedFor       DateTime?
   completedAt      DateTime?
   budgetConstraint Float?
-  isActive         Boolean          @default(true)
+  isActive         Boolean                @default(true)
   weatherReqs      Json?
-  user             User             @relation(fields: [userId], references: [id])
+  user             User                   @relation(fields: [userId], references: [id])
   nodes            RouteNode[]
   activityRoute    ActivityRoute?
   alerts           RouteAlert[]
@@ -70,9 +71,9 @@ model Route {
 }
 
 model RouteNode {
-  id            String    @id @default(uuid())
+  id            String        @id @default(uuid())
   routeId       String
-  nodeType      String    // coffee, gas, food, destination
+  nodeType      String // coffee, gas, food, destination
   sequence      Int
   latitude      Float
   longitude     Float
@@ -80,34 +81,34 @@ model RouteNode {
   status        String?
   providerData  Json?
   costEstimate  Float?
-  route         Route     @relation(fields: [routeId], references: [id])
+  route         Route         @relation(fields: [routeId], references: [id])
   metadata      NodeMetadata?
 
   @@map("route_nodes")
 }
 
 model NodeMetadata {
-  id            String    @id @default(uuid())
-  routeNodeId   String    @unique
-  weatherData   Json?
-  trafficData   Json?
-  openingHours  Json?
-  reviews       Json?
-  routeNode     RouteNode @relation(fields: [routeNodeId], references: [id])
+  id           String    @id @default(uuid())
+  routeNodeId  String    @unique
+  weatherData  Json?
+  trafficData  Json?
+  openingHours Json?
+  reviews      Json?
+  routeNode    RouteNode @relation(fields: [routeNodeId], references: [id])
 
   @@map("node_metadata")
 }
 
 model ActivityRoute {
-  id              String           @id @default(uuid())
-  routeId         String          @unique
-  activityType    String
-  elevationData   Json?
+  id               String          @id @default(uuid())
+  routeId          String          @unique
+  activityType     String
+  elevationData    Json?
   difficultyRating Json?
-  trailConditions Json?
-  lastUpdated     DateTime
-  route           Route           @relation(fields: [routeId], references: [id])
-  points          ActivityPoint[]
+  trailConditions  Json?
+  lastUpdated      DateTime
+  route            Route           @relation(fields: [routeId], references: [id])
+  points           ActivityPoint[]
 
   @@map("activity_routes")
 }
@@ -128,55 +129,55 @@ model ActivityPoint {
 }
 
 model TrainingPlan {
-  id            String        @id @default(uuid())
-  userId        String
+  id             String        @id @default(uuid())
+  userId         String
   sourcePlatform String
-  planType      String
-  startDate     DateTime
-  endDate       DateTime
-  trainingZones Json?
-  weeklyTargets Json?
-  user          User          @relation(fields: [userId], references: [id])
-  workouts      WorkoutType[]
+  planType       String
+  startDate      DateTime
+  endDate        DateTime
+  trainingZones  Json?
+  weeklyTargets  Json?
+  user           User          @relation(fields: [userId], references: [id])
+  workouts       WorkoutType[]
 
   @@map("training_plans")
 }
 
 model WorkoutType {
-  id            String       @id @default(uuid())
+  id             String       @id @default(uuid())
   trainingPlanId String
-  name          String
-  description   String?
-  duration      Float
-  intensity     String
-  trainingPlan  TrainingPlan @relation(fields: [trainingPlanId], references: [id])
+  name           String
+  description    String?
+  duration       Float
+  intensity      String
+  trainingPlan   TrainingPlan @relation(fields: [trainingPlanId], references: [id])
 
   @@map("workout_types")
 }
 
 model Device {
-  id               String   @id @default(uuid())
-  userId           String
-  deviceType       String
-  makeModel        String?
+  id                String    @id @default(uuid())
+  userId            String
+  deviceType        String
+  makeModel         String?
   connectionDetails Json?
-  lastSync         DateTime?
-  user             User     @relation(fields: [userId], references: [id])
+  lastSync          DateTime?
+  user              User      @relation(fields: [userId], references: [id])
 
   @@map("devices")
 }
 
 model ActivityHistory {
-  id               String            @id @default(uuid())
-  userId           String
-  activityType     String
-  date             DateTime
-  location         Json?
-  duration         Float?
+  id                 String              @id @default(uuid())
+  userId             String
+  activityType       String
+  date               DateTime
+  location           Json?
+  duration           Float?
   satisfactionRating Float?
-  user             User              @relation(fields: [userId], references: [id])
-  metrics          PerformanceMetrics?
-  externalSync     ExternalSync[]
+  user               User                @relation(fields: [userId], references: [id])
+  metrics            PerformanceMetrics?
+  externalSync       ExternalSync[]
 
   @@map("activity_history")
 }
@@ -224,26 +225,26 @@ model ChatInteraction {
 }
 
 model RouteAlert {
-  id          String   @id @default(uuid())
-  routeId     String
-  alertType   String
-  message     String
-  severity    String
-  timestamp   DateTime @default(now())
-  isResolved  Boolean  @default(false)
-  route       Route    @relation(fields: [routeId], references: [id])
+  id         String   @id @default(uuid())
+  routeId    String
+  alertType  String
+  message    String
+  severity   String
+  timestamp  DateTime @default(now())
+  isResolved Boolean  @default(false)
+  route      Route    @relation(fields: [routeId], references: [id])
 
   @@map("route_alerts")
 }
 
 model WeatherAlert {
-  id          String   @id @default(uuid())
-  routeId     String
-  alertType   String
-  conditions  Json
-  severity    String
-  timestamp   DateTime @default(now())
-  route       Route    @relation(fields: [routeId], references: [id])
+  id         String   @id @default(uuid())
+  routeId    String
+  alertType  String
+  conditions Json
+  severity   String
+  timestamp  DateTime @default(now())
+  route      Route    @relation(fields: [routeId], references: [id])
 
   @@map("weather_alerts")
 }
@@ -261,24 +262,24 @@ model RouteGenerationParams {
 }
 
 model Chat {
-  id            String    @id @default(uuid())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id])
-  messages      Message[]
-  context       Json?     // For storing route preferences, location, etc.
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  messages  Message[]
+  context   Json? // For storing route preferences, location, etc.
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@map("chats")
 }
 
 model Message {
-  id            String    @id @default(uuid())
-  chatId        String
-  chat          Chat      @relation(fields: [chatId], references: [id])
-  content       String
-  role          String    // 'user' or 'assistant'
-  createdAt     DateTime  @default(now())
+  id        String   @id @default(uuid())
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  content   String
+  role      String // 'user' or 'assistant'
+  createdAt DateTime @default(now())
 
   @@map("messages")
 }
@@ -319,14 +320,14 @@ model VerificationToken {
 }
 
 model RecentLocation {
-  id          String   @id @default(cuid())
-  userId      String
-  place_name  String
-  center_lat  Float
-  center_lng  Float
-  locationType String  // 'START' or 'DESTINATION'
-  timestamp   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id])
+  id           String   @id @default(cuid())
+  userId       String
+  place_name   String
+  center_lat   Float
+  center_lng   Float
+  locationType String // 'START' or 'DESTINATION'
+  timestamp    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id])
 
   @@index([userId, locationType])
 }
