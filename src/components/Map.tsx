@@ -258,19 +258,19 @@ const Map = forwardRef<MapRef, MapProps>(({
 
     // Create marker with custom element
     const markerEl = document.createElement('div');
-    markerEl.className = 'marker-container';
+    markerEl.className = 'mapboxgl-marker-container';
     markerEl.innerHTML = `
-      <div class="marker">
-        <div class="marker-inner">
+      <div class="mapboxgl-marker">
+        <div class="mapboxgl-marker-inner">
           <img src="/logo.svg" alt="Location" width="24" height="24" />
         </div>
-        <div class="marker-pulse"></div>
+        <div class="mapboxgl-marker-pulse"></div>
       </div>
     `;
 
     locationMarker.current = new mapboxgl.Marker({
       element: markerEl,
-      anchor: 'center'
+      anchor: 'bottom'
     });
 
     // Initialize geolocate control with high accuracy
@@ -347,56 +347,102 @@ const Map = forwardRef<MapRef, MapProps>(({
   return (
     <>
       <style jsx global>{`
-        .marker-container {
+        .mapboxgl-marker-container {
           width: 32px;
           height: 32px;
           cursor: pointer;
+          transform-origin: center bottom;
         }
         
-        .marker {
+        .mapboxgl-marker {
           position: relative;
           width: 100%;
           height: 100%;
+          transform-style: preserve-3d;
+          perspective: 1000px;
         }
         
-        .marker-inner {
+        .mapboxgl-marker-inner {
           position: absolute;
           width: 100%;
           height: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
-          animation: gentleBounce 2s ease-in-out infinite;
+          animation: floatMarker 3s ease-in-out infinite;
           will-change: transform;
+          filter: drop-shadow(0 0 8px rgba(66, 135, 245, 0.6));
         }
         
-        .marker-pulse {
+        .mapboxgl-marker-inner img {
+          transform-style: preserve-3d;
+          backface-visibility: hidden;
+          filter: brightness(1.2);
+        }
+        
+        .mapboxgl-marker-pulse {
           position: absolute;
           width: 100%;
           height: 100%;
           border-radius: 50%;
-          background: rgba(66, 135, 245, 0.15);
-          animation: gentlePulse 2s ease-in-out infinite;
+          background: radial-gradient(
+            circle at center,
+            rgba(66, 135, 245, 0.2) 0%,
+            rgba(66, 135, 245, 0.1) 45%,
+            rgba(66, 135, 245, 0) 70%
+          );
+          box-shadow: 
+            0 0 15px rgba(66, 135, 245, 0.4),
+            0 0 30px rgba(66, 135, 245, 0.2),
+            0 0 45px rgba(66, 135, 245, 0.1);
+          animation: pulseGlow 2s ease-in-out infinite;
           will-change: transform, opacity;
         }
         
-        @keyframes gentleBounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
+        .mapboxgl-marker::after {
+          content: '';
+          position: absolute;
+          bottom: -2px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 16px;
+          height: 2px;
+          background: rgba(66, 135, 245, 0.4);
+          border-radius: 50%;
+          filter: blur(2px);
+          animation: shadowPulse 3s ease-in-out infinite;
+        }
+
+        @keyframes floatMarker {
+          0%, 100% { 
+            transform: translateY(0) rotateX(0);
+            filter: drop-shadow(0 4px 8px rgba(66, 135, 245, 0.2));
+          }
+          50% { 
+            transform: translateY(-8px) rotateX(5deg);
+            filter: drop-shadow(0 8px 12px rgba(66, 135, 245, 0.3));
+          }
         }
         
-        @keyframes gentlePulse {
-          0% {
-            transform: scale(0.8);
-            opacity: 0.8;
+        @keyframes pulseGlow {
+          0%, 100% {
+            transform: scale(0.95);
+            opacity: 0.5;
           }
           50% {
-            transform: scale(1.5);
-            opacity: 0.2;
+            transform: scale(1.8);
+            opacity: 0;
           }
-          100% {
-            transform: scale(0.8);
-            opacity: 0.8;
+        }
+
+        @keyframes shadowPulse {
+          0%, 100% {
+            opacity: 0.4;
+            transform: translateX(-50%) scale(1);
+          }
+          50% {
+            opacity: 0.2;
+            transform: translateX(-50%) scale(1.5);
           }
         }
         .suggestions-container {
