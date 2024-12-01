@@ -1,0 +1,141 @@
+.route-drawing-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.route-drawing-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.smoothing-indicator {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  animation: fade-in 0.3s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* High contrast mode support */
+@media (forced-colors: active) {
+  .route-drawing-canvas {
+    forced-color-adjust: none;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .smoothing-indicator {
+    animation: none;
+  }
+}
+
+/* Activity-specific styles */
+.route-drawing-car {
+  filter: drop-shadow(0 0 4px rgba(63, 81, 181, 0.4));
+}
+
+.route-drawing-bike {
+  filter: drop-shadow(0 0 4px rgba(76, 175, 80, 0.4));
+}
+
+.route-drawing-walk {
+  filter: drop-shadow(0 0 4px rgba(255, 152, 0, 0.4));
+}
+
+.route-drawing-ski {
+  filter: drop-shadow(0 0 4px rgba(33, 150, 243, 0.4));
+}
+
+/* Preview controls */
+.route-preview-controls {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  border-radius: 30px;
+  z-index: 20;
+}
+
+.preview-button {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.preview-button.cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.preview-button.edit {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+}
+
+.preview-button.confirm {
+  background: theme('colors.emerald.500');
+  color: white;
+}
+
+.preview-button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.preview-button:active {
+  transform: translateY(0);
+}
+
+/* Drawing animations */
+@keyframes draw-pulse {
+  0% { stroke-width: 3; }
+  50% { stroke-width: 4; }
+  100% { stroke-width: 3; }
+}
+
+.drawing-active path {
+  animation: draw-pulse 1s ease-in-out infinite;
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .drawing-active path {
+    animation: none;
+  }
+  
+  .preview-button {
+    transition: none;
+  }
+} 

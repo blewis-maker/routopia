@@ -1,45 +1,66 @@
-import React from 'react';
-import { ActivityType } from '@/types/routes';
+import React, { useCallback, useRef } from 'react';
+import type { ActivityType } from '@/types/routes';
+import { useKeyboardNav } from '@/hooks/useKeyboardNav';
 
 interface Props {
   selectedActivity: ActivityType;
   onActivityChange: (activity: ActivityType) => void;
+  id?: string;
 }
-
-const activities: Array<{
-  type: ActivityType;
-  icon: string;
-  label: string;
-}> = [
-  { type: 'car', icon: '🚗', label: 'Drive' },
-  { type: 'bike', icon: '🚲', label: 'Bike' },
-  { type: 'walk', icon: '🚶', label: 'Walk' },
-  { type: 'ski', icon: '⛷️', label: 'Ski' },
-];
 
 export const ActivitySelector: React.FC<Props> = ({ 
   selectedActivity, 
-  onActivityChange 
+  onActivityChange,
+  id = 'activity-selector'
 }) => {
+  const activities = [
+    { type: 'car', label: 'Drive', icon: '🚗', description: 'Travel by car' },
+    { type: 'bike', label: 'Bike', icon: '🚲', description: 'Travel by bicycle' },
+    { type: 'walk', label: 'Walk', icon: '🚶', description: 'Travel by foot' },
+    { type: 'ski', label: 'Ski', icon: '⛷️', description: 'Travel by ski' }
+  ] as const;
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  const handleKeyDown = useCallback((e: React.KeyboardEvent, index: number) => {
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        e.preventDefault();
+        const nextIndex = (index + 1) % activities.length;
+        onActivityChange(activities[nextIndex].type);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        e.preventDefault();
+        const prevIndex = (index - 1 + activities.length) % activities.length;
+        onActivityChange(activities[prevIndex].type);
+        break;
+    }
+  }, [onActivityChange]);
+
   return (
-    <div className="activity-selector flex gap-2 p-2 bg-stone-800 rounded-lg">
-      {activities.map(({ type, icon, label }) => (
+    <div 
+      ref={containerRef}
+      role="radiogroup"
+      aria-label="Select travel mode"
+      className="activity-selector"
+      id={id}
+    >
+      {activities.map(({ type, label, icon, description }, index) => (
         <button
           key={type}
+          role="radio"
+          aria-checked={selectedActivity === type}
+          aria-label={description}
           onClick={() => onActivityChange(type)}
-          className={`
-            flex flex-col items-center p-2 rounded transition-colors
-            ${selectedActivity === type 
-              ? 'bg-emerald-600 text-white' 
-              : 'bg-stone-700 text-stone-300 hover:bg-stone-600'
-            }
-          `}
-          aria-label={`Select ${label} activity`}
+          onKeyDown={(e) => handleKeyDown(e, index)}
+          className={`activity-button ${selectedActivity === type ? 'active' : ''}`}
+          tabIndex={selectedActivity === type ? 0 : -1}
+          data-testid={`activity-${type}`}
         >
-          <span className="text-xl" role="img" aria-hidden="true">
-            {icon}
-          </span>
-          <span className="text-xs mt-1">{label}</span>
+          <span className="text-2xl" aria-hidden="true">{icon}</span>
+          <span className="text-sm text-stone-300">{label}</span>
         </button>
       ))}
     </div>

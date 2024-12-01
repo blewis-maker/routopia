@@ -1,0 +1,104 @@
+/* Enhanced Route Animation Styles */
+.route-animation-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 15;
+}
+
+/* Activity-specific animations */
+@keyframes car-pulse {
+  0% { filter: drop-shadow(0 0 4px rgba(63, 81, 181, 0.4)); }
+  50% { filter: drop-shadow(0 0 8px rgba(63, 81, 181, 0.6)); }
+  100% { filter: drop-shadow(0 0 4px rgba(63, 81, 181, 0.4)); }
+}
+
+@keyframes bike-dash {
+  to { stroke-dashoffset: -20; }
+}
+
+@keyframes walk-dots {
+  to { stroke-dashoffset: -10; }
+}
+
+@keyframes ski-wave {
+  0% { transform: scaleY(1); }
+  50% { transform: scaleY(1.2); }
+  100% { transform: scaleY(1); }
+}
+
+/* Activity-specific styles */
+.route-car {
+  animation: car-pulse 2s infinite;
+}
+
+.route-bike {
+  stroke-dasharray: 10, 5;
+  animation: bike-dash 1s linear infinite;
+}
+
+.route-walk {
+  stroke-dasharray: 2, 4;
+  animation: walk-dots 1s linear infinite;
+}
+
+.route-ski {
+  animation: ski-wave 1.5s ease-in-out infinite;
+}
+
+/* Particle effects */
+.particle {
+  position: absolute;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.particle-car {
+  background: radial-gradient(circle, rgba(63, 81, 181, 0.8) 0%, rgba(63, 81, 181, 0) 70%);
+}
+
+.particle-bike {
+  background: radial-gradient(circle, rgba(76, 175, 80, 0.8) 0%, rgba(76, 175, 80, 0) 70%);
+}
+
+.particle-walk {
+  background: radial-gradient(circle, rgba(255, 152, 0, 0.8) 0%, rgba(255, 152, 0, 0) 70%);
+}
+
+.particle-ski {
+  background: radial-gradient(circle, rgba(33, 150, 243, 0.8) 0%, rgba(33, 150, 243, 0) 70%);
+}
+
+/* Touch feedback */
+.touch-indicator {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  opacity: 0.5;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 70%);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .route-animation-container {
+    transform-origin: center center;
+    transform: scale(0.8);
+  }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .route-car,
+  .route-bike,
+  .route-walk,
+  .route-ski,
+  .particle {
+    animation: none;
+  }
+} 

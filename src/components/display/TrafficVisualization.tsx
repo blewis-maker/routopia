@@ -1,89 +1,93 @@
-import React, { useEffect, useState } from 'react';
-import { TrafficData } from '@/types/routes';
+import React, { useEffect, useRef, useCallback } from 'react';
+import type { TrafficData } from '@/types/routes';
 
 interface Props {
   routeGeometry: [number, number][];
-  onTrafficUpdate: (trafficData: TrafficData) => void;
+  trafficData?: TrafficData;
+  onTrafficUpdate?: (data: TrafficData) => void;
+  id?: string;
 }
 
 export const TrafficVisualization: React.FC<Props> = ({
   routeGeometry,
-  onTrafficUpdate
+  trafficData,
+  onTrafficUpdate,
+  id = 'traffic-visualization'
 }) => {
-  const [trafficData, setTrafficData] = useState<TrafficData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  const getTrafficDescription = useCallback((severity: TrafficData['severity']) => {
+    switch (severity) {
+      case 'low': return 'Light traffic';
+      case 'moderate': return 'Moderate traffic';
+      case 'heavy': return 'Heavy traffic';
+      default: return 'Unknown traffic condition';
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchTrafficData = async () => {
-      try {
-        const response = await fetch('/api/traffic', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ geometry: routeGeometry })
-        });
-        
-        const data = await response.json();
-        setTrafficData(data);
-        onTrafficUpdate(data);
-      } catch (error) {
-        console.error('Failed to fetch traffic data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (!canvasRef.current || !routeGeometry.length) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    if (routeGeometry.length > 0) {
-      fetchTrafficData();
-    }
-  }, [routeGeometry, onTrafficUpdate]);
+    // Make canvas accessible
+    canvas.setAttribute('role', 'img');
+    canvas.setAttribute('aria-label', trafficData ? 
+      `Traffic visualization: ${getTrafficDescription(trafficData.severity)}` :
+      'Traffic visualization loading'
+    );
 
-  if (loading || !trafficData) return null;
+    // Drawing logic...
+  }, [routeGeometry, trafficData, getTrafficDescription]);
 
   return (
-    <div className="traffic-visualization absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm p-4 rounded-lg text-white">
-      <h3 className="text-sm font-semibold mb-2">Traffic Conditions</h3>
-      <div className="space-y-2">
-        {trafficData.segments.map((segment, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${getTrafficColor(segment.level)}`} />
-            <span className="text-xs">
-              {segment.distance.toFixed(1)}km - {getTrafficLabel(segment.level)}
-            </span>
+    <div 
+      className="traffic-visualization"
+      role="region"
+      aria-label="Traffic conditions"
+      id={id}
+    >
+      <div className="relative">
+        <canvas
+          ref={canvasRef}
+          width={300}
+          height={100}
+          className="rounded-lg bg-stone-800/90 backdrop-blur-sm"
+          tabIndex={0}
+          aria-describedby={`${id}-legend`}
+        />
+        <div 
+          ref={tooltipRef}
+          className="tooltip hidden absolute bg-stone-900 p-2 rounded text-sm"
+          role="tooltip"
+        />
+      </div>
+      <div 
+        className="mt-2 flex justify-between text-xs text-stone-400"
+        id={`${id}-legend`}
+        role="list"
+        aria-label="Traffic condition legend"
+      >
+        {['Light', 'Moderate', 'Heavy'].map((level) => (
+          <div 
+            key={level}
+            role="listitem"
+            className="flex items-center gap-2"
+          >
+            <div 
+              className={`w-3 h-1 rounded ${
+                level === 'Light' ? 'bg-green-500' :
+                level === 'Moderate' ? 'bg-amber-500' :
+                'bg-red-500'
+              }`}
+              aria-hidden="true"
+            />
+            <span>{level}</span>
           </div>
         ))}
       </div>
-      {trafficData.delay > 0 && (
-        <div className="mt-3 text-xs text-amber-400">
-          Expected delay: {formatDelay(trafficData.delay)}
-        </div>
-      )}
     </div>
   );
-};
-
-function getTrafficColor(level: string): string {
-  const colors = {
-    low: 'bg-green-500',
-    moderate: 'bg-yellow-500',
-    heavy: 'bg-red-500'
-  };
-  return colors[level as keyof typeof colors] || colors.low;
-}
-
-function getTrafficLabel(level: string): string {
-  const labels = {
-    low: 'Light Traffic',
-    moderate: 'Moderate Traffic',
-    heavy: 'Heavy Traffic'
-  };
-  return labels[level as keyof typeof labels] || 'Unknown';
-}
-
-function formatDelay(minutes: number): string {
-  if (minutes < 60) {
-    return `${minutes} mins`;
-  }
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return `${hours}h ${remainingMinutes}m`;
-} 
+}; 

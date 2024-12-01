@@ -1,0 +1,101 @@
+/* Advanced Search Styles */
+.advanced-search {
+  --search-height: 48px;
+  --search-border-radius: 24px;
+  --search-background: var(--surface-color);
+  --search-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  height: var(--search-height);
+  padding: 0 16px;
+  background: var(--search-background);
+  border-radius: var(--search-border-radius);
+  box-shadow: var(--search-shadow);
+}
+
+/* Voice Search Animation */
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.voice-search-btn.listening {
+  animation: pulse 1.5s infinite;
+  color: var(--accent-color);
+}
+
+/* Enhanced Settings Styles */
+.enhanced-settings {
+  --settings-width: 360px;
+  --settings-max-height: 80vh;
+  
+  width: var(--settings-width);
+  max-height: var(--settings-max-height);
+  background: var(--surface-color);
+  border-radius: 12px;
+  box-shadow: var(--elevation-3);
+  overflow: hidden;
+}
+
+/* Enhanced Feedback Styles */
+.enhanced-feedback {
+  --feedback-min-width: 320px;
+  --feedback-max-width: 480px;
+  
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  min-width: var(--feedback-min-width);
+  max-width: var(--feedback-max-width);
+  background: var(--surface-color);
+  border-radius: 8px;
+  box-shadow: var(--elevation-2);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .advanced-search {
+    max-width: 100%;
+    margin: 0 16px;
+  }
+
+  .enhanced-settings {
+    width: 100%;
+    max-width: var(--settings-width);
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .enhanced-feedback {
+    width: calc(100% - 32px);
+    min-width: auto;
+    margin: 16px;
+  }
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-color: #1e1e1e;
+    --text-color: #ffffff;
+    --border-color: #333333;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .voice-search-btn.listening {
+    animation: none;
+  }
+} 
