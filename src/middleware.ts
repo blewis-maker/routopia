@@ -1,14 +1,10 @@
-import { auth } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { getToken } from 'next-auth/jwt'
+import type { NextRequest } from 'next/server'
 
-export default auth((req) => {
-  const isAuthenticated = !!req.auth
-  
-  // Redirect authenticated users from home to routopia
-  if (req.nextUrl.pathname === '/') {
-    if (isAuthenticated) {
-      return Response.redirect(new URL('/routopia', req.url))
-    }
-  }
+export async function middleware(req: NextRequest) {
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+  const isAuthenticated = !!token
   
   const protectedPaths = [
     '/routopia',
@@ -24,16 +20,14 @@ export default auth((req) => {
   )
 
   if (isProtectedPath && !isAuthenticated) {
-    return Response.redirect(new URL('/?signin=true', req.url))
+    return NextResponse.redirect(new URL('/', req.url))
   }
 
-  return null
-})
+  return NextResponse.next()
+}
 
 export const config = {
   matcher: [
-    '/',
-    '/dashboard/:path*',
     '/routopia/:path*',
     '/routes/:path*',
     '/profile/:path*',

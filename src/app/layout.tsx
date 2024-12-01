@@ -4,10 +4,10 @@ import { AuthProvider } from '@/components/AuthProvider';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Routopia - AI Route Planning Companion',
-  description: 'Plan your next adventure with AI-powered inspiration',
+  title: 'Routopia',
+  description: 'Your AI Route Planning Companion',
   icons: {
-    icon: '/routopia-logo.png',
+    icon: '/favicon.ico',
   },
 };
 
@@ -18,6 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head />
       <body>
         <AuthProvider>
           <NavBar />

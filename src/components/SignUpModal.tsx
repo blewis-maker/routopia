@@ -24,14 +24,14 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
       setError(null);
       
       const result = await signIn('google', {
-        redirect: false,
-        callbackUrl: '/routopia'
+        callbackUrl: '/routopia',
+        redirect: false
       });
-      
+
       if (result?.error) {
-        setError(result.error);
-      } else if (result?.ok && result.url) {
-        router.push(result.url);
+        setError('An error occurred during sign in');
+      } else if (result?.ok) {
+        router.push('/routopia');
       }
     } catch (error) {
       setError('An error occurred during sign in');

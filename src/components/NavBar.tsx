@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { UserAvatar } from './UserAvatar';
+import Image from 'next/image';
 
 // Dynamically import SignUpModal to avoid SSR issues
 const SignUpModal = dynamic(() => import('./SignUpModal'), {
@@ -27,12 +28,13 @@ export default function NavBar() {
             onMouseEnter={() => setIsLogoHovered(true)}
             onMouseLeave={() => setIsLogoHovered(false)}
           >
-            <img
-              src="/routopia-logo.png"
+            <Image
+              src="/logo.png"
               alt="Routopia"
               className={`h-8 w-8 mr-2 ${isLogoHovered ? 'animate-logo-active' : ''}`}
               width={32}
               height={32}
+              priority
             />
             <span className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">
               Routopia

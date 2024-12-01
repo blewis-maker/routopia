@@ -1,19 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import SignUpModal from '@/components/SignUpModal';
+import Image from 'next/image';
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isButtonHovered, setIsButtonHovered] = useState(false);
   const searchParams = useSearchParams();
-
-  useEffect(() => {
-    if (searchParams.get('signin') === 'true') {
-      setIsModalOpen(true);
-    }
-  }, [searchParams]);
 
   return (
     <main className="relative min-h-screen flex flex-col items-center justify-center text-center p-4">
@@ -34,13 +29,17 @@ export default function Home() {
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen text-white">
         <div className="flex flex-col items-center mb-8">
-          <img 
-            src="/routopia-logo.png"
-            alt="Routopia"
-            className={`h-16 w-16 ${isButtonHovered ? 'animate-logo-active-large' : ''}`}
-            width={64}
-            height={64}
-          />
+          <div className="relative w-16 h-16 mb-4">
+            <Image 
+              src="/routopia-logo.png"
+              alt="Routopia"
+              fill
+              priority
+              className={`object-contain transition-all duration-300 ${
+                isButtonHovered ? 'animate-logo-active' : ''
+              }`}
+            />
+          </div>
           <h1 className="text-5xl font-bold">Your AI Route</h1>
           <div className="text-5xl font-bold bg-gradient-to-r from-teal-400 to-emerald-400 text-transparent bg-clip-text leading-relaxed py-2">
             Planning Companion
