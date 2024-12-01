@@ -20,7 +20,6 @@ const ChatWindow = ({ onSendMessage }: ChatWindowProps) => {
     setMessages(prev => [...prev, { type: 'user', content: message }]);
 
     try {
-      // Send to API
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -35,10 +34,7 @@ const ChatWindow = ({ onSendMessage }: ChatWindowProps) => {
 
       const data = await response.json();
       
-      // Add AI response to chat
       setMessages(prev => [...prev, { type: 'assistant', content: data.message }]);
-      
-      // Update map marker
       onSendMessage(data.message);
       
     } catch (error) {
@@ -52,19 +48,15 @@ const ChatWindow = ({ onSendMessage }: ChatWindowProps) => {
 
   return (
     <div className="flex flex-col h-full bg-[#1E1E1E]">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-800">
-        <h2 className="text-white text-lg font-semibold">RouteGPT</h2>
-      </div>
-
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto">
-        <ChatMessages messages={messages} />
-      </div>
-
-      {/* Input Area */}
-      <div className="p-4 border-t border-gray-800 bg-[#1E1E1E]">
+      {/* Header with Input */}
+      <div className="p-4 border-b border-gray-800 bg-[#1E1E1E]">
+        <h2 className="text-white text-lg font-semibold mb-4">RouteGPT</h2>
         <ChatInput onSendMessage={handleSendMessage} />
+      </div>
+
+      {/* Messages Area - Now below input */}
+      <div className="flex-1 overflow-y-auto">
+        <ChatMessages messages={messages} scrollDirection="up" />
       </div>
     </div>
   );

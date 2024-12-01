@@ -7,13 +7,17 @@ interface Message {
 
 interface ChatMessagesProps {
   messages: Message[];
+  scrollDirection?: 'up' | 'down';
 }
 
-const ChatMessages = ({ messages }: ChatMessagesProps) => {
+const ChatMessages = ({ messages, scrollDirection = 'down' }: ChatMessagesProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
   };
 
   useEffect(() => {
@@ -21,7 +25,10 @@ const ChatMessages = ({ messages }: ChatMessagesProps) => {
   }, [messages]);
 
   return (
-    <div className="p-4 space-y-4">
+    <div 
+      ref={containerRef}
+      className="p-4 space-y-4 min-h-0"
+    >
       {messages.map((message, index) => (
         <div
           key={index}

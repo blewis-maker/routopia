@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { debounce } from 'lodash';
 
 const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 if (!token) {
@@ -29,6 +30,11 @@ export interface MapRef {
   getCurrentLocation: () => { lat: number; lng: number } | null;
 }
 
+interface Suggestion {
+  place_name: string;
+  center: [number, number];
+}
+
 const Map = forwardRef<MapRef, MapProps>(({ 
   startLocation, 
   endLocation, 
@@ -44,6 +50,11 @@ const Map = forwardRef<MapRef, MapProps>(({
   const [isLoading, setIsLoading] = useState(true);
   const [currentAddress, setCurrentAddress] = useState<string>('');
   const currentLocation = useRef<{ lat: number; lng: number } | null>(null);
+  const [startSuggestions, setStartSuggestions] = useState<Suggestion[]>([]);
+  const [destSuggestions, setDestSuggestions] = useState<Suggestion[]>([]);
+  const [showStartSuggestions, setShowStartSuggestions] = useState(false);
+  const [showDestSuggestions, setShowDestSuggestions] = useState(false);
+  const [destinationAddress, setDestinationAddress] = useState('');
 
   // Optimized reverse geocoding with caching
   const reverseGeocode = async (lat: number, lng: number) => {
@@ -72,6 +83,54 @@ const Map = forwardRef<MapRef, MapProps>(({
     }
     return null;
   };
+
+  // Add geocoding suggestions function
+  const getSuggestions = async (query: string, proximity?: [number, number]) => {
+    if (!query.trim()) return [];
+    
+    try {
+      const params = new URLSearchParams({
+        access_token: token,
+        types: 'address,poi,place',
+        limit: '5',
+        country: 'US',
+        language: 'en',
+        ...(proximity && { proximity: `${proximity[0]},${proximity[1]}` })
+      });
+
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?${params}`
+      );
+      
+      if (!response.ok) throw new Error('Geocoding failed');
+      
+      const data = await response.json();
+      return data.features.map((feature: any) => ({
+        place_name: feature.place_name,
+        center: feature.center
+      }));
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      return [];
+    }
+  };
+
+  // Debounced suggestion fetchers
+  const debouncedStartSuggestions = debounce(async (query: string) => {
+    const suggestions = await getSuggestions(
+      query,
+      currentLocation.current ? [currentLocation.current.lng, currentLocation.current.lat] : undefined
+    );
+    setStartSuggestions(suggestions);
+  }, 300);
+
+  const debouncedDestSuggestions = debounce(async (query: string) => {
+    const suggestions = await getSuggestions(
+      query,
+      currentLocation.current ? [currentLocation.current.lng, currentLocation.current.lat] : undefined
+    );
+    setDestSuggestions(suggestions);
+  }, 300);
 
   // Initialize map and controls
   useEffect(() => {
@@ -225,10 +284,58 @@ const Map = forwardRef<MapRef, MapProps>(({
             opacity: 0;
           }
         }
+        .suggestions-container {
+          background: #2D2D2D;
+          border: 1px solid #404040;
+          border-top: none;
+          border-radius: 0 0 8px 8px;
+          max-height: 200px;
+          overflow-y: auto;
+          z-index: 1000;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        .suggestion-item {
+          padding: 10px 12px;
+          cursor: pointer;
+          transition: background-color 0.2s;
+          border-bottom: 1px solid #404040;
+          white-space: normal;
+          line-height: 1.4;
+          font-size: 0.9rem;
+        }
+        
+        .suggestion-item:last-child {
+          border-bottom: none;
+        }
+        
+        .suggestion-item:hover {
+          background-color: #404040;
+        }
+
+        /* Custom scrollbar for suggestions */
+        .suggestions-container::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        .suggestions-container::-webkit-scrollbar-track {
+          background: #2D2D2D;
+          border-radius: 0 8px 8px 0;
+        }
+
+        .suggestions-container::-webkit-scrollbar-thumb {
+          background: #404040;
+          border-radius: 4px;
+        }
+
+        .suggestions-container::-webkit-scrollbar-thumb:hover {
+          background: #4A4A4A;
+        }
       `}</style>
       <div className="relative w-full h-full">
-        <div className="absolute top-4 left-4 z-10 space-y-2 w-72">
-          <div className="bg-white rounded-lg shadow-lg">
+        <div className="absolute top-4 left-4 z-20 space-y-2 w-72">
+          {/* Start Location Input */}
+          <div className="relative">
             <input
               type="text"
               value={currentAddress}
@@ -236,19 +343,85 @@ const Map = forwardRef<MapRef, MapProps>(({
               className="w-full px-4 py-2 rounded-lg bg-[#2D2D2D] text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               onChange={(e) => {
                 setCurrentAddress(e.target.value);
-                onStartLocationChange?.(e.target.value);
+                debouncedStartSuggestions(e.target.value);
+                setShowStartSuggestions(true);
+              }}
+              onFocus={() => setShowStartSuggestions(true)}
+              onBlur={() => {
+                // Delay hiding suggestions to allow for clicks
+                setTimeout(() => setShowStartSuggestions(false), 200);
               }}
             />
+            {showStartSuggestions && startSuggestions.length > 0 && (
+              <div className="absolute w-full mt-1 suggestions-container">
+                {startSuggestions.map((suggestion, index) => (
+                  <div
+                    key={index}
+                    className="suggestion-item text-white"
+                    onClick={() => {
+                      setCurrentAddress(suggestion.place_name);
+                      setShowStartSuggestions(false);
+                      if (mapInstance.current) {
+                        mapInstance.current.flyTo({
+                          center: suggestion.center,
+                          zoom: 14
+                        });
+                      }
+                      onStartLocationChange?.(suggestion.place_name);
+                    }}
+                  >
+                    {suggestion.place_name}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="bg-white rounded-lg shadow-lg">
+
+          {/* Destination Input */}
+          <div className="relative">
             <input
               type="text"
+              value={destinationAddress}
               placeholder="Destination"
               className="w-full px-4 py-2 rounded-lg bg-[#2D2D2D] text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              onChange={(e) => onDestinationChange?.(e.target.value)}
+              onChange={(e) => {
+                setDestinationAddress(e.target.value);
+                debouncedDestSuggestions(e.target.value);
+                setShowDestSuggestions(true);
+              }}
+              onFocus={() => setShowDestSuggestions(true)}
+              onBlur={() => {
+                // Delay hiding suggestions to allow for clicks
+                setTimeout(() => setShowDestSuggestions(false), 200);
+              }}
             />
+            {showDestSuggestions && destSuggestions.length > 0 && (
+              <div className="absolute w-full mt-1 suggestions-container">
+                {destSuggestions.map((suggestion, index) => (
+                  <div
+                    key={index}
+                    className="suggestion-item text-white"
+                    onClick={() => {
+                      setDestinationAddress(suggestion.place_name);
+                      setShowDestSuggestions(false);
+                      if (mapInstance.current) {
+                        mapInstance.current.flyTo({
+                          center: suggestion.center,
+                          zoom: 14
+                        });
+                      }
+                      onDestinationChange?.(suggestion.place_name);
+                    }}
+                  >
+                    {suggestion.place_name}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
+        
+        {/* Map Container */}
         <div ref={mapContainer} className="absolute inset-0" />
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
