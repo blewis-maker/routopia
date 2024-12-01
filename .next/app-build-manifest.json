@@ -9,6 +9,7 @@
     "/routopia/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
+      "static/css/app/routopia/page.css",
       "static/chunks/app/routopia/page.js"
     ],
     "/api/auth/[...nextauth]/route": [
@@ -20,6 +21,11 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/chat/route.js"
+    ],
+    "/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/page.js"
     ]
   }
 }

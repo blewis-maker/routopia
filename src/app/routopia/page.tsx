@@ -1,127 +1,32 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import { useState, useRef } from 'react';
-import { UserAvatar } from '@/components/UserAvatar';
-import Map from '@/components/Map';
-import type { MapRef } from '@/components/Map';
+import { useRef } from 'react';
+import Map, { MapRef } from '@/components/Map';
+import ChatWindow from '@/components/chat/ChatWindow';
 
-// Define the Location type
-interface Location {
-  coordinates: [number, number];
-  address: string;
-}
-
-// Import Map with no SSR
-const Map = dynamic(() => import('@/components/Map'), {
-  ssr: false,
-  loading: () => (
-    <div className="h-full w-full flex items-center justify-center bg-stone-900">
-      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-teal-500"></div>
-    </div>
-  ),
-});
-
-export default function RoutopiaPage() {
+const RoutopiaPage = () => {
   const mapRef = useRef<MapRef>(null);
-  const [inputValue, setInputValue] = useState('');
-  const [startLocation, setStartLocation] = useState<Location | null>(null);
-  const [endLocation, setEndLocation] = useState<Location | null>(null);
-  const [waypoints, setWaypoints] = useState<Location[]>([]);
 
-  const handleChatSubmit = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      
-      if (!inputValue.trim()) return;
-
-      try {
-        // Get current location from map
-        const currentLocation = mapRef.current?.getCurrentLocation();
-        
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            message: inputValue,
-            location: currentLocation ? {
-              latitude: currentLocation.lat,
-              longitude: currentLocation.lng
-            } : null
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to get response');
-        }
-
-        const data = await response.json();
-        
-        if (mapRef.current && data.message) {
-          mapRef.current.showResponse(data.message);
-        }
-
-        setInputValue('');
-      } catch (error) {
-        console.error('Chat error:', error);
-        if (mapRef.current) {
-          mapRef.current.showResponse("I'm here to help plan your route. What would you like to know?");
-        }
-      }
-    }
+  const handleChatResponse = (message: string) => {
+    // Show response on map
+    mapRef.current?.showResponse(message);
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] relative">
-      {/* Left Sidebar - RouteGPT Test */}
-      <div className="absolute left-0 top-0 bottom-0 w-64 bg-stone-900 border-r border-stone-800 z-10">
-        <div className="p-4">
-          <h2 className="text-lg font-semibold text-white mb-4">RouteGPT Test</h2>
-          <div className="mt-4">
-            <textarea
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleChatSubmit}
-              className="w-full p-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none resize-none mb-4"
-              placeholder="Enter your route planning question and press Enter..."
-              rows={3}
-            />
-          </div>
+    <div className="flex h-screen">
+      {/* Chat Sidebar */}
+      <div className="w-[400px] flex flex-col bg-[#1E1E1E] border-r border-gray-800">
+        <ChatWindow onSendMessage={handleChatResponse} />
+      </div>
+
+      {/* Map Container */}
+      <div className="flex-1 relative">
+        <div className="absolute inset-0">
+          <Map ref={mapRef} />
         </div>
-      </div>
-
-      {/* Main Map Area */}
-      <div className="absolute inset-0">
-        <Map 
-          ref={mapRef}
-          startLocation={startLocation?.coordinates || null}
-          endLocation={endLocation?.coordinates || null}
-          waypoints={waypoints.map(wp => wp.coordinates)}
-          onLocationSelect={(coords) => {
-            // Handle location selection logic here
-          }}
-        />
-      </div>
-
-      {/* Right Sidebar - My Routes */}
-      <div className="absolute right-0 top-0 bottom-0 w-64 bg-stone-900 border-l border-stone-800 z-10">
-        <div className="p-4">
-          <h2 className="text-lg font-semibold text-white mb-4">My Routes</h2>
-          {/* Route list will go here */}
-        </div>
-      </div>
-
-      {/* Floating Search Bar - Adjusted position and width */}
-      <div className="absolute top-4 left-72 z-10">
-        <input
-          type="text"
-          placeholder="Search for a location..."
-          className="w-96 px-4 py-2 bg-stone-900/90 backdrop-blur-sm border border-stone-700 rounded-lg text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
-        />
       </div>
     </div>
   );
-} 
+};
+
+export default RoutopiaPage; 

@@ -1,5 +1,6 @@
 {
-  "/api/chat/route": "app/api/chat/route.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/chat/route": "app/api/chat/route.js",
+  "/page": "app/page.js",
   "/routopia/page": "app/routopia/page.js"
 }

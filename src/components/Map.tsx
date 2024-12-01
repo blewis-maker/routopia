@@ -37,7 +37,6 @@ const Map = forwardRef<MapRef, MapProps>(({
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<mapboxgl.Map | null>(null);
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
-  const markerPopup = useRef<mapboxgl.Popup | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const currentLocation = useRef<{ lat: number; lng: number } | null>(null);
 
@@ -144,26 +143,15 @@ const Map = forwardRef<MapRef, MapProps>(({
     };
   }, []);
 
-  // Add back the useImperativeHandle for chat responses
+  // Update useImperativeHandle to remove popup logic
   useImperativeHandle(ref, () => ({
     showResponse: (response: string) => {
-      if (markerPopup.current) {
-        markerPopup.current.remove();
-      }
-      
+      // Only update marker position if needed
       if (currentLocation.current && mapInstance.current) {
-        markerPopup.current = new mapboxgl.Popup({ 
-          closeButton: false,
-          className: 'chat-popup',
-          offset: [0, -15]
-        })
-          .setLngLat([currentLocation.current.lng, currentLocation.current.lat])
-          .setHTML(`
-            <div class="bg-white text-black p-4 rounded-lg shadow-lg max-w-sm">
-              ${response}
-            </div>
-          `)
-          .addTo(mapInstance.current);
+        locationMarker.current?.setLngLat([
+          currentLocation.current.lng,
+          currentLocation.current.lat
+        ]);
       }
     },
     getCurrentLocation: () => currentLocation.current

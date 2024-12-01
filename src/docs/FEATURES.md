@@ -13,7 +13,8 @@
 
 ### Map System (`src/components/map/`)
 - ✅ Interactive Mapbox integration
-- ⬜ Multi-mode visualization
+- ✅ User location tracking
+- ✅ Location marker with animations
 - Components:
   - ✅ MapView.tsx (base map component)
   - ⬜ RouteLayer.tsx (route visualization)
@@ -21,15 +22,23 @@
   - ⬜ POIMarkers.tsx (nodes/points of interest)
   - ⬜ WeatherOverlay.tsx
 
-### AI Assistant System (`src/components/ai/`)
-- ✅ Chat interface for route planning
+### AI Chat System (`src/components/chat/`)
+- 🚧 Persistent chat interface
 - Components:
-  - ✅ ChatInterface.tsx
-  - ✅ GPT Integration
-  - ✅ GPTTest.tsx (new)
-  - ⬜ SuggestionBubble.tsx
-  - ⬜ ContextDisplay.tsx
-  - ⬜ PreferenceManager.tsx
+  - 🚧 ChatWindow.tsx (main container)
+  - 🚧 ChatMessages.tsx (message history)
+  - 🚧 ChatInput.tsx (user input)
+  - 🚧 MessageBubble.tsx (individual messages)
+  - 🚧 RouteCard.tsx (suggested route display)
+  - ⬜ ChatToolbar.tsx (actions & settings)
+
+Key Features:
+- Fixed left sidebar layout
+- Message history with user/AI messages
+- Route-specific message formatting
+- Interactive route suggestions
+- Ability to save routes from chat
+- Context-aware responses based on map location
 
 ### Route Management (`src/components/routes/`)
 - ⬜ Route type-specific interfaces
@@ -176,3 +185,17 @@
 - External API integration
 - Weather integration
 - Device connectivity
+
+## Next Steps
+
+1. Implement new chat interface:
+   - Create sliding/fixed chat panel
+   - Design message bubbles for user/AI
+   - Add route suggestion cards
+   - Maintain chat history
+   - Integrate with existing GPT functionality
+
+2. Update map interactions:
+   - Link chat suggestions to map visualization
+   - Add route highlighting
+   - Show POIs mentioned in chat
