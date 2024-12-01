@@ -317,3 +317,16 @@ model VerificationToken {
 
   @@unique([identifier, token])
 }
+
+model RecentLocation {
+  id          String   @id @default(cuid())
+  userId      String
+  place_name  String
+  center_lat  Float
+  center_lng  Float
+  locationType String  // 'START' or 'DESTINATION'
+  timestamp   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, locationType])
+}

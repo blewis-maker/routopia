@@ -1,5 +1,10 @@
 {
   "pages": {
+    "/api/auth/[...nextauth]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/auth/[...nextauth]/route.js"
+    ],
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -12,10 +17,15 @@
       "static/css/app/routopia/page.css",
       "static/chunks/app/routopia/page.js"
     ],
-    "/api/auth/[...nextauth]/route": [
+    "/api/users/[userId]/recent-locations/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/[...nextauth]/route.js"
+      "static/chunks/app/api/users/[userId]/recent-locations/route.js"
+    ],
+    "/api/recent-locations/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/recent-locations/route.js"
     ]
   }
 }

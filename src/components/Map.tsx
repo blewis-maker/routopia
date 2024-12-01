@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 're
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { debounce } from 'lodash';
+import { useSession } from 'next-auth/react';
 
 const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 if (!token) {
@@ -35,6 +36,19 @@ interface Suggestion {
   center: [number, number];
 }
 
+interface RecentLocation {
+  place_name: string;
+  center: [number, number];
+  timestamp: number;
+}
+
+const MAX_RECENT_LOCATIONS = 5;
+
+// Add user-specific prefix to localStorage keys
+const getUserStorageKey = (userId: string, type: 'start' | 'dest') => {
+  return `user_${userId}_recent_${type}_locations`;
+};
+
 const Map = forwardRef<MapRef, MapProps>(({ 
   startLocation, 
   endLocation, 
@@ -55,6 +69,103 @@ const Map = forwardRef<MapRef, MapProps>(({
   const [showStartSuggestions, setShowStartSuggestions] = useState(false);
   const [showDestSuggestions, setShowDestSuggestions] = useState(false);
   const [destinationAddress, setDestinationAddress] = useState('');
+  const [recentStartLocations, setRecentStartLocations] = useState<RecentLocation[]>([]);
+  const [recentDestinations, setRecentDestinations] = useState<RecentLocation[]>([]);
+  const { data: session } = useSession();
+
+  // Load recent locations from database
+  useEffect(() => {
+    const loadRecentLocations = async () => {
+      if (!session?.user?.id) return;
+
+      try {
+        const response = await fetch(`/api/users/${session.user.id}/recent-locations`);
+        
+        // Add response type check
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error('Invalid response type from server');
+        }
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.startLocations) {
+          setRecentStartLocations(data.startLocations.map((loc: any) => ({
+            place_name: loc.place_name,
+            center: [loc.center_lng, loc.center_lat] as [number, number],
+            timestamp: new Date(loc.timestamp).getTime()
+          })));
+        }
+        
+        if (data.destLocations) {
+          setRecentDestinations(data.destLocations.map((loc: any) => ({
+            place_name: loc.place_name,
+            center: [loc.center_lng, loc.center_lat] as [number, number],
+            timestamp: new Date(loc.timestamp).getTime()
+          })));
+        }
+      } catch (error) {
+        console.error('Failed to load recent locations:', error);
+        // Set empty arrays to prevent undefined errors
+        setRecentStartLocations([]);
+        setRecentDestinations([]);
+      }
+    };
+
+    loadRecentLocations();
+  }, [session?.user?.id]);
+
+  // Modified addToRecent function
+  const addToRecent = async (
+    location: { place_name: string; center: [number, number] },
+    isStart: boolean
+  ) => {
+    if (!session?.user?.id) return;
+
+    try {
+      const response = await fetch('/api/recent-locations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: session.user.id,
+          place_name: location.place_name,
+          center_lat: location.center[1],
+          center_lng: location.center[0],
+          locationType: isStart ? 'start' : 'destination'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save location');
+      }
+
+      // Update local state
+      const newLocation: RecentLocation = {
+        ...location,
+        timestamp: Date.now()
+      };
+
+      if (isStart) {
+        setRecentStartLocations(prev => {
+          const filtered = prev.filter(loc => loc.place_name !== location.place_name);
+          return [newLocation, ...filtered].slice(0, MAX_RECENT_LOCATIONS);
+        });
+      } else {
+        setRecentDestinations(prev => {
+          const filtered = prev.filter(loc => loc.place_name !== location.place_name);
+          return [newLocation, ...filtered].slice(0, MAX_RECENT_LOCATIONS);
+        });
+      }
+    } catch (error) {
+      console.error('Failed to save recent location:', error);
+    }
+  };
 
   // Optimized reverse geocoding with caching
   const reverseGeocode = async (lat: number, lng: number) => {
@@ -151,7 +262,7 @@ const Map = forwardRef<MapRef, MapProps>(({
     markerEl.innerHTML = `
       <div class="marker">
         <div class="marker-inner">
-          <img src="/logo.svg" alt="Location" width="32" height="32" />
+          <img src="/logo.svg" alt="Location" width="24" height="24" />
         </div>
         <div class="marker-pulse"></div>
       </div>
@@ -237,8 +348,8 @@ const Map = forwardRef<MapRef, MapProps>(({
     <>
       <style jsx global>{`
         .marker-container {
-          width: 40px;
-          height: 40px;
+          width: 32px;
+          height: 32px;
           cursor: pointer;
         }
         
@@ -255,7 +366,7 @@ const Map = forwardRef<MapRef, MapProps>(({
           display: flex;
           align-items: center;
           justify-content: center;
-          animation: bounce 1s infinite;
+          animation: gentleBounce 2s ease-in-out infinite;
           will-change: transform;
         }
         
@@ -264,24 +375,28 @@ const Map = forwardRef<MapRef, MapProps>(({
           width: 100%;
           height: 100%;
           border-radius: 50%;
-          background: rgba(66, 135, 245, 0.2);
-          animation: pulse 1.5s infinite;
+          background: rgba(66, 135, 245, 0.15);
+          animation: gentlePulse 2s ease-in-out infinite;
           will-change: transform, opacity;
         }
         
-        @keyframes bounce {
+        @keyframes gentleBounce {
           0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
+          50% { transform: translateY(-6px); }
         }
         
-        @keyframes pulse {
+        @keyframes gentlePulse {
           0% {
-            transform: scale(0.5);
-            opacity: 1;
+            transform: scale(0.8);
+            opacity: 0.8;
+          }
+          50% {
+            transform: scale(1.5);
+            opacity: 0.2;
           }
           100% {
-            transform: scale(2);
-            opacity: 0;
+            transform: scale(0.8);
+            opacity: 0.8;
           }
         }
         .suggestions-container {
@@ -293,6 +408,15 @@ const Map = forwardRef<MapRef, MapProps>(({
           overflow-y: auto;
           z-index: 1000;
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+          
+          /* Hide scrollbar for Chrome, Safari and Opera */
+          &::-webkit-scrollbar {
+            display: none;
+          }
+          
+          /* Hide scrollbar for IE, Edge and Firefox */
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
         }
         
         .suggestion-item {
@@ -312,24 +436,18 @@ const Map = forwardRef<MapRef, MapProps>(({
         .suggestion-item:hover {
           background-color: #404040;
         }
-
-        /* Custom scrollbar for suggestions */
-        .suggestions-container::-webkit-scrollbar {
-          width: 8px;
+        .recent-location-item {
+          display: flex;
+          align-items: center;
+          padding: 10px 12px;
+          cursor: pointer;
+          transition: background-color 0.2s;
+          border-bottom: 1px solid #404040;
         }
 
-        .suggestions-container::-webkit-scrollbar-track {
-          background: #2D2D2D;
-          border-radius: 0 8px 8px 0;
-        }
-
-        .suggestions-container::-webkit-scrollbar-thumb {
-          background: #404040;
-          border-radius: 4px;
-        }
-
-        .suggestions-container::-webkit-scrollbar-thumb:hover {
-          background: #4A4A4A;
+        .recent-location-icon {
+          margin-right: 8px;
+          opacity: 0.6;
         }
       `}</style>
       <div className="relative w-full h-full">
@@ -346,21 +464,51 @@ const Map = forwardRef<MapRef, MapProps>(({
                 debouncedStartSuggestions(e.target.value);
                 setShowStartSuggestions(true);
               }}
-              onFocus={() => setShowStartSuggestions(true)}
+              onFocus={() => {
+                if (!currentAddress) {
+                  setStartSuggestions([]);
+                  setShowStartSuggestions(true);
+                }
+              }}
               onBlur={() => {
-                // Delay hiding suggestions to allow for clicks
                 setTimeout(() => setShowStartSuggestions(false), 200);
               }}
             />
-            {showStartSuggestions && startSuggestions.length > 0 && (
+            {showStartSuggestions && (
               <div className="absolute w-full mt-1 suggestions-container">
+                {currentAddress === '' && recentStartLocations.length > 0 && (
+                  <div className="border-b border-gray-700 pb-2">
+                    <div className="px-3 py-2 text-gray-400 text-xs">Recent Locations</div>
+                    {recentStartLocations.map((location, index) => (
+                      <div
+                        key={`recent-${index}`}
+                        className="recent-location-item text-white"
+                        onClick={() => {
+                          setCurrentAddress(location.place_name);
+                          setShowStartSuggestions(false);
+                          if (mapInstance.current) {
+                            mapInstance.current.flyTo({
+                              center: location.center,
+                              zoom: 14
+                            });
+                          }
+                          onStartLocationChange?.(location.place_name);
+                        }}
+                      >
+                        <span className="recent-location-icon">⭐</span>
+                        {location.place_name}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {startSuggestions.map((suggestion, index) => (
                   <div
-                    key={index}
+                    key={`suggestion-${index}`}
                     className="suggestion-item text-white"
                     onClick={() => {
                       setCurrentAddress(suggestion.place_name);
                       setShowStartSuggestions(false);
+                      addToRecent(suggestion, true);
                       if (mapInstance.current) {
                         mapInstance.current.flyTo({
                           center: suggestion.center,
@@ -389,21 +537,51 @@ const Map = forwardRef<MapRef, MapProps>(({
                 debouncedDestSuggestions(e.target.value);
                 setShowDestSuggestions(true);
               }}
-              onFocus={() => setShowDestSuggestions(true)}
+              onFocus={() => {
+                if (!destinationAddress) {
+                  setDestSuggestions([]);
+                  setShowDestSuggestions(true);
+                }
+              }}
               onBlur={() => {
-                // Delay hiding suggestions to allow for clicks
                 setTimeout(() => setShowDestSuggestions(false), 200);
               }}
             />
-            {showDestSuggestions && destSuggestions.length > 0 && (
+            {showDestSuggestions && (
               <div className="absolute w-full mt-1 suggestions-container">
+                {destinationAddress === '' && recentDestinations.length > 0 && (
+                  <div className="border-b border-gray-700 pb-2">
+                    <div className="px-3 py-2 text-gray-400 text-xs">Recent Destinations</div>
+                    {recentDestinations.map((location, index) => (
+                      <div
+                        key={`recent-${index}`}
+                        className="recent-location-item text-white"
+                        onClick={() => {
+                          setDestinationAddress(location.place_name);
+                          setShowDestSuggestions(false);
+                          if (mapInstance.current) {
+                            mapInstance.current.flyTo({
+                              center: location.center,
+                              zoom: 14
+                            });
+                          }
+                          onDestinationChange?.(location.place_name);
+                        }}
+                      >
+                        <span className="recent-location-icon">📍</span>
+                        {location.place_name}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {destSuggestions.map((suggestion, index) => (
                   <div
-                    key={index}
+                    key={`suggestion-${index}`}
                     className="suggestion-item text-white"
                     onClick={() => {
                       setDestinationAddress(suggestion.place_name);
                       setShowDestSuggestions(false);
+                      addToRecent(suggestion, false);
                       if (mapInstance.current) {
                         mapInstance.current.flyTo({
                           center: suggestion.center,
