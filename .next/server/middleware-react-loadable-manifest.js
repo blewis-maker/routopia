@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{\"components\\\\NavBar.tsx -> ./SignUpModal\":{\"id\":\"components\\\\NavBar.tsx -> ./SignUpModal\",\"files\":[\"static/chunks/_app-pages-browser_src_components_SignUpModal_tsx.js\"]}}"
+self.__REACT_LOADABLE_MANIFEST="{}"

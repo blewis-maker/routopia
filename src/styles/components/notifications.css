@@ -1,0 +1,51 @@
+.notification-item {
+  animation: slideIn 0.3s ease-out;
+  max-width: 400px;
+}
+
+.notification-item.removing {
+  animation: slideOut 0.3s ease-in forwards;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+.notification-item button {
+  transition: opacity 0.2s ease;
+}
+
+/* Notification types */
+.notification-success {
+  background: linear-gradient(to right, rgb(16, 185, 129), rgb(5, 150, 105));
+}
+
+.notification-error {
+  background: linear-gradient(to right, rgb(239, 68, 68), rgb(220, 38, 38));
+}
+
+.notification-warning {
+  background: linear-gradient(to right, rgb(245, 158, 11), rgb(217, 119, 6));
+}
+
+.notification-info {
+  background: linear-gradient(to right, rgb(59, 130, 246), rgb(37, 99, 235));
+} 

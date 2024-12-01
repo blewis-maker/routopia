@@ -1,0 +1,57 @@
+/* Component positioning */
+.map-overlay {
+  background: rgba(23, 23, 23, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Activity selector specific styles */
+.activity-selector {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(23, 23, 23, 0.9);
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+}
+
+.activity-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.activity-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.activity-button.active {
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.5);
+}
+
+/* Settings menu positioning */
+.settings-overlay {
+  position: absolute;
+  top: 70px;
+  right: 16px;
+  width: 320px;
+  z-index: 1000;
+}
+
+/* Notification system positioning */
+.notification-container {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 400px;
+} 

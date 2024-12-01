@@ -1,5 +1,4 @@
 {
-  "/api/locations/recent/route": "app/api/locations/recent/route.js",
   "/_not-found/page": "app/_not-found/page.js",
-  "/routopia/page": "app/routopia/page.js"
+  "/page": "app/page.js"
 }

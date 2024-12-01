@@ -1,0 +1,24 @@
+.weather-overlay {
+  transition: opacity 0.3s ease;
+}
+
+.weather-overlay img {
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.3));
+}
+
+.weather-overlay:hover {
+  opacity: 0.9;
+}
+
+/* Weather condition specific styles */
+.weather-clear {
+  background: linear-gradient(to right, rgba(0,0,0,0.5), rgba(0,0,0,0.3));
+}
+
+.weather-rain {
+  background: linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0.4));
+}
+
+.weather-snow {
+  background: linear-gradient(to right, rgba(0,0,0,0.7), rgba(0,0,0,0.5));
+} 

@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
+import { MapIntegrationLayer } from '../../services/maps/MapIntegrationLayer';
+import ChatInput from './ChatInput';
 
 interface Message {
   id: string;
@@ -12,6 +14,7 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
+  mapIntegration: MapIntegrationLayer;
   routeContext?: {
     startLocation?: string;
     endLocation?: string;
@@ -19,7 +22,7 @@ interface ChatInterfaceProps {
   };
 }
 
-export function ChatInterface({ routeContext }: ChatInterfaceProps) {
+export function ChatInterface({ mapIntegration, routeContext }: ChatInterfaceProps) {
   const { data: session } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -34,31 +37,36 @@ export function ChatInterface({ routeContext }: ChatInterfaceProps) {
     scrollToBottom();
   }, [messages]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
-
-    const userMessage: Message = {
-      id: uuidv4(),
-      content: inputValue,
-      role: 'user',
-      createdAt: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
-    setIsLoading(true);
-
+  const handleMessage = async (message: string) => {
     try {
+      // First, try to parse intent from message
+      const intent = await parseIntent(message);
+      
+      // Handle map-related actions
+      if (intent.type === 'LOCATION_SEARCH' || intent.type === 'ROUTE_PLANNING') {
+        const result = await mapIntegration.handleChatAction({
+          type: intent.type === 'LOCATION_SEARCH' ? 'SEARCH_LOCATION' : 'PLAN_ROUTE',
+          payload: intent.payload
+        });
+
+        // Update chat with results
+        setMessages(prev => [...prev, {
+          id: uuidv4(),
+          content: formatResponseFromResult(result),
+          role: 'assistant',
+          createdAt: new Date()
+        }]);
+      }
+
+      // Continue with normal chat processing
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, userMessage],
+          messages: [...messages, { role: 'user', content: message }],
           routeContext,
-        }),
+          mapContext: mapIntegration.getState()
+        })
       });
 
       if (!response.ok) throw new Error('Failed to send message');

@@ -25,15 +25,17 @@
     "clsx": "^2.0.0",
     "ioredis": "^5.4.1",
     "lodash": "^4.17.21",
-    "lucide-react": "^0.344.0",
-    "mapbox-gl": "^3.8.0",
+    "lucide-react": "^x.x",
+    "mapbox-gl": "^2.x",
     "next": "^15.0.3",
     "next-auth": "^4.24.5",
     "openai": "^4.73.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwind-merge": "^2.0.0",
-    "uuid": "^11.0.3"
+    "uuid": "^11.0.3",
+    "@/components/ui/input": "...",
+    "@/components/ui/button": "..."
   },
   "devDependencies": {
     "@types/lodash": "^4.17.13",

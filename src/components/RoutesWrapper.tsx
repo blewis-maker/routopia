@@ -27,6 +27,29 @@ export default function RoutesWrapper() {
   const [waypoints, setWaypoints] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [destinationFromChat, setDestinationFromChat] = useState<string>('');
+  const [settings, setSettings] = useState({
+    map: {
+      showTraffic: true,
+      show3DBuildings: true,
+      style: 'dark',
+      language: 'en',
+      zoom: 12
+    },
+    display: {
+      units: 'metric',
+      highContrast: false,
+      enableAnimations: true,
+      fontSize: 'medium',
+      theme: 'dark'
+    },
+    notifications: {
+      routeUpdates: true,
+      trafficAlerts: true,
+      weatherAlerts: true,
+      sound: true,
+      vibration: true
+    }
+  });
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -77,6 +100,8 @@ export default function RoutesWrapper() {
         onLocationSelect={handleLocationSelect}
         onPlanRoute={() => setShowRoutePanel(true)}
         destinationFromChat={destinationFromChat}
+        settings={settings}
+        onSettingsChange={setSettings}
       />
       <ChatWindow
         onSendMessage={(message) => {

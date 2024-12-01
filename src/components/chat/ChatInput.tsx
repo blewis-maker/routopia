@@ -28,11 +28,11 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Enter your route planning question..."
-        className="w-full px-4 py-2 bg-[#2D2D2D] text-white rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full px-4 py-2 bg-stone-800 text-white rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
         rows={2}
         style={{ minHeight: '50px', maxHeight: '80px' }}
       />
-      <div className="absolute right-2 bottom-1 text-xs text-gray-400">
+      <div className="absolute right-2 bottom-1 text-xs text-stone-400">
         Press Enter to send
       </div>
     </div>
