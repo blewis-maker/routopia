@@ -7,9 +7,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 if (!token) {
   throw new Error('Mapbox token not found');
-} else {
-  mapboxgl.accessToken = token;
 }
+mapboxgl.accessToken = token;
 
 interface Location {
   coordinates: [number, number];
@@ -21,6 +20,8 @@ interface MapProps {
   endLocation: [number, number] | null;
   waypoints: [number, number][];
   onLocationSelect: (coords: [number, number]) => void;
+  onStartLocationChange?: (location: string) => void;
+  onDestinationChange?: (location: string) => void;
 }
 
 export interface MapRef {
@@ -33,120 +34,136 @@ const Map = forwardRef<MapRef, MapProps>(({
   endLocation, 
   waypoints, 
   onLocationSelect,
+  onStartLocationChange,
+  onDestinationChange
 }: MapProps, ref) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<mapboxgl.Map | null>(null);
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
+  const geolocateControl = useRef<mapboxgl.GeolocateControl | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentAddress, setCurrentAddress] = useState<string>('');
   const currentLocation = useRef<{ lat: number; lng: number } | null>(null);
 
+  // Optimized reverse geocoding with caching
+  const reverseGeocode = async (lat: number, lng: number) => {
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` + 
+        new URLSearchParams({
+          access_token: token,
+          types: 'address',
+          limit: '1',
+          language: 'en'
+        })
+      );
+      
+      if (!response.ok) throw new Error('Geocoding failed');
+      
+      const data = await response.json();
+      if (data.features && data.features.length > 0) {
+        const address = data.features[0].place_name;
+        setCurrentAddress(address);
+        onStartLocationChange?.(address);
+        return address;
+      }
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+    }
+    return null;
+  };
+
+  // Initialize map and controls
   useEffect(() => {
     if (!mapContainer.current || mapInstance.current) return;
 
-    const coloradoBounds = [
-      [-109.0448, 36.9924], // Southwest coordinates
-      [-102.0424, 41.0034]  // Northeast coordinates
-    ];
+    const map = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/dark-v11',
+      center: [-105.5217, 39.0084],
+      zoom: 7,
+      pitch: 0,
+      bearing: 0
+    });
 
-    try {
-      const map = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/dark-v11',
-        bounds: coloradoBounds,
-        fitBoundsOptions: {
-          padding: 20
-        },
-        pitch: 0,
-        bearing: 0
-      });
-
-      // Create the marker element with animations
-      const markerEl = document.createElement('div');
-      markerEl.className = 'marker-container';
-      markerEl.innerHTML = `
-        <div class="marker">
-          <div class="marker-inner">
-            <img src="/logo.svg" alt="Location" width="32" height="32" />
-          </div>
-          <div class="marker-pulse"></div>
+    // Create marker with custom element
+    const markerEl = document.createElement('div');
+    markerEl.className = 'marker-container';
+    markerEl.innerHTML = `
+      <div class="marker">
+        <div class="marker-inner">
+          <img src="/logo.svg" alt="Location" width="32" height="32" />
         </div>
-      `;
+        <div class="marker-pulse"></div>
+      </div>
+    `;
 
-      // Initialize marker but don't add it to the map yet
-      locationMarker.current = new mapboxgl.Marker({
-        element: markerEl,
-        anchor: 'center'
-      });
+    locationMarker.current = new mapboxgl.Marker({
+      element: markerEl,
+      anchor: 'center'
+    });
 
-      // Add geolocate control
-      const geolocate = new mapboxgl.GeolocateControl({
-        positionOptions: {
-          enableHighAccuracy: true
-        },
-        trackUserLocation: true,
-        showAccuracyCircle: false,
-        showUserLocation: false
-      });
-      map.addControl(geolocate, 'right');
+    // Initialize geolocate control with high accuracy
+    geolocateControl.current = new mapboxgl.GeolocateControl({
+      positionOptions: {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 6000
+      },
+      trackUserLocation: true,
+      showAccuracyCircle: false,
+      showUserLocation: false
+    });
 
-      // Handle geolocate events
-      geolocate.on('geolocate', (position) => {
-        const { longitude, latitude } = position.coords;
-        currentLocation.current = { lat: latitude, lng: longitude };
-        
-        // Only add/update marker when we have a valid location
-        if (locationMarker.current) {
-          locationMarker.current.setLngLat([longitude, latitude]);
-          if (!locationMarker.current.getElement().parentNode) {
-            locationMarker.current.addTo(map);
-          }
-        }
-      });
+    map.addControl(geolocateControl.current, 'top-right');
 
-      // Keep all other existing controls
-      const nav = new mapboxgl.NavigationControl({
-        showCompass: true,
-        showZoom: true,
-        visualizePitch: true
-      });
-      map.addControl(nav, 'right');
+    // Add other controls
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    map.addControl(new mapboxgl.ScaleControl({ unit: 'imperial' }), 'bottom-right');
 
-      const scale = new mapboxgl.ScaleControl({
-        maxWidth: 80,
-        unit: 'imperial'
-      });
-      map.addControl(scale, 'bottom-left');
-
-      // Handle map load
-      map.on('load', () => {
-        console.log('Map loaded successfully');
-        setIsLoading(false);
-        // Trigger geolocate on load
-        geolocate.trigger();
-      });
-
-      mapInstance.current = map;
-
-    } catch (error) {
-      console.error('Map initialization error:', error);
-      setIsLoading(false);
-    }
-
-    return () => {
+    // Handle location events
+    geolocateControl.current.on('geolocate', async (position) => {
+      const { longitude, latitude } = position.coords;
+      currentLocation.current = { lat: latitude, lng: longitude };
+      
+      // Update marker position
       if (locationMarker.current) {
-        locationMarker.current.remove();
+        locationMarker.current.setLngLat([longitude, latitude]);
+        if (!locationMarker.current.getElement().parentNode) {
+          locationMarker.current.addTo(map);
+        }
       }
-      if (mapInstance.current) {
-        mapInstance.current.remove();
-      }
+
+      // Get and set address
+      await reverseGeocode(latitude, longitude);
+    });
+
+    // Handle map load
+    map.on('load', () => {
+      setIsLoading(false);
+      // Trigger geolocation after map loads
+      geolocateControl.current?.trigger();
+    });
+
+    // Error handling
+    geolocateControl.current.on('error', (err) => {
+      console.error('Geolocation error:', err);
+      setCurrentAddress('Location unavailable');
+    });
+
+    mapInstance.current = map;
+
+    // Cleanup
+    return () => {
+      if (locationMarker.current) locationMarker.current.remove();
+      if (mapInstance.current) mapInstance.current.remove();
       mapInstance.current = null;
     };
   }, []);
 
-  // Update useImperativeHandle to remove popup logic
+  // Expose methods via ref
   useImperativeHandle(ref, () => ({
     showResponse: (response: string) => {
-      // Only update marker position if needed
       if (currentLocation.current && mapInstance.current) {
         locationMarker.current?.setLngLat([
           currentLocation.current.lng,
@@ -157,7 +174,6 @@ const Map = forwardRef<MapRef, MapProps>(({
     getCurrentLocation: () => currentLocation.current
   }));
 
-  // Add the CSS for the bouncing animation
   return (
     <>
       <style jsx global>{`
@@ -195,12 +211,8 @@ const Map = forwardRef<MapRef, MapProps>(({
         }
         
         @keyframes bounce {
-          0%, 100% {
-            transform: translateY(0);
-          }
-          50% {
-            transform: translateY(-10px);
-          }
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
         }
         
         @keyframes pulse {
@@ -215,6 +227,28 @@ const Map = forwardRef<MapRef, MapProps>(({
         }
       `}</style>
       <div className="relative w-full h-full">
+        <div className="absolute top-4 left-4 z-10 space-y-2 w-72">
+          <div className="bg-white rounded-lg shadow-lg">
+            <input
+              type="text"
+              value={currentAddress}
+              placeholder="Current Location"
+              className="w-full px-4 py-2 rounded-lg bg-[#2D2D2D] text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) => {
+                setCurrentAddress(e.target.value);
+                onStartLocationChange?.(e.target.value);
+              }}
+            />
+          </div>
+          <div className="bg-white rounded-lg shadow-lg">
+            <input
+              type="text"
+              placeholder="Destination"
+              className="w-full px-4 py-2 rounded-lg bg-[#2D2D2D] text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) => onDestinationChange?.(e.target.value)}
+            />
+          </div>
+        </div>
         <div ref={mapContainer} className="absolute inset-0" />
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">

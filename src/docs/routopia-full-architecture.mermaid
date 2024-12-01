@@ -6,47 +6,43 @@ graph TB
         Updates[Real-time Updates]
     end
 
-    subgraph Authentication
-        Auth[Auth System]
-        Session[Session Manager]
-        UserMgmt[User Management]
+    subgraph Cloud Infrastructure
+        Redis[(Redis Cache)]
+        AWS_ES[(AWS ElastiCache)]
+        OpenAI[OpenAI GPT-4]
     end
 
     subgraph AI Agent Core
         NLP[Intent Parser]
         Agent[Trip Planning Agent]
         Context[Context Manager]
+        LocationAware[Location Service]
         Monitor[Activity Monitor]
         Alert[Alert System]
     end
 
-    subgraph Database
-        Users[(Users)]
-        Routes[(Routes)]
-        Activities[(Activities)]
-        Chat_History[(Chat History)]
-        Performance[(Performance Data)]
+    subgraph Message Flow
+        ChatHistory[(Chat History)]
+        MessageQueue[Message Queue]
+        StateManager[State Manager]
     end
 
-    subgraph Route Types
-        Car[Car Routes]
-        Bike[Bike Routes]
-        Ski[Ski Routes]
-    end
-
-    subgraph External Services
-        Weather[Weather API]
-        Places[Google/Yelp API]
-        Trails[AllTrails API]
-        Traffic[Traffic API]
-        Training[Training Peaks]
-    end
-
-    subgraph Real-time Systems
-        EventBus[Event Bus]
-        Cache[Route Cache]
-        Updates_Queue[Updates Queue]
-    end
+    %% New Connections
+    Chat --> MessageQueue
+    MessageQueue --> OpenAI
+    OpenAI --> Agent
+    Agent --> LocationAware
+    LocationAware --> Maps
+    
+    %% Cache System
+    MessageQueue --> Redis
+    Redis --> AWS_ES
+    AWS_ES --> ChatHistory
+    
+    %% State Management
+    StateManager --> Chat
+    StateManager --> Maps
+    LocationAware --> StateManager
 
     %% User Flow
     UI --> Auth
@@ -88,11 +84,15 @@ graph TB
     classDef route fill:#fff8e1,stroke:#ff6f00
     classDef external fill:#f3e5f5,stroke:#6a1b9a
     classDef realtime fill:#e8eaf6,stroke:#283593
+    classDef cloud fill:#b3e5fc,stroke:#0288d1
+    classDef flow fill:#e8f5e9,stroke:#2e7d32
 
     class UI,Chat,Maps,Updates ui
     class Auth,Session,UserMgmt auth
-    class NLP,Agent,Context,Monitor,Alert ai
+    class NLP,Agent,Context,LocationAware,Monitor,Alert ai
     class Users,Routes,Activities,Chat_History,Performance data
     class Car,Bike,Ski route
     class Weather,Places,Trails,Traffic,Training external
     class EventBus,Cache,Updates_Queue realtime
+    class Redis,AWS_ES,OpenAI cloud
+    class ChatHistory,MessageQueue,StateManager flow

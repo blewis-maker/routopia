@@ -7,26 +7,34 @@ interface ChatInputProps {
 const ChatInput = ({ onSendMessage }: ChatInputProps) => {
   const [message, setMessage] = useState('');
 
+  const handleSend = () => {
+    if (message.trim()) {
+      onSendMessage(message.trim());
+      setMessage('');
+    }
+  };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (message.trim()) {
-        onSendMessage(message);
-        setMessage('');
-      }
+      handleSend();
     }
   };
 
   return (
-    <div className="p-4 border-t border-gray-800">
+    <div className="relative">
       <textarea
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="w-full bg-[#2D2D2D] text-white rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
         placeholder="Enter your route planning question..."
+        className="w-full px-4 py-3 bg-[#2D2D2D] text-white rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
         rows={3}
+        style={{ minHeight: '60px', maxHeight: '120px' }}
       />
+      <div className="absolute right-2 bottom-2 text-xs text-gray-400">
+        Press Enter to send
+      </div>
     </div>
   );
 };
