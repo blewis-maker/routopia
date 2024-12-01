@@ -5,7 +5,7 @@ import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Routopia',
-  description: 'Your AI Route Planning Companion',
+  description: 'Your AI-powered route planning assistant',
   icons: {
     icon: '/favicon.ico',
   },
@@ -18,7 +18,19 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head />
+      <head>
+        <link 
+          rel="preload" 
+          href="/next/image?url=%2F_next%2Fstatic%2Fmedia%2Flogo.png&w=256&q=75" 
+          as="image"
+        />
+        <link 
+          rel="preload"
+          href="/routopia.ico" 
+          as="image" 
+          type="image/x-icon"
+        />
+      </head>
       <body>
         <AuthProvider>
           <NavBar />

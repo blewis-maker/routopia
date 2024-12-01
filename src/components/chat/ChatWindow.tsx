@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
 
 interface ChatWindowProps {
   onSendMessage: (message: string) => void;
+  onDestinationChange?: (destination: string) => void;
 }
 
-const ChatWindow = ({ onSendMessage }: ChatWindowProps) => {
+const ChatWindow = ({ onSendMessage, onDestinationChange }: ChatWindowProps) => {
   const [messages, setMessages] = useState<Array<{
     type: 'user' | 'assistant';
     content: string;
@@ -15,8 +16,28 @@ const ChatWindow = ({ onSendMessage }: ChatWindowProps) => {
     content: "I'm here and ready to help you with any route planning or travel-related questions you may have in Colorado. Where are you currently located or where are you planning to go?"
   }]);
 
+  const [currentLocation, setCurrentLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCurrentLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+        }
+      );
+    }
+  }, []);
+
   const handleSendMessage = async (message: string) => {
-    // Add user message to chat
     setMessages(prev => [...prev, { type: 'user', content: message }]);
 
     try {
@@ -25,15 +46,40 @@ const ChatWindow = ({ onSendMessage }: ChatWindowProps) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ 
+          message,
+          location: currentLocation
+        }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response');
-      }
 
       const data = await response.json();
       
+      if (data.message && onDestinationChange) {
+        const patterns = [
+          /I recommend ([^\.]+)/i,
+          /recommend visiting ([^\.]+)/i,
+          /Let's head to ([^\.]+)/i,
+          /heading to ([^\.]+)/i,
+          /suggesting ([^\.]+)/i,
+          /visit ([^(]+?)(?=\s*\(|\.)/i,  // Matches up to coordinates or period
+          /recommend ([^(]+?)(?=\s*\(|\.)/i  // Same as above but with "recommend"
+        ];
+
+        for (const pattern of patterns) {
+          const match = data.message.match(pattern);
+          if (match) {
+            const destination = match[1]
+              .trim()
+              .replace(/\.$/, '')  // Remove trailing period
+              .replace(/\s*\([^)]+\)/, '');  // Remove coordinates if present
+            
+            console.log('Parsed destination:', destination); // Debug log
+            onDestinationChange(destination);
+            break;
+          }
+        }
+      }
+
       setMessages(prev => [...prev, { type: 'assistant', content: data.message }]);
       onSendMessage(data.message);
       

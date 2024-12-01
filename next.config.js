@@ -8,7 +8,20 @@ const nextConfig = {
       bodySizeLimit: '2mb'
     }
   },
-  serverExternalPackages: ['@prisma/client']
+  serverExternalPackages: ['@prisma/client'],
+  async headers() {
+    return [
+      {
+        source: '/favicon.ico',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'image/x-icon'
+          }
+        ]
+      }
+    ]
+  }
 }
 
 module.exports = nextConfig 

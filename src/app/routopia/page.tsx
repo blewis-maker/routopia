@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import Map, { MapRef } from '@/components/Map';
 import ChatWindow from '@/components/chat/ChatWindow';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const RoutopiaPage = () => {
   const mapRef = useRef<MapRef>(null);
@@ -33,7 +34,7 @@ const RoutopiaPage = () => {
 
       {/* Center Map Container */}
       <div className="flex-1 relative">
-        <div className="absolute inset-0">
+        <ErrorBoundary>
           <Map 
             ref={mapRef}
             startLocation={null}
@@ -43,7 +44,7 @@ const RoutopiaPage = () => {
             onStartLocationChange={handleStartLocationChange}
             onDestinationChange={handleDestinationChange}
           />
-        </div>
+        </ErrorBoundary>
       </div>
 
       {/* Right Routes Sidebar */}

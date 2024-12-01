@@ -1,21 +1,19 @@
 'use client';
 
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
-import mapboxgl from 'mapbox-gl';
+import mapboxgl, { LngLatBounds } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { debounce } from 'lodash';
 import { useSession } from 'next-auth/react';
+import { RouteProcessor, ProcessedRoute } from '@/services/routing/RouteProcessor';
+import { MapIntegrationLayer } from '@/services/maps/MapIntegrationLayer';
+import { MAP_FEATURE_FLAGS } from '@/lib/config';
 
 const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 if (!token) {
   throw new Error('Mapbox token not found');
 }
 mapboxgl.accessToken = token;
-
-interface Location {
-  coordinates: [number, number];
-  address: string;
-}
 
 interface MapProps {
   startLocation: [number, number] | null;
@@ -24,6 +22,7 @@ interface MapProps {
   onLocationSelect: (coords: [number, number]) => void;
   onStartLocationChange?: (location: string) => void;
   onDestinationChange?: (location: string) => void;
+  destinationFromChat?: string;
 }
 
 export interface MapRef {
@@ -49,13 +48,16 @@ const getUserStorageKey = (userId: string, type: 'start' | 'dest') => {
   return `user_${userId}_recent_${type}_locations`;
 };
 
+const MAP_CONTAINER_ID = 'routopia-map-container';
+
 const Map = forwardRef<MapRef, MapProps>(({ 
   startLocation, 
   endLocation, 
   waypoints, 
   onLocationSelect,
   onStartLocationChange,
-  onDestinationChange
+  onDestinationChange,
+  destinationFromChat
 }: MapProps, ref) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<mapboxgl.Map | null>(null);
@@ -71,113 +73,109 @@ const Map = forwardRef<MapRef, MapProps>(({
   const [destinationAddress, setDestinationAddress] = useState('');
   const [recentStartLocations, setRecentStartLocations] = useState<RecentLocation[]>([]);
   const [recentDestinations, setRecentDestinations] = useState<RecentLocation[]>([]);
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const [destinationMarker, setDestinationMarker] = useState<mapboxgl.Marker | null>(null);
+  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
+  const routeLayerId = 'route-line';
+  const routeSourceId = 'route';
+  const mapIntegration = useRef<MapIntegrationLayer | null>(null);
+  const routeProcessor = useRef<RouteProcessor | null>(null);
+
+  // Initialize RouteProcessor with map
+  useEffect(() => {
+    if (!routeProcessor.current) {
+      routeProcessor.current = new RouteProcessor('mapbox', token);
+    }
+  }, []);
 
   // Load recent locations from database
   useEffect(() => {
     const loadRecentLocations = async () => {
-      if (!session?.user?.id) {
-        console.log('No user session, skipping recent locations load');
-        return;
-      }
-
       try {
-        console.log('Fetching recent locations for user:', session.user.id);
-        
-        const response = await fetch(`/api/users/${session.user.id}/recent-locations`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-          },
-          credentials: 'include' // Important for auth cookies
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Failed to load recent locations:', response.status, errorText);
-          throw new Error(`HTTP error! status: ${response.status}`);
+        if (status !== 'authenticated') {
+          console.log('User not authenticated, skipping recent locations');
+          return;
         }
 
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          console.error('Invalid content type:', contentType);
-          throw new Error('Invalid response type from server');
+        const response = await fetch('/api/locations/recent');
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            console.log('User needs to authenticate');
+            return;
+          }
+          if (response.status === 404) {
+            console.log('No recent locations found');
+            return;
+          }
+          throw new Error(`Failed to load recent locations: ${response.status}`);
         }
 
         const data = await response.json();
-        console.log('Received recent locations:', data);
-
-        if (data.startLocations) {
-          setRecentStartLocations(data.startLocations.map((loc: any) => ({
-            place_name: loc.place_name,
-            center: [loc.center_lng, loc.center_lat] as [number, number],
-            timestamp: new Date(loc.timestamp).getTime()
-          })));
-        }
-
-        if (data.destLocations) {
-          setRecentDestinations(data.destLocations.map((loc: any) => ({
-            place_name: loc.place_name,
-            center: [loc.center_lng, loc.center_lat] as [number, number],
-            timestamp: new Date(loc.timestamp).getTime()
-          })));
-        }
+        setRecentStartLocations(data.startLocations || []);
+        setRecentDestinations(data.destinations || []);
       } catch (error) {
-        console.error('Failed to load recent locations:', error);
-        // Set empty arrays to prevent undefined errors
+        console.error('Error loading recent locations:', error);
+        // Set empty arrays to prevent further loading attempts
         setRecentStartLocations([]);
         setRecentDestinations([]);
       }
     };
 
     loadRecentLocations();
-  }, [session?.user?.id]);
+  }, [status]); // Only run when authentication status changes
 
   // Modified addToRecent function
-  const addToRecent = async (
-    location: { place_name: string; center: [number, number] },
-    isStart: boolean
-  ) => {
-    if (!session?.user?.id) return;
-
+  const addToRecent = async (location: Suggestion, isStart: boolean) => {
     try {
-      const response = await fetch('/api/recent-locations', {
+      if (!session?.user?.id) {
+        console.log('User not authenticated, skipping recent location save');
+        return;
+      }
+
+      const newLocation = {
+        place_name: location.place_name,
+        center_lat: location.center[1], // Mapbox returns [lng, lat]
+        center_lng: location.center[0],
+        locationType: isStart ? 'START' : 'DESTINATION',
+        timestamp: new Date()
+      };
+
+      // Make API call to save location
+      const response = await fetch('/api/locations/add', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          userId: session.user.id,
-          place_name: location.place_name,
-          center_lat: location.center[1],
-          center_lng: location.center[0],
-          locationType: isStart ? 'start' : 'destination'
-        }),
+        body: JSON.stringify(newLocation),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save location');
+        throw new Error('Failed to save recent location');
       }
 
-      // Update local state
-      const newLocation: RecentLocation = {
-        ...location,
+      // Convert to RecentLocation format for state update
+      const recentLocationFormat: RecentLocation = {
+        place_name: newLocation.place_name,
+        center: [newLocation.center_lng, newLocation.center_lat],
         timestamp: Date.now()
       };
 
+      // Update local state
       if (isStart) {
         setRecentStartLocations(prev => {
-          const filtered = prev.filter(loc => loc.place_name !== location.place_name);
-          return [newLocation, ...filtered].slice(0, MAX_RECENT_LOCATIONS);
+          const filtered = prev.filter(loc => loc.place_name !== recentLocationFormat.place_name);
+          return [recentLocationFormat, ...filtered].slice(0, MAX_RECENT_LOCATIONS);
         });
       } else {
         setRecentDestinations(prev => {
-          const filtered = prev.filter(loc => loc.place_name !== location.place_name);
-          return [newLocation, ...filtered].slice(0, MAX_RECENT_LOCATIONS);
+          const filtered = prev.filter(loc => loc.place_name !== recentLocationFormat.place_name);
+          return [recentLocationFormat, ...filtered].slice(0, MAX_RECENT_LOCATIONS);
         });
       }
+
     } catch (error) {
-      console.error('Failed to save recent location:', error);
+      console.error('Error adding recent location:', error);
     }
   };
 
@@ -259,104 +257,249 @@ const Map = forwardRef<MapRef, MapProps>(({
 
   // Initialize map and controls
   useEffect(() => {
-    if (!mapContainer.current || mapInstance.current) return;
-
-    const map = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
-      center: [-105.5217, 39.0084],
-      zoom: 7,
-      pitch: 0,
-      bearing: 0
-    });
-
-    // Create marker with custom element
-    const markerEl = document.createElement('div');
-    markerEl.className = 'mapboxgl-marker-container';
-    markerEl.innerHTML = `
-      <div class="mapboxgl-marker">
-        <div class="mapboxgl-marker-inner">
-          <img src="/logo.svg" alt="Location" width="24" height="24" />
-        </div>
-        <div class="mapboxgl-marker-pulse"></div>
-      </div>
-    `;
-
-    locationMarker.current = new mapboxgl.Marker({
-      element: markerEl,
-      anchor: 'bottom'
-    });
-
-    // Initialize geolocate control with high accuracy
-    geolocateControl.current = new mapboxgl.GeolocateControl({
-      positionOptions: {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 6000
-      },
-      trackUserLocation: true,
-      showAccuracyCircle: false,
-      showUserLocation: false
-    });
-
-    map.addControl(geolocateControl.current, 'top-right');
-
-    // Add other controls
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-    map.addControl(new mapboxgl.ScaleControl({ unit: 'imperial' }), 'bottom-right');
-
-    // Handle location events
-    geolocateControl.current.on('geolocate', async (position) => {
-      const { longitude, latitude } = position.coords;
-      currentLocation.current = { lat: latitude, lng: longitude };
+    if (mapContainer.current && !mapIntegration.current) {
+      mapContainer.current.id = MAP_CONTAINER_ID;
       
-      // Update marker position
-      if (locationMarker.current) {
-        locationMarker.current.setLngLat([longitude, latitude]);
-        if (!locationMarker.current.getElement().parentNode) {
-          locationMarker.current.addTo(map);
+      mapIntegration.current = new MapIntegrationLayer(MAP_CONTAINER_ID);
+      routeProcessor.current = new RouteProcessor(
+        mapIntegration.current.getActiveProviderName(),
+        token
+      );
+
+      mapIntegration.current.initialize().then(() => {
+        if (MAP_FEATURE_FLAGS.useTrafficData) {
+          mapIntegration.current?.setTrafficLayer(true);
         }
-      }
-
-      // Get and set address
-      await reverseGeocode(latitude, longitude);
-    });
-
-    // Handle map load
-    map.on('load', () => {
-      setIsLoading(false);
-      // Trigger geolocation after map loads
-      geolocateControl.current?.trigger();
-    });
-
-    // Error handling
-    geolocateControl.current.on('error', (err) => {
-      console.error('Geolocation error:', err);
-      setCurrentAddress('Location unavailable');
-    });
-
-    mapInstance.current = map;
-
-    // Cleanup
-    return () => {
-      if (locationMarker.current) locationMarker.current.remove();
-      if (mapInstance.current) mapInstance.current.remove();
-      mapInstance.current = null;
-    };
+        
+        mapIntegration.current?.setGeolocateControl(true);
+        
+        setIsLoading(false);
+      });
+    }
   }, []);
 
-  // Expose methods via ref
+  // Function to get and set user's current location
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          currentLocation.current = { lat: latitude, lng: longitude };
+          
+          if (mapInstance.current) {
+            mapInstance.current.flyTo({
+              center: [longitude, latitude],
+              zoom: 12
+            });
+            
+            // Update marker position
+            if (locationMarker.current) {
+              locationMarker.current.setLngLat([longitude, latitude]);
+            }
+          }
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+        }
+      );
+    }
+  };
+
+  // Update your drawRoute function to use RouteProcessor
+  const drawRoute = async (start: [number, number], end: [number, number]) => {
+    if (!mapIntegration.current || !routeProcessor.current) return;
+
+    try {
+      // Process route using RouteProcessor
+      const processedRoute = await routeProcessor.current.processRoute(
+        { coordinates: start, address: currentAddress },
+        { coordinates: end, address: destinationAddress },
+        waypoints.map(wp => ({ coordinates: wp, address: '' }))
+      );
+
+      // Use MapIntegrationLayer to draw the route
+      await mapIntegration.current.drawRoute(
+        processedRoute.coordinates[0],
+        processedRoute.coordinates[processedRoute.coordinates.length - 1],
+        processedRoute.coordinates.slice(1, -1)
+      );
+
+      setRouteCoordinates(processedRoute.coordinates);
+
+    } catch (error) {
+      console.error('Error drawing route:', error);
+      // Fallback to your existing Mapbox implementation if RouteProcessor fails
+      try {
+        const query = await fetch(
+          `https://api.mapbox.com/directions/v5/mapbox/driving/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&access_token=${token}`
+        );
+        const json = await query.json();
+        
+        if (json.routes && json.routes[0]) {
+          const route = json.routes[0].geometry.coordinates;
+          setRouteCoordinates(route);
+          
+          if (mapInstance.current) {
+            // Clean up existing route
+            if (mapInstance.current.getLayer(routeLayerId)) {
+              mapInstance.current.removeLayer(routeLayerId);
+            }
+            if (mapInstance.current.getSource(routeSourceId)) {
+              mapInstance.current.removeSource(routeSourceId);
+            }
+
+            // Add new route
+            mapInstance.current.addSource(routeSourceId, {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                properties: {},
+                geometry: {
+                  type: 'LineString',
+                  coordinates: route
+                }
+              }
+            });
+
+            mapInstance.current.addLayer({
+              id: routeLayerId,
+              type: 'line',
+              source: routeSourceId,
+              layout: {
+                'line-join': 'round',
+                'line-cap': 'round'
+              },
+              paint: {
+                'line-color': '#3b82f6',
+                'line-width': 4,
+                'line-opacity': 0.75
+              }
+            });
+
+            // Fit bounds
+            const bounds = new LngLatBounds();
+            route.forEach((coord: [number, number]) => {
+              bounds.extend(coord);
+            });
+
+            mapInstance.current.fitBounds(bounds, {
+              padding: 50,
+              duration: 1000,
+              maxZoom: 15
+            });
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Fallback route calculation failed:', fallbackError);
+      }
+    }
+  };
+
+  // Add effect to handle destination changes
+  useEffect(() => {
+    if (destinationFromChat && currentLocation.current) {
+      // Geocode the destination
+      const geocodeDestination = async () => {
+        try {
+          const response = await fetch(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${
+              encodeURIComponent(destinationFromChat)
+            }.json?access_token=${token}&country=us&types=place,poi`
+          );
+
+          if (!response.ok) {
+            throw new Error('Geocoding failed');
+          }
+
+          const data = await response.json();
+          
+          if (data.features?.[0]) {
+            const coords = data.features[0].center;
+            // Update destination address if callback exists
+            if (onDestinationChange) {
+              onDestinationChange(data.features[0].place_name);
+            }
+            
+            // Draw route from current location to destination
+            drawRoute(
+              [currentLocation.current.lng, currentLocation.current.lat],
+              coords
+            );
+          }
+        } catch (error) {
+          console.error('Error geocoding destination:', error);
+        }
+      };
+
+      geocodeDestination();
+    }
+  }, [destinationFromChat]);
+
+  // Expose methods via ref for ChatGPT integration
   useImperativeHandle(ref, () => ({
     showResponse: (response: string) => {
-      if (currentLocation.current && mapInstance.current) {
-        locationMarker.current?.setLngLat([
-          currentLocation.current.lng,
-          currentLocation.current.lat
-        ]);
-      }
+      // This will be called when ChatGPT suggests a location
+      // Parse the response to extract coordinates and place name
+      // Then call setDestination with the extracted data
     },
     getCurrentLocation: () => currentLocation.current
   }));
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          currentLocation.current = { lat: latitude, lng: longitude };
+          console.log('Current location set:', currentLocation.current); // Debug log
+        },
+        (error) => console.error('Geolocation error:', error)
+      );
+    }
+  }, []);
+
+  // Add effect to handle destination from chat
+  useEffect(() => {
+    if (destinationFromChat) {
+      setDestinationAddress(destinationFromChat);
+      // Trigger geocoding for the new destination
+      debouncedDestSuggestions(destinationFromChat);
+    }
+  }, [destinationFromChat]);
+
+  // Clean up route when component unmounts
+  useEffect(() => {
+    return () => {
+      if (mapInstance.current) {
+        if (mapInstance.current.getLayer(routeLayerId)) {
+          mapInstance.current.removeLayer(routeLayerId);
+        }
+        if (mapInstance.current.getSource(routeSourceId)) {
+          mapInstance.current.removeSource(routeSourceId);
+        }
+      }
+    };
+  }, []);
+
+  // Update your route calculation logic
+  const calculateRoute = async (start: Location, end: Location) => {
+    if (!mapIntegration.current) return;
+
+    try {
+      const route = await mapIntegration.current.calculateRoute(start, end);
+      
+      // Update UI with route information
+      if (route.totalDistance && route.totalDuration) {
+        // Update your route summary UI
+        const distance = mapUtils.formatDistance(route.totalDistance);
+        const duration = mapUtils.formatDuration(route.totalDuration);
+        // Update your UI components...
+      }
+    } catch (error) {
+      console.error('Failed to calculate route:', error);
+      // Handle error in UI
+    }
+  };
 
   return (
     <>
@@ -660,7 +803,11 @@ const Map = forwardRef<MapRef, MapProps>(({
         </div>
         
         {/* Map Container */}
-        <div ref={mapContainer} className="absolute inset-0" />
+        <div 
+          ref={mapContainer} 
+          id={MAP_CONTAINER_ID}
+          className="absolute inset-0" 
+        />
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
             <div className="text-white">Loading map...</div>

@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import type { Location } from '@/types';
 import { RoutePanel } from './RoutePanel';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { ChatWindow } from './ChatWindow';
 
 const Map = dynamic(() => import('@/components/Map'), {
   ssr: false,
@@ -25,6 +26,7 @@ export default function RoutesWrapper() {
   const [endLocation, setEndLocation] = useState<Location | null>(null);
   const [waypoints, setWaypoints] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [destinationFromChat, setDestinationFromChat] = useState<string>('');
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -56,6 +58,16 @@ export default function RoutesWrapper() {
     }
   };
 
+  const handleDestinationFromChat = (destination: string) => {
+    setDestinationFromChat(destination);
+    if (destination) {
+      handleLocationSelect({
+        address: destination,
+        coordinates: [0, 0]
+      }, 'end');
+    }
+  };
+
   return (
     <div className="relative h-screen">
       <Map 
@@ -64,6 +76,13 @@ export default function RoutesWrapper() {
         waypoints={waypoints}
         onLocationSelect={handleLocationSelect}
         onPlanRoute={() => setShowRoutePanel(true)}
+        destinationFromChat={destinationFromChat}
+      />
+      <ChatWindow
+        onSendMessage={(message) => {
+          // Handle message if needed
+        }}
+        onDestinationChange={handleDestinationFromChat}
       />
       {showRoutePanel && (
         <RoutePanel
