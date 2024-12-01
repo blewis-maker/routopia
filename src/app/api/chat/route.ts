@@ -1,47 +1,38 @@
-import { OpenAIStream } from '@/lib/openai';
-import { prisma } from '@/lib/prisma';
-import { authenticatedRoute } from '@/lib/auth';
+import { NextResponse } from 'next/server';
+import { testRouteGPT } from '@/lib/gpt/routeGPT';
 
-export const POST = authenticatedRoute(async (req: Request, session) => {
+export async function POST(request: Request) {
   try {
-    const { messages, routeContext } = await req.json();
+    const body = await request.json();
+    console.log('Received chat request:', body); // Debug log
 
-    // Validate input
-    if (!messages || !Array.isArray(messages)) {
-      return new Response('Invalid messages format', { status: 400 });
+    if (!body.message) {
+      return NextResponse.json(
+        { error: 'Message is required' },
+        { status: 400 }
+      );
     }
 
-    // Create or update chat session
-    const chat = await prisma.chat.create({
-      data: {
-        userId: session.user.id,
-        context: routeContext,
-        messages: {
-          create: messages.map((msg: any) => ({
-            content: msg.content,
-            role: msg.role,
-            createdAt: new Date(),
-          })),
-        },
-      },
-      include: {
-        messages: true,
-      },
+    const response = await testRouteGPT({
+      message: body.message,
+      location: body.location
     });
-
-    // Generate AI response stream
-    const stream = await OpenAIStream(messages, routeContext);
     
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    });
+    if (!response) {
+      throw new Error('No response from RouteGPT');
+    }
 
-  } catch (error) {
+    return NextResponse.json({ message: response });
+
+  } catch (error: any) {
     console.error('Chat API error:', error);
-    return new Response('Internal Server Error', { status: 500 });
+    return NextResponse.json(
+      { 
+        error: 'Failed to process chat request', 
+        details: error.message,
+        timestamp: new Date().toISOString()
+      },
+      { status: 500 }
+    );
   }
-}); 
+} 

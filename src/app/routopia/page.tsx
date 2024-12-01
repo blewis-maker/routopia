@@ -36,25 +36,39 @@ export default function RoutopiaPage() {
       if (!inputValue.trim()) return;
 
       try {
+        // Get current location from map
+        const currentLocation = mapRef.current?.getCurrentLocation();
+        
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ message: inputValue }),
+          body: JSON.stringify({ 
+            message: inputValue,
+            location: currentLocation ? {
+              latitude: currentLocation.lat,
+              longitude: currentLocation.lng
+            } : null
+          }),
         });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to get response');
+        }
 
         const data = await response.json();
         
-        // Show response if we have a map reference
-        if (mapRef.current) {
-          mapRef.current.showResponse(data.message || inputValue);
+        if (mapRef.current && data.message) {
+          mapRef.current.showResponse(data.message);
         }
 
         setInputValue('');
       } catch (error) {
+        console.error('Chat error:', error);
         if (mapRef.current) {
-          mapRef.current.showResponse("I'm ready to help plan your route. What would you like to know?");
+          mapRef.current.showResponse("I'm here to help plan your route. What would you like to know?");
         }
       }
     }

@@ -6,9 +6,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 if (!token) {
-  console.error('Mapbox token not found');
+  throw new Error('Mapbox token not found');
 } else {
-  console.log('Mapbox token loaded');
   mapboxgl.accessToken = token;
 }
 
@@ -26,6 +25,7 @@ interface MapProps {
 
 export interface MapRef {
   showResponse: (response: string) => void;
+  getCurrentLocation: () => { lat: number; lng: number } | null;
 }
 
 const Map = forwardRef<MapRef, MapProps>(({ 
@@ -39,11 +39,11 @@ const Map = forwardRef<MapRef, MapProps>(({
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
   const markerPopup = useRef<mapboxgl.Popup | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const currentLocation = useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     if (!mapContainer.current || mapInstance.current) return;
 
-    // Start with Colorado bounds
     const coloradoBounds = [
       [-109.0448, 36.9924], // Southwest coordinates
       [-102.0424, 41.0034]  // Northeast coordinates
@@ -73,15 +73,38 @@ const Map = forwardRef<MapRef, MapProps>(({
         </div>
       `;
 
-      // Initialize the marker
+      // Initialize marker but don't add it to the map yet
       locationMarker.current = new mapboxgl.Marker({
         element: markerEl,
         anchor: 'center'
-      })
-        .setLngLat([-105.2705, 40.0150]) // Default to Boulder, CO
-        .addTo(map);
+      });
 
-      // Add navigation controls in a vertical layout
+      // Add geolocate control
+      const geolocate = new mapboxgl.GeolocateControl({
+        positionOptions: {
+          enableHighAccuracy: true
+        },
+        trackUserLocation: true,
+        showAccuracyCircle: false,
+        showUserLocation: false
+      });
+      map.addControl(geolocate, 'right');
+
+      // Handle geolocate events
+      geolocate.on('geolocate', (position) => {
+        const { longitude, latitude } = position.coords;
+        currentLocation.current = { lat: latitude, lng: longitude };
+        
+        // Only add/update marker when we have a valid location
+        if (locationMarker.current) {
+          locationMarker.current.setLngLat([longitude, latitude]);
+          if (!locationMarker.current.getElement().parentNode) {
+            locationMarker.current.addTo(map);
+          }
+        }
+      });
+
+      // Keep all other existing controls
       const nav = new mapboxgl.NavigationControl({
         showCompass: true,
         showZoom: true,
@@ -89,40 +112,11 @@ const Map = forwardRef<MapRef, MapProps>(({
       });
       map.addControl(nav, 'right');
 
-      // Add geolocate control
-      const geolocate = new mapboxgl.GeolocateControl({
-        positionOptions: {
-          enableHighAccuracy: true
-        },
-        trackUserLocation: false,
-        showAccuracyCircle: false,
-        showUserLocation: false
-      });
-      map.addControl(geolocate, 'right');
-
-      // Add scale control
       const scale = new mapboxgl.ScaleControl({
         maxWidth: 80,
         unit: 'imperial'
       });
       map.addControl(scale, 'bottom-left');
-
-      // Handle geolocate events
-      geolocate.on('geolocate', (position) => {
-        const { longitude, latitude } = position.coords;
-        if (locationMarker.current) {
-          locationMarker.current.setLngLat([longitude, latitude]);
-        }
-      });
-
-      // Handle map click
-      map.on('click', (e) => {
-        const { lng, lat } = e.lngLat;
-        if (locationMarker.current) {
-          locationMarker.current.setLngLat([lng, lat]);
-        }
-        onLocationSelect([lng, lat]);
-      });
 
       // Handle map load
       map.on('load', () => {
@@ -150,218 +144,97 @@ const Map = forwardRef<MapRef, MapProps>(({
     };
   }, []);
 
-  useEffect(() => {
-    if (!mapInstance.current || !locationMarker.current) return;
-    
-    // Handle location updates here
-    if (startLocation) {
-      locationMarker.current.setLngLat(startLocation);
-    }
-  }, [startLocation]);
-
+  // Add back the useImperativeHandle for chat responses
   useImperativeHandle(ref, () => ({
     showResponse: (response: string) => {
-      if (!locationMarker.current || !mapInstance.current) return;
-
       if (markerPopup.current) {
         markerPopup.current.remove();
       }
-
-      const markerLocation = locationMarker.current.getLngLat();
       
-      markerPopup.current = new mapboxgl.Popup({
-        closeButton: false,
-        closeOnClick: true,
-        offset: [15, -15],
-        anchor: 'bottom-left',
-        className: 'marker-popup',
-        maxWidth: 'none'
-      })
-        .setLngLat(markerLocation)
-        .setHTML(`
-          <div class="popup-content">
-            <div class="popup-text">${response}</div>
-          </div>
-        `)
-        .addTo(mapInstance.current);
-    }
+      if (currentLocation.current && mapInstance.current) {
+        markerPopup.current = new mapboxgl.Popup({ 
+          closeButton: false,
+          className: 'chat-popup',
+          offset: [0, -15]
+        })
+          .setLngLat([currentLocation.current.lng, currentLocation.current.lat])
+          .setHTML(`
+            <div class="bg-white text-black p-4 rounded-lg shadow-lg max-w-sm">
+              ${response}
+            </div>
+          `)
+          .addTo(mapInstance.current);
+      }
+    },
+    getCurrentLocation: () => currentLocation.current
   }));
 
-  // Add marker styles
+  // Add the CSS for the bouncing animation
   return (
-    <div className="relative w-full h-full">
-      <div ref={mapContainer} className="absolute inset-0" />
+    <>
       <style jsx global>{`
         .marker-container {
-          width: 32px;
-          height: 32px;
+          width: 40px;
+          height: 40px;
           cursor: pointer;
         }
-
+        
         .marker {
+          position: relative;
           width: 100%;
           height: 100%;
-          animation: bounce 0.5s ease-in-out infinite alternate;
         }
-
+        
         .marker-inner {
+          position: absolute;
           width: 100%;
           height: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 50%;
-          padding: 4px;
-          position: relative;
+          animation: bounce 1s infinite;
+          will-change: transform;
         }
-
+        
         .marker-pulse {
           position: absolute;
-          top: -2px;
-          left: -2px;
-          width: calc(100% + 4px);
-          height: calc(100% + 4px);
+          width: 100%;
+          height: 100%;
           border-radius: 50%;
-          animation: pulse 2s ease-out infinite;
-          pointer-events: none;
-          border: none;
-          background: radial-gradient(
-            circle at center,
-            rgba(0, 200, 150, 0.2) 0%,
-            rgba(0, 200, 150, 0.1) 40%,
-            rgba(0, 200, 150, 0.05) 60%,
-            transparent 100%
-          );
-          box-shadow: 
-            0 0 20px rgba(0, 200, 150, 0.15),
-            0 0 30px rgba(0, 200, 150, 0.1);
-          backdrop-filter: blur(2px);
+          background: rgba(66, 135, 245, 0.2);
+          animation: pulse 1.5s infinite;
+          will-change: transform, opacity;
         }
-
+        
         @keyframes bounce {
-          from {
+          0%, 100% {
             transform: translateY(0);
           }
-          to {
+          50% {
             transform: translateY(-10px);
           }
         }
-
+        
         @keyframes pulse {
           0% {
-            transform: scale(0.98);
-            opacity: 0.8;
+            transform: scale(0.5);
+            opacity: 1;
           }
           100% {
-            transform: scale(1.4);
+            transform: scale(2);
             opacity: 0;
-          }
-        }
-
-        /* Map Controls Container */
-        .mapboxgl-control-container {
-          position: absolute;
-          right: 10px;
-          top: 50%;
-          transform: translateY(-50%);
-        }
-
-        /* Vertical controls layout */
-        .mapboxgl-ctrl-group {
-          margin-bottom: 10px;
-          background: rgba(38, 38, 38, 0.95) !important;
-          border: 1px solid rgba(0, 200, 150, 0.3) !important;
-          border-radius: 8px !important;
-          overflow: hidden;
-        }
-
-        .mapboxgl-ctrl-group button {
-          width: 36px !important;
-          height: 36px !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          border: none !important;
-          border-bottom: 1px solid rgba(0, 200, 150, 0.3) !important;
-          background-color: transparent !important;
-          color: white !important;
-        }
-
-        .mapboxgl-ctrl-group button:last-child {
-          border-bottom: none !important;
-        }
-
-        .mapboxgl-ctrl-group button:hover {
-          background-color: rgba(0, 200, 150, 0.2) !important;
-        }
-
-        /* Scale control styling */
-        .mapboxgl-ctrl-scale {
-          background-color: rgba(38, 38, 38, 0.95) !important;
-          border-color: rgba(0, 200, 150, 0.3) !important;
-          color: white !important;
-          padding: 4px 8px !important;
-          border-radius: 4px !important;
-        }
-
-        /* Geolocate control specific styling */
-        .mapboxgl-ctrl-geolocate {
-          background-image: none !important;
-        }
-
-        .mapboxgl-ctrl-geolocate::before {
-          content: '📍';
-          font-size: 18px;
-        }
-
-        .marker-popup {
-          z-index: 1000;
-        }
-
-        .marker-popup .mapboxgl-popup-content {
-          background-color: rgba(38, 38, 38, 0.95);
-          border: 1px solid rgba(0, 200, 150, 0.3);
-          border-radius: 8px;
-          padding: 12px 16px;
-          color: white;
-          font-size: 14px;
-          line-height: 1.4;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        .popup-content {
-          max-width: 300px;
-          white-space: pre-wrap;
-          word-wrap: break-word;
-        }
-
-        .marker-popup .mapboxgl-popup-close-button {
-          color: rgba(255, 255, 255, 0.7);
-          padding: 4px 8px;
-          font-size: 16px;
-        }
-
-        .marker-popup .mapboxgl-popup-close-button:hover {
-          color: white;
-          background: rgba(255, 255, 255, 0.1);
-        }
-
-        .mapboxgl-popup {
-          animation: popup-fade-in 0.3s ease-out;
-        }
-
-        @keyframes popup-fade-in {
-          from {
-            opacity: 0;
-            transform: translate(-10px, 10px);
-          }
-          to {
-            opacity: 1;
-            transform: translate(0, 0);
           }
         }
       `}</style>
-    </div>
+      <div className="relative w-full h-full">
+        <div ref={mapContainer} className="absolute inset-0" />
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
+            <div className="text-white">Loading map...</div>
+          </div>
+        )}
+      </div>
+    </>
   );
 });
 
