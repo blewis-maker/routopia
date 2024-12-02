@@ -1,9 +1,7 @@
-interface ReportData {
+import type { AggregatedMetrics } from '@/types/monitoring';
+
+interface ReportData extends AggregatedMetrics {
   name: string;
-  avg: number;
-  min: number;
-  max: number;
-  p95: number;
   unit?: string;
 }
 

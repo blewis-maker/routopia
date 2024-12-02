@@ -1,9 +1,7 @@
-interface MetricDefinition {
-  name: string;
-  description: string;
-  unit: string;
+import type { MetricDefinition as BaseMetricDefinition } from '@/types/monitoring';
+
+interface MetricDefinition extends BaseMetricDefinition {
   threshold?: number;
-  calculate: (data: any) => number;
   tags?: string[];
 }
 

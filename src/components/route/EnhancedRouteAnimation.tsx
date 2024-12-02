@@ -87,6 +87,52 @@ export const EnhancedRouteAnimation: React.FC<Props> = ({
     }
   };
 
+  const getActivityColor = (activityType: ActivityType): string => {
+    switch (activityType) {
+      case 'car':
+        return '#FF0000'; // Red
+      case 'bike':
+        return '#00FF00'; // Green
+      case 'walk':
+        return '#0000FF'; // Blue
+      case 'ski':
+        return '#FFFF00'; // Yellow
+      default:
+        return '#FFFFFF'; // White
+    }
+  };
+
+  const getTrailPattern = (trailEffect: string): number[] => {
+    switch (trailEffect) {
+      case 'dashed':
+        return [5, 5];
+      case 'dotted':
+        return [1, 4];
+      case 'wavy':
+        return [10, 5, 2, 5];
+      default:
+        return [];
+    }
+  };
+
+  const projectToCanvas = (
+    point: [number, number],
+    mapInstance: mapboxgl.Map,
+    canvas: HTMLCanvasElement
+  ): [number, number] => {
+    const { lng, lat } = mapInstance.unproject(point);
+    const { x, y } = mapInstance.project({ lng, lat });
+    return [x, y];
+  };
+
+  const updateParticles = (currentPoint: number) => {
+    // Logic to update particles based on currentPoint
+  };
+
+  const drawParticles = (ctx: CanvasRenderingContext2D) => {
+    // Logic to draw particles on the canvas
+  };
+
   useEffect(() => {
     if (!canvasRef.current || !mapInstance || !isAnimating) return;
     const ctx = canvasRef.current.getContext('2d');
@@ -139,4 +185,12 @@ export const EnhancedRouteAnimation: React.FC<Props> = ({
     return () => cancelAnimationFrame(animationFrame);
   }, [path, activityType, progress, mapInstance, isAnimating]);
 
-  // ... rest of the component 
+  return (
+    <canvas
+      ref={canvasRef}
+      className="route-animation-overlay"
+      width={mapInstance?.getCanvas().width || 0}
+      height={mapInstance?.getCanvas().height || 0}
+    />
+  );
+};

@@ -5,6 +5,15 @@ import { PluginSystem } from '@/services/plugins/PluginSystem';
 import { TrafficPlugin } from '@/services/plugins/implementations/TrafficPlugin';
 import { WeatherPlugin } from '@/services/plugins/implementations/WeatherPlugin';
 
+interface Plugin {
+  name: string;
+  version: string;
+  dependencies?: string[];
+  initialize: () => void;
+  activate: () => void;
+  deactivate: () => void;
+}
+
 describe('Plugin System Integration', () => {
   let pluginSystem: PluginSystem;
   let trafficPlugin: TrafficPlugin;
@@ -44,7 +53,7 @@ describe('Plugin System Integration', () => {
     });
 
     test('should handle dependency resolution', async () => {
-      const dependentPlugin = {
+      const dependentPlugin: Plugin = {
         name: 'dependent-plugin',
         version: '1.0.0',
         dependencies: ['traffic', 'weather'],
@@ -88,7 +97,7 @@ describe('Plugin System Integration', () => {
 
   describe('Error Handling', () => {
     test('should handle plugin initialization errors', async () => {
-      const errorPlugin = {
+      const errorPlugin: Plugin = {
         name: 'error-plugin',
         version: '1.0.0',
         initialize: () => { throw new Error('Init failed'); },

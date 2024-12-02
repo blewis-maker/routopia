@@ -7,6 +7,9 @@ graph TB
     end
 
     subgraph Cloud Infrastructure
+        EC2[AWS EC2]
+        Nginx[Nginx Server]
+        PM2[PM2 Process Manager]
         Redis[(Redis Cache)]
         AWS_ES[(AWS ElastiCache)]
         OpenAI[OpenAI GPT-4]
@@ -27,7 +30,12 @@ graph TB
         StateManager[State Manager]
     end
 
-    %% New Connections
+    %% New Deployment Flow
+    UI --> Nginx
+    Nginx --> PM2
+    PM2 --> Agent
+
+    %% Existing Connections
     Chat --> MessageQueue
     MessageQueue --> OpenAI
     OpenAI --> Agent
@@ -86,6 +94,7 @@ graph TB
     classDef realtime fill:#e8eaf6,stroke:#283593
     classDef cloud fill:#b3e5fc,stroke:#0288d1
     classDef flow fill:#e8f5e9,stroke:#2e7d32
+    classDef deployment fill:#e8f5e9,stroke:#2e7d32
 
     class UI,Chat,Maps,Updates ui
     class Auth,Session,UserMgmt auth
@@ -94,5 +103,5 @@ graph TB
     class Car,Bike,Ski route
     class Weather,Places,Trails,Traffic,Training external
     class EventBus,Cache,Updates_Queue realtime
-    class Redis,AWS_ES,OpenAI cloud
+    class Redis,AWS_ES,OpenAI,EC2,Nginx,PM2 cloud
     class ChatHistory,MessageQueue,StateManager flow

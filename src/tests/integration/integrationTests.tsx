@@ -1,3 +1,4 @@
+import React from 'react';
 import { test, expect } from '@playwright/test';
 import { testData } from '../data/testData';
 

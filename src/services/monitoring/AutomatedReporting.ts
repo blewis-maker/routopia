@@ -1,6 +1,7 @@
-interface ReportConfig {
-  schedule: 'hourly' | 'daily' | 'weekly';
-  metrics: string[];
+import type { ReportConfig as BaseReportConfig } from '@/types/monitoring';
+import { PerformanceMetrics } from './PerformanceMetrics';
+
+interface ReportConfig extends BaseReportConfig {
   format: 'json' | 'csv' | 'html';
   destination: 'email' | 'slack' | 'storage';
   recipients?: string[];

@@ -97,6 +97,41 @@ interface RouteUpdate {
   timestamp: Date;
 }
 
+interface CarOptimizationOptions {
+  avoidTraffic: boolean;
+  considerPOIs: boolean;
+  budgetAware: boolean;
+  realTimeAlerts: boolean;
+}
+
+interface BikeOptimizationOptions {
+  trainingMode?: boolean;
+  elevationAware: boolean;
+  weatherOptimized: boolean;
+  safetyFirst: boolean;
+}
+
+interface SkiOptimizationOptions {
+  resortBounds: boolean;
+  trailDifficulty: boolean;
+  conditionAware: boolean;
+  performanceTracking: boolean;
+}
+
+interface PerformanceMetrics {
+  difficulty: number;
+  estimatedDuration: number;
+  caloriesBurn: number;
+}
+
+interface RouteProcessor {
+  getTrafficData(route: ProcessedRoute): Promise<GoogleTrafficData>;
+}
+
+interface WeatherLayer {
+  getWeatherData(coordinates: [number, number]): Promise<WeatherData>;
+}
+
 export class AIRouteEnhancer {
   private routeContext: RouteContext | null = null;
   private enhancementConfig: EnhancedRouteGeneration = {
@@ -130,6 +165,8 @@ export class AIRouteEnhancer {
       restStopFrequency: 5000 // meters between rest stops
     }
   };
+  private routeProcessor: RouteProcessor;
+  private weatherLayer: WeatherLayer;
 
   async enhanceRoute(
     route: ProcessedRoute,
@@ -281,6 +318,7 @@ export class AIRouteEnhancer {
         alternatives.push(
           this.optimizeForHiking(route, context.elevationProfile)
         );
+      }
     }
 
     return alternatives;
@@ -664,5 +702,246 @@ export class AIRouteEnhancer {
       },
       updates: fromEvent(eventBus, 'update')
     };
+  }
+
+  private async optimizeForCar(
+    route: ProcessedRoute,
+    options: CarOptimizationOptions
+  ): Promise<ProcessedRoute> {
+    const optimizedRoute = { ...route };
+    
+    if (options.avoidTraffic) {
+      optimizedRoute.coordinates = await this.avoidHighTrafficAreas(route.coordinates);
+    }
+    
+    if (options.considerPOIs) {
+      optimizedRoute.waypoints = await this.incorporatePointsOfInterest(route);
+    }
+    
+    return optimizedRoute;
+  }
+
+  private async optimizeForBike(
+    route: ProcessedRoute,
+    options: BikeOptimizationOptions
+  ): Promise<ProcessedRoute> {
+    const optimizedRoute = { ...route };
+    
+    if (options.elevationAware) {
+      optimizedRoute.coordinates = await this.optimizeElevationProfile(route);
+    }
+    
+    if (options.safetyFirst) {
+      optimizedRoute.coordinates = await this.prioritizeSafetyFeatures(route);
+    }
+    
+    return optimizedRoute;
+  }
+
+  private async optimizeForSki(
+    route: ProcessedRoute,
+    options: SkiOptimizationOptions
+  ): Promise<ProcessedRoute> {
+    const optimizedRoute = { ...route };
+    
+    if (options.resortBounds) {
+      optimizedRoute.coordinates = await this.enforceResortBoundaries(route);
+    }
+    
+    if (options.conditionAware) {
+      optimizedRoute.waypoints = await this.incorporateSnowConditions(route);
+    }
+    
+    return optimizedRoute;
+  }
+
+  private generateRecommendations(
+    route: ProcessedRoute,
+    activityType: ActivityType
+  ): string[] {
+    const recommendations: string[] = [];
+    const context = this.routeContext!;
+
+    // Weather-based recommendations
+    const weather = context.weatherConditions.current;
+    if (weather.precipitation > 0) {
+      recommendations.push('Bring rain gear');
+    }
+    if (weather.temp < 10) {
+      recommendations.push('Dress warmly');
+    }
+
+    // Activity-specific recommendations
+    switch (activityType.type) {
+      case 'bike':
+        recommendations.push('Wear a helmet');
+        break;
+      case 'ski':
+        recommendations.push('Check resort conditions');
+        break;
+    }
+
+    return recommendations;
+  }
+
+  private calculatePerformanceMetrics(
+    route: ProcessedRoute,
+    activityType: ActivityType
+  ): PerformanceMetrics {
+    const elevation = this.routeContext!.elevationProfile;
+    const totalDistance = this.calculateTotalDistance(route.coordinates);
+    
+    return {
+      difficulty: this.calculateRouteDifficulty(elevation, activityType),
+      estimatedDuration: this.estimateActivityDuration(totalDistance, activityType),
+      caloriesBurn: this.estimateCalorieBurn(totalDistance, elevation, activityType)
+    };
+  }
+
+  private hasSignificantChange(
+    newTraffic: GoogleTrafficData,
+    oldTraffic: GoogleTrafficData
+  ): boolean {
+    return (
+      newTraffic.congestionLevel !== oldTraffic.congestionLevel ||
+      newTraffic.incidents.length !== oldTraffic.incidents.length ||
+      this.hasNewIncidents(newTraffic.incidents, oldTraffic.incidents)
+    );
+  }
+
+  private assessTrafficSeverity(traffic: GoogleTrafficData): 'low' | 'medium' | 'high' {
+    if (traffic.incidents.some(i => i.severity > 3)) return 'high';
+    if (traffic.congestionLevel === 'high') return 'high';
+    if (traffic.congestionLevel === 'medium') return 'medium';
+    return 'low';
+  }
+
+  private generateTrafficUpdate(traffic: GoogleTrafficData): string {
+    const incidents = traffic.incidents
+      .map(i => `${i.type} - ${i.description}`)
+      .join('; ');
+    return `Traffic Level: ${traffic.congestionLevel}${incidents ? `. Incidents: ${incidents}` : ''}`;
+  }
+
+  private hasSignificantWeatherChange(
+    newWeather: WeatherData,
+    oldWeather: WeatherData
+  ): boolean {
+    const current = newWeather.current;
+    const old = oldWeather.current;
+    
+    return (
+      Math.abs(current.temp - old.temp) > 5 ||
+      Math.abs(current.precipitation - old.precipitation) > 2 ||
+      Math.abs(current.windSpeed - old.windSpeed) > 5
+    );
+  }
+
+  /**
+   * Avoids high traffic areas by adjusting the route coordinates.
+   * @param coordinates - The original route coordinates.
+   * @returns The adjusted route coordinates.
+   */
+  private async avoidHighTrafficAreas(coordinates: [number, number][]): Promise<[number, number][]> {
+    // Implement logic to avoid high traffic areas
+    return coordinates;
+  }
+
+  /**
+   * Incorporates points of interest into the route.
+   * @param route - The original route.
+   * @returns The waypoints including points of interest.
+   */
+  private async incorporatePointsOfInterest(route: ProcessedRoute): Promise<any[]> {
+    // Implement logic to add points of interest
+    return [];
+  }
+
+  /**
+   * Optimizes the elevation profile of the route.
+   * @param route - The original route.
+   * @returns The adjusted route coordinates.
+   */
+  private async optimizeElevationProfile(route: ProcessedRoute): Promise<[number, number][]> {
+    // Implement logic to optimize elevation profile
+    return route.coordinates;
+  }
+
+  /**
+   * Prioritizes safety features in the route.
+   * @param route - The original route.
+   * @returns The adjusted route coordinates.
+   */
+  private async prioritizeSafetyFeatures(route: ProcessedRoute): Promise<[number, number][]> {
+    // Implement logic to prioritize safety features
+    return route.coordinates;
+  }
+
+  /**
+   * Enforces resort boundaries for ski routes.
+   * @param route - The original route.
+   * @returns The adjusted route coordinates.
+   */
+  private async enforceResortBoundaries(route: ProcessedRoute): Promise<[number, number][]> {
+    // Implement logic to enforce resort boundaries
+    return route.coordinates;
+  }
+
+  /**
+   * Incorporates snow conditions into the ski route.
+   * @param route - The original route.
+   * @returns The waypoints including snow conditions.
+   */
+  private async incorporateSnowConditions(route: ProcessedRoute): Promise<any[]> {
+    // Implement logic to incorporate snow conditions
+    return [];
+  }
+
+  private hasNewIncidents(
+    newIncidents: GoogleTrafficData['incidents'],
+    oldIncidents: GoogleTrafficData['incidents']
+  ): boolean {
+    return newIncidents.some(newInc => 
+      !oldIncidents.some(oldInc => 
+        oldInc.type === newInc.type && 
+        oldInc.description === newInc.description
+      )
+    );
+  }
+
+  private calculateTotalDistance(coordinates: [number, number][]): number {
+    let distance = 0;
+    for (let i = 1; i < coordinates.length; i++) {
+      distance += this.calculateDistance(
+        coordinates[i-1][0], coordinates[i-1][1],
+        coordinates[i][0], coordinates[i][1]
+      );
+    }
+    return distance;
+  }
+
+  private calculateRouteDifficulty(
+    elevation: ElevationData,
+    activityType: ActivityType
+  ): number {
+    // Implement difficulty calculation logic
+    return 1;
+  }
+
+  private estimateActivityDuration(
+    distance: number,
+    activityType: ActivityType
+  ): number {
+    // Implement duration estimation logic
+    return 0;
+  }
+
+  private estimateCalorieBurn(
+    distance: number,
+    elevation: ElevationData,
+    activityType: ActivityType
+  ): number {
+    // Implement calorie burn estimation logic
+    return 0;
   }
 } 

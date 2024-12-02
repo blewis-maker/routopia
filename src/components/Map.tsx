@@ -13,7 +13,7 @@ import ChatInput from '@/components/chat/ChatInput';
 import { WeatherOverlay } from './display/WeatherOverlay';
 import { ElevationProfile } from './display/ElevationProfile';
 import { TrafficVisualization } from './display/TrafficVisualization';
-import { ActivitySelector } from './controls/ActivitySelector';
+import { ActivitySelector } from './activity/ActivitySelector';
 import { SettingsMenu } from './controls/SettingsMenu';
 import { NotificationSystem } from './feedback/NotificationSystem';
 import { EnhancedSearchBox } from './search/EnhancedSearchBox';

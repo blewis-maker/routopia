@@ -1,15 +1,4 @@
-interface MetricPoint {
-  value: number;
-  timestamp: number;
-  metadata?: Record<string, any>;
-}
-
-interface PerformanceMetric {
-  name: string;
-  points: MetricPoint[];
-  threshold?: number;
-  unit: string;
-}
+import type { MetricPoint, PerformanceMetric } from '@/types/monitoring';
 
 export class PerformanceMetrics {
   private metrics: Map<string, PerformanceMetric>;
@@ -91,5 +80,56 @@ export class PerformanceMetrics {
     this.observers.forEach(observer => observer(metric));
   }
 
-  getAggregatedMetrics(
+  getAggregatedMetrics(options: {
+    timeRange?: {
+      start: number;
+      end: number;
+    };
+    metrics?: string[];
+    aggregation: 'avg' | 'min' | 'max' | 'sum';
+  }): Record<string, {
+    value: number;
+    unit: string;
+  }> {
+    const result: Record<string, { value: number; unit: string }> = {};
+    const metricsToAggregate = options.metrics || Array.from(this.metrics.keys());
+
+    metricsToAggregate.forEach(metricName => {
+      const metric = this.metrics.get(metricName);
+      if (!metric) return;
+
+      let points = metric.points;
+      if (options.timeRange) {
+        points = points.filter(point => 
+          point.timestamp >= options.timeRange!.start && 
+          point.timestamp <= options.timeRange!.end
+        );
+      }
+
+      if (points.length === 0) return;
+
+      let value: number;
+      switch (options.aggregation) {
+        case 'min':
+          value = Math.min(...points.map(p => p.value));
+          break;
+        case 'max':
+          value = Math.max(...points.map(p => p.value));
+          break;
+        case 'sum':
+          value = points.reduce((sum, p) => sum + p.value, 0);
+          break;
+        case 'avg':
+        default:
+          value = points.reduce((sum, p) => sum + p.value, 0) / points.length;
+      }
+
+      result[metricName] = {
+        value,
+        unit: metric.unit
+      };
+    });
+
+    return result;
+  }
 } 

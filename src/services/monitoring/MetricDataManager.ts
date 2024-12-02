@@ -1,4 +1,4 @@
-import { PerformanceMetric } from './PerformanceMetrics';
+import type { MetricPoint, PerformanceMetric } from '@/types/monitoring';
 
 interface ExportFormat {
   version: string;

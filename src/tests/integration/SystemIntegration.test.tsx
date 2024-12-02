@@ -1,9 +1,16 @@
+import React from 'react';
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { SystemManager } from '@/components/integration/SystemManager';
 import { MapProviderSystem } from '@/services/integration/MapProviderSystem';
 import { ServiceAdapterFramework } from '@/services/integration/ServiceAdapterFramework';
 import { PluginSystem } from '@/services/plugins/PluginSystem';
+import type { 
+  MapProvider,
+  AdapterType,
+  PluginIdentifier,
+  SystemManagerProps
+} from '@/types/system';
 
 describe('System Integration Tests', () => {
   let mapSystem: MapProviderSystem;
@@ -35,12 +42,14 @@ describe('System Integration Tests', () => {
       fireEvent.click(getByText('Mapbox'));
       
       await waitFor(() => {
-        expect(switchSpy).toHaveBeenCalledWith('mapbox');
+        expect(switchSpy).toHaveBeenCalledWith('mapbox' as MapProvider);
       });
     });
 
     test('should handle provider switch errors', async () => {
-      vi.spyOn(mapSystem, 'switchProvider').mockRejectedValue(new Error('Switch failed'));
+      vi.spyOn(mapSystem, 'switchProvider').mockRejectedValue(
+        new Error('Switch failed')
+      );
       
       const { getByText } = render(
         <SystemManager
@@ -73,7 +82,7 @@ describe('System Integration Tests', () => {
       fireEvent.click(getByText('Routing Adapter'));
       
       await waitFor(() => {
-        expect(setAdapterSpy).toHaveBeenCalled();
+        expect(setAdapterSpy).toHaveBeenCalledWith('routing' as AdapterType);
       });
     });
   });
@@ -91,16 +100,18 @@ describe('System Integration Tests', () => {
         />
       );
 
+      const testPluginId: PluginIdentifier = 'test-plugin';
+
       // Test activation
       fireEvent.click(getByText('Test Plugin'));
       await waitFor(() => {
-        expect(activateSpy).toHaveBeenCalled();
+        expect(activateSpy).toHaveBeenCalledWith(testPluginId);
       });
 
       // Test deactivation
       fireEvent.click(getByText('Test Plugin'));
       await waitFor(() => {
-        expect(deactivateSpy).toHaveBeenCalled();
+        expect(deactivateSpy).toHaveBeenCalledWith(testPluginId);
       });
     });
   });

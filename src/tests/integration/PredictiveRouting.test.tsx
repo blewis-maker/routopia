@@ -1,16 +1,24 @@
+import React from 'react';
 import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { PredictiveRoutingPanel } from '@/components/features/PredictiveRoutingPanel';
 import { AdvancedFeatureImplementations } from '@/services/features/AdvancedFeatureImplementations';
+import type { 
+  Route,
+  RoutePreferences,
+  Coordinates,
+  WeatherCondition,
+  TrafficLevel
+} from '@/types/routing';
 
 describe('Predictive Routing Integration', () => {
-  const mockRoute = {
-    path: [[0, 0], [1, 1]],
+  const mockRoute: Route = {
+    path: [[0, 0], [1, 1]] as Coordinates[],
     duration: 1200,
     distance: 5000,
     conditions: {
-      weather: 'clear',
-      traffic: 'light'
+      weather: 'clear' as WeatherCondition,
+      traffic: 'light' as TrafficLevel
     }
   };
 
@@ -19,7 +27,7 @@ describe('Predictive Routing Integration', () => {
   });
 
   test('should calculate route with all preferences enabled', async () => {
-    const onRouteCalculated = vi.fn();
+    const onRouteCalculated = vi.fn<[Route], void>();
     vi.spyOn(AdvancedFeatureImplementations, 'calculatePredictiveRoute')
       .mockResolvedValue(mockRoute);
 
@@ -65,7 +73,7 @@ describe('Predictive Routing Integration', () => {
   });
 
   test('should update route when preferences change', async () => {
-    const onRouteCalculated = vi.fn();
+    const onRouteCalculated = vi.fn<[Route], void>();
     const calculateSpy = vi.spyOn(
       AdvancedFeatureImplementations,
       'calculatePredictiveRoute'
@@ -82,7 +90,7 @@ describe('Predictive Routing Integration', () => {
       expect(calculateSpy).toHaveBeenCalledWith(
         expect.any(Array),
         expect.any(Array),
-        expect.objectContaining({ useHistoricalData: true }),
+        expect.objectContaining({ useHistoricalData: true } as RoutePreferences),
         expect.any(Date)
       );
     });

@@ -7,9 +7,9 @@ import { handlers } from './mockHandlers';
 export const server = setupServer(...handlers);
 
 // Setup
-beforeAll(() => {
+beforeAll(async () => {
   // Start mock server
-  server.listen();
+  await server.listen({ onUnhandledRequest: 'error' });
   
   // Mock window properties
   Object.defineProperty(window, 'matchMedia', {
@@ -36,9 +36,9 @@ beforeAll(() => {
 });
 
 // Cleanup
-afterEach(() => {
-  server.resetHandlers();
+afterEach(async () => {
+  await server.resetHandlers();
   vi.clearAllMocks();
 });
 
-afterAll(() => server.close()); 
+afterAll(async () => await server.close()); 

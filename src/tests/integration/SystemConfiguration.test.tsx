@@ -1,3 +1,4 @@
+import React from 'react';
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { ConfigurationPanel } from '@/components/system/ConfigurationPanel';
