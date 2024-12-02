@@ -1,4 +1,4 @@
-export const deploymentConfig = {
+const deploymentConfig = {
   environments: {
     production: {
       api: {
@@ -46,4 +46,6 @@ export const deploymentConfig = {
       scaleDownThreshold: 0.3 // 30% CPU
     }
   }
-}; 
+};
+
+module.exports = { deploymentConfig }; 

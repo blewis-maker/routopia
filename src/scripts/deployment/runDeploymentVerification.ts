@@ -1,5 +1,9 @@
-const { DeploymentVerificationService } = require('../../services/deployment/deploymentVerificationService');
+const { DeploymentVerificationService: VerificationService } = require('../../services/deployment/deploymentVerificationService');
 const { analytics } = require('../../services/analytics/analyticsService');
+const fs = require('fs');
+const path = require('path');
+require('dotenv').config({ path: '.env.local' });  // Load .env.local first
+require('dotenv').config({ path: '.env' });        // Then load .env
 
 interface VerificationResult {
   category: string;
@@ -18,41 +22,48 @@ interface DeploymentVerificationReport {
 }
 
 async function runDeploymentVerification() {
-  console.log('🚀 Running Pre-Verification Checks...');
+  console.log('🚀 Environment Debug:');
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  console.log('Current Directory:', __dirname);
+
+  // Add env file check
+  const envFiles = ['.env.local', '.env'];
+  console.log('\n📝 Checking ENV Files:');
+  envFiles.forEach(file => {
+    const exists = fs.existsSync(path.resolve(process.cwd(), file));
+    console.log(`${exists ? '✅' : '❌'} ${file} ${exists ? 'found' : 'not found'}`);
+  });
+
+  console.log('\n🚀 Running Pre-Verification Checks...');
 
   // Pre-verification environment checks
   const preChecks = {
     nodeVersion: process.version,
     environment: process.env.NODE_ENV,
     requiredFiles: [
-      'deploymentConfig.ts',
-      'analyticsService.ts',
-      'deploymentVerificationService.ts'
+      'config/deployment/deploymentConfig.ts',
+      'services/analytics/analyticsService.ts',
+      'services/deployment/deploymentVerificationService.ts'
     ],
-    requiredEnv: [
-      // Database
-      'DATABASE_URL',
-      // Redis
-      'UPSTASH_REDIS_URL',
-      'UPSTASH_REDIS_TOKEN',
-      'REDIS_ENDPOINT',
-      'REDIS_PORT',
-      // Auth
-      'NEXTAUTH_URL',
-      'NEXTAUTH_SECRET',
-      // APIs
-      'NEXT_PUBLIC_MAPBOX_TOKEN',
-      'OPENAI_API_KEY',
-      'NEXT_PUBLIC_GOOGLE_MAPS_KEY',
-      // AWS
-      'AWS_REGION',
-      'AWS_ACCESS_KEY_ID',
-      'AWS_SECRET_ACCESS_KEY',
-      'AWS_USER_AVATARS_BUCKET',
-      'AWS_USER_CONTENT_BUCKET',
-      'AWS_ROUTE_DATA_BUCKET',
-      'AWS_ACTIVITY_DATA_BUCKET'
-    ]
+    requiredEnv: {
+      database: ['DATABASE_URL'],
+      redis: ['UPSTASH_REDIS_URL', 'UPSTASH_REDIS_TOKEN', 'REDIS_ENDPOINT', 'REDIS_PORT'],
+      auth: ['NEXTAUTH_URL', 'NEXTAUTH_SECRET'],
+      services: [
+        'NEXT_PUBLIC_MAPBOX_TOKEN',
+        'OPENAI_API_KEY',
+        'NEXT_PUBLIC_GOOGLE_MAPS_KEY'
+      ],
+      aws: [
+        'AWS_REGION',
+        'AWS_ACCESS_KEY_ID',
+        'AWS_SECRET_ACCESS_KEY',
+        'AWS_USER_AVATARS_BUCKET',
+        'AWS_USER_CONTENT_BUCKET',
+        'AWS_ROUTE_DATA_BUCKET',
+        'AWS_ACTIVITY_DATA_BUCKET'
+      ]
+    }
   };
 
   // Verify Node version
@@ -62,29 +73,52 @@ async function runDeploymentVerification() {
     return false;
   }
 
-  // Check environment
+  // Check environment with more detailed error
   if (!process.env.NODE_ENV || !['staging', 'production'].includes(process.env.NODE_ENV)) {
-    console.error('❌ Environment must be staging or production for verification');
+    console.error(`❌ Environment Check Failed:`);
+    console.error(`- Current NODE_ENV: ${process.env.NODE_ENV}`);
+    console.error(`- Expected: 'staging' or 'production'`);
+    console.error(`- Check your .env and .env.local files`);
     return false;
   }
 
   // Check required files
   console.log('\n📁 Checking Required Files...');
   for (const file of preChecks.requiredFiles) {
-    try {
-      require(`../../${file}`);
-      console.log(`✅ Found ${file}`);
-    } catch (error) {
+    const filePath = path.resolve(__dirname, '../../', file);
+    console.log(`Checking for file: ${filePath}`);
+    
+    if (!fs.existsSync(filePath)) {
       console.error(`❌ Missing required file: ${file}`);
+      console.error(`   Looking for: ${filePath}`);
+      console.error(`   Does file exist? ${fs.existsSync(filePath)}`);
+      return false;
+    }
+    
+    try {
+      require(filePath);
+      console.log(`✅ Found ${file}`);
+    } catch (error: any) {
+      console.error(`❌ Error requiring ${file}:`, error?.message || 'Unknown error');
       return false;
     }
   }
 
   // Check required env variables
   console.log('\n🔐 Checking Environment Variables...');
-  const missingEnv = preChecks.requiredEnv.filter(env => !process.env[env]);
-  if (missingEnv.length > 0) {
-    console.error('❌ Missing required environment variables:', missingEnv);
+  const missingEnv = Object.entries(preChecks.requiredEnv).reduce((missing, [category, vars]) => {
+    const categoryMissing = vars.filter(v => !process.env[v]);
+    if (categoryMissing.length > 0) {
+      missing[category] = categoryMissing;
+    }
+    return missing;
+  }, {});
+
+  if (Object.keys(missingEnv).length > 0) {
+    console.error('❌ Missing environment variables:');
+    Object.entries(missingEnv).forEach(([category, vars]) => {
+      console.error(`   ${category}: ${vars.join(', ')}`);
+    });
     return false;
   }
 
@@ -99,7 +133,7 @@ async function runDeploymentVerification() {
 
   // Run main verification
   console.log('\n🚀 Starting Deployment Verification...');
-  const verificationService = new DeploymentVerificationService();
+  const verificationService = new VerificationService();
 
   try {
     const report = await verificationService.verifyDeployment();

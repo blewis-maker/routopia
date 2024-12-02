@@ -1,4 +1,4 @@
-const { analytics } = require('../analytics/analyticsService');
+const { analytics: analyticsService } = require('../analytics/analyticsService');
 
 interface ServiceConfig {
   name: string;
@@ -10,7 +10,6 @@ class DeploymentVerificationService {
 
   async verifyDeployment(): Promise<DeploymentVerificationReport> {
     try {
-      // Run all verification checks in parallel
       const results = await Promise.all([
         this.verifyConfigurations(),
         this.verifyEnvironmentVariables(),
@@ -18,11 +17,9 @@ class DeploymentVerificationService {
         this.verifySSLCertificates()
       ]);
 
-      // Generate verification report
       const report = this.generateReport(results);
       
-      // Track verification completion
-      analytics.trackDeploymentVerification(report);
+      analyticsService.trackDeploymentVerification(report);
 
       return report;
     } catch (error) {
@@ -107,16 +104,20 @@ class DeploymentVerificationService {
   }
 
   private async verifySSLCertificates(): Promise<VerificationResult> {
-    const domains = [
-      'api.routopia.com',
-      'www.routopia.com',
-      'cdn.routopia.com'
-    ];
+    const domains = process.env.NODE_ENV === 'development' 
+      ? ['localhost:3000']  // Development domains
+      : [                   // Production/Staging domains
+          'routopia.io',
+          'api.routopia.io',
+          'staging.routopia.io'
+        ];
 
     const certResults = await Promise.all(
       domains.map(async domain => ({
         domain,
-        valid: await this.validateSSL(domain)
+        valid: domain.includes('localhost') 
+          ? true  // Skip SSL check for localhost
+          : await this.validateSSL(domain)
       }))
     );
 
@@ -128,7 +129,8 @@ class DeploymentVerificationService {
       details: {
         checked: domains,
         invalid: invalidCerts.map(c => c.domain),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV
       }
     };
   }
@@ -201,5 +203,5 @@ interface DeploymentVerificationReport {
   recommendations: string[];
 }
 
-// Export as a namespace to avoid conflicts
-export = { DeploymentVerificationService };
+// Change the export syntax
+module.exports = { DeploymentVerificationService };

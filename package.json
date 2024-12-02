@@ -23,6 +23,7 @@
     "ai": "^4.0.9",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
+    "dotenv": "^16.4.5",
     "ioredis": "^5.4.1",
     "lodash": "^4.17.21",
     "lucide-react": "^x.x",
@@ -33,9 +34,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwind-merge": "^2.0.0",
-    "uuid": "^11.0.3",
-    "@/components/ui/input": "...",
-    "@/components/ui/button": "..."
+    "uuid": "^11.0.3"
   },
   "devDependencies": {
     "@types/lodash": "^4.17.13",

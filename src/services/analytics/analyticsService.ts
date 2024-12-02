@@ -1,4 +1,4 @@
-export = {
+module.exports = {
   analytics: {
     trackEvent: (eventName: string, metadata: Record<string, any>) => {
       console.log(`📊 Analytics Event: ${eventName}`, metadata);
