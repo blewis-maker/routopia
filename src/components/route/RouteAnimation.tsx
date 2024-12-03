@@ -3,17 +3,17 @@ import { useSpring, animated } from '@react-spring/web';
 import type { ActivityType } from '@/types/routes';
 
 interface Props {
-  path: [number, number][];
-  activityType: ActivityType;
-  isAnimating: boolean;
+  activityType?: ActivityType;
+  path?: [number, number][];
+  isAnimating?: boolean;
   duration?: number;
   mapInstance?: mapboxgl.Map;
 }
 
 export const RouteAnimation: React.FC<Props> = ({
-  path,
-  activityType,
-  isAnimating,
+  activityType = 'walk',
+  path = [],
+  isAnimating = false,
   duration = 2000,
   mapInstance
 }) => {
@@ -91,7 +91,7 @@ export const RouteAnimation: React.FC<Props> = ({
 
   return (
     <canvas
-      ref={canvasRef}
+      data-testid="route-animation-canvas"
       className={`route-animation-canvas activity-${activityType}`}
       width={window.innerWidth}
       height={window.innerHeight}

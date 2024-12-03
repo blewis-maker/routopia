@@ -186,11 +186,11 @@ export const EnhancedRouteAnimation: React.FC<Props> = ({
   }, [path, activityType, progress, mapInstance, isAnimating]);
 
   return (
-    <canvas
-      ref={canvasRef}
+    <canvas 
+      data-testid="route-animation-overlay"
       className="route-animation-overlay"
-      width={mapInstance?.getCanvas().width || 0}
-      height={mapInstance?.getCanvas().height || 0}
+      width={800}
+      height={600}
     />
   );
 };

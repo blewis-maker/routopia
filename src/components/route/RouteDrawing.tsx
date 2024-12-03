@@ -96,7 +96,7 @@ export const RouteDrawing: React.FC<Props> = ({
       addPoint({ coordinates: [lng, lat], timestamp: Date.now() });
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: mapboxgl.MapMouseEvent) => {
       if (points.length < 2) return;
       
       setIsSmoothing(true);
@@ -107,13 +107,13 @@ export const RouteDrawing: React.FC<Props> = ({
     };
 
     mapInstance.on('mousemove', handleMouseMove);
-    mapInstance.once('mouseup', handleMouseUp);
+    mapInstance.on('mouseup', handleMouseUp);
 
     return () => {
       mapInstance.off('mousemove', handleMouseMove);
       mapInstance.off('mouseup', handleMouseUp);
     };
-  }, [isDrawing, mapInstance, onDrawComplete, onDrawProgress, enableUndo, snapToRoads]);
+  }, [mapInstance, isDrawing, onDrawComplete, onDrawProgress, enableUndo, snapToRoads]);
 
   useEffect(() => {
     if (!canvasRef.current || points.length < 2) return;

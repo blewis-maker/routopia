@@ -8,7 +8,9 @@ import type {
   MetricDefinition,
   ReportConfig,
   ExportedMetrics,
-  MetricPoint
+  MetricPoint,
+  UserPreferences,
+  ActivityHistory
 } from '@/types/monitoring';
 
 describe('Metrics System Integration', () => {
@@ -32,6 +34,77 @@ describe('Metrics System Integration', () => {
     await testEnv.teardown();
   });
 
+  // Phase 1: Data Integrity - User Preferences
+  describe('User Preferences Management', () => {
+    test('should persist user preferences correctly', async () => {
+      const mockPreferences: UserPreferences = {
+        theme: 'dark',
+        units: 'metric',
+        notifications: ['weather', 'route-updates'],
+        defaultActivity: 'hiking'
+      };
+
+      await dataManager.saveUserPreferences('user-1', mockPreferences);
+      const savedPreferences = await dataManager.getUserPreferences('user-1');
+      
+      expect(savedPreferences).toEqual(mockPreferences);
+    });
+
+    test('should handle preference updates', async () => {
+      const initialPrefs: UserPreferences = {
+        theme: 'light',
+        units: 'imperial',
+        notifications: ['weather'],
+        defaultActivity: 'cycling'
+      };
+
+      await dataManager.saveUserPreferences('user-1', initialPrefs);
+      
+      // Update single preference
+      await dataManager.updateUserPreference('user-1', 'theme', 'dark');
+      const updatedPrefs = await dataManager.getUserPreferences('user-1');
+      
+      expect(updatedPrefs.theme).toBe('dark');
+      expect(updatedPrefs.units).toBe('imperial'); // Other prefs unchanged
+    });
+  });
+
+  // Phase 1: Data Integrity - Activity History
+  describe('Activity History Tracking', () => {
+    test('should record new activity entries', async () => {
+      const mockActivity: ActivityHistory = {
+        timestamp: new Date().toISOString(),
+        type: 'hiking',
+        duration: 3600,
+        distance: 5000,
+        route: 'route-1'
+      };
+
+      await dataManager.recordActivity('user-1', mockActivity);
+      const history = await dataManager.getActivityHistory('user-1');
+      
+      expect(history).toContainEqual(mockActivity);
+    });
+
+    test('should maintain activity history integrity', async () => {
+      const activities = [
+        { timestamp: '2024-03-19T10:00:00Z', type: 'hiking', duration: 3600 },
+        { timestamp: '2024-03-19T15:00:00Z', type: 'cycling', duration: 1800 }
+      ];
+
+      // Record multiple activities
+      for (const activity of activities) {
+        await dataManager.recordActivity('user-1', activity);
+      }
+
+      const history = await dataManager.getActivityHistory('user-1');
+      
+      expect(history).toHaveLength(2);
+      expect(history).toBeSortedBy('timestamp', { descending: true });
+    });
+  });
+
+  // Keep existing metrics tests
   test('should record and export metrics', async () => {
     // Record some test metrics
     metrics.record('test.metric', 100);

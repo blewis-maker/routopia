@@ -113,11 +113,11 @@ export const AdvancedRouteEffects: React.FC<Props> = ({
   }, [weather, timeOfDay, terrain]);
 
   return (
-    <canvas
-      ref={canvasRef}
+    <canvas 
+      data-testid="route-effects-canvas"
       className="route-effects-canvas"
-      width={window.innerWidth}
-      height={window.innerHeight}
+      width={1024}
+      height={768}
     />
   );
 }; 

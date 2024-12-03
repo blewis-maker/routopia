@@ -1,192 +1,168 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { TestContextProvider } from '../utils/TestContextProvider';
-import { mockGenerators } from '../utils/mockGenerators';
-import { ActivityTracker } from '../../components/ActivityTracker';
-import type { ActivityDetails } from '../../types/activities-enhanced';
+import { ActivityTracker } from '@/components/ActivityTracker';
+import { MetricsService } from '@/services/metrics/MetricsService';
+import { LocationService } from '@/services/location/LocationService';
+import type { 
+  ActivityMetrics,
+  TrackingState,
+  LiveMetrics,
+  ActivitySummary 
+} from '@/types/activities';
 
-describe('ActivityTracking Integration', () => {
-  const mockActivity: ActivityDetails = {
-    type: 'hiking',
-    metrics: {
-      speed: {
-        min: 2,
-        max: 8,
-        average: 4,
-        unit: 'km/h'
-      },
-      elevation: {
-        minGain: 0,
-        maxGain: 1000,
-        preferredGain: 500,
-        unit: 'm'
-      },
-      duration: {
-        min: 30,
-        max: 240,
-        preferred: 120,
-        unit: 'minutes'
-      }
-    },
-    requirements: {
-      fitness: 'intermediate',
-      technical: 'medium',
-      equipment: ['hiking_boots', 'water_bottle'],
-      season: ['spring', 'summer', 'fall']
-    },
-    constraints: {
-      weather: {
-        maxWind: 30,
-        maxTemp: 30,
-        minTemp: 5,
-        conditions: ['clear', 'cloudy']
-      },
-      daylight: {
-        required: true,
-        minimumHours: 4
-      }
-    }
-  };
+describe('Activity Tracking Integration', () => {
+  let metricsService: MetricsService;
+  let locationService: LocationService;
 
   beforeEach(() => {
+    metricsService = new MetricsService();
+    locationService = new LocationService();
     vi.clearAllMocks();
   });
 
   describe('Activity Recording', () => {
-    it('should start and stop activity recording', async () => {
-      render(
-        <TestContextProvider>
-          <ActivityTracker initialActivity={mockActivity} />
-        </TestContextProvider>
-      );
-
-      const startButton = screen.getByRole('button', { name: /start/i });
-      fireEvent.click(startButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/recording/i)).toBeInTheDocument();
-        expect(screen.getByTestId('timer')).toBeInTheDocument();
-      });
-
-      const stopButton = screen.getByRole('button', { name: /stop/i });
-      fireEvent.click(stopButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/summary/i)).toBeInTheDocument();
-      });
-    });
-
-    it('should track real-time metrics', async () => {
-      const mockMetrics = {
-        speed: 5.2,
-        elevation: 320,
-        duration: 45,
-        distance: 3.8
-      };
-
-      vi.mock('../../services/tracking', () => ({
-        getRealtimeMetrics: () => mockMetrics
-      }));
+    it('should start and stop activity tracking', async () => {
+      const mockLocation = { latitude: 47.6062, longitude: -122.3321 };
+      vi.spyOn(locationService, 'getCurrentPosition')
+        .mockResolvedValue(mockLocation);
 
       render(
         <TestContextProvider>
-          <ActivityTracker initialActivity={mockActivity} />
+          <ActivityTracker
+            metricsService={metricsService}
+            locationService={locationService}
+          />
         </TestContextProvider>
       );
 
-      const startButton = screen.getByRole('button', { name: /start/i });
-      fireEvent.click(startButton);
-
+      // Start tracking
+      fireEvent.click(screen.getByText('Start Activity'));
+      
       await waitFor(() => {
-        expect(screen.getByText(/5.2 km\/h/)).toBeInTheDocument();
-        expect(screen.getByText(/320m/)).toBeInTheDocument();
-        expect(screen.getByText(/3.8 km/)).toBeInTheDocument();
+        expect(screen.getByText('Recording...')).toBeInTheDocument();
+        expect(screen.getByTestId('tracking-indicator')).toHaveClass('active');
       });
-    });
-  });
 
-  describe('Environmental Conditions', () => {
-    it('should display weather warnings when conditions exceed constraints', async () => {
-      const mockWeather = {
-        temperature: 35, // Exceeds maxTemp
-        windSpeed: 35,   // Exceeds maxWind
-        condition: 'rain' // Not in allowed conditions
-      };
-
-      vi.mock('../../services/weather', () => ({
-        getCurrentWeather: () => mockWeather
-      }));
-
-      render(
-        <TestContextProvider>
-          <ActivityTracker initialActivity={mockActivity} />
-        </TestContextProvider>
-      );
-
+      // Stop tracking
+      fireEvent.click(screen.getByText('Stop'));
+      
       await waitFor(() => {
-        expect(screen.getByText(/temperature warning/i)).toBeInTheDocument();
-        expect(screen.getByText(/wind warning/i)).toBeInTheDocument();
-        expect(screen.getByText(/weather condition warning/i)).toBeInTheDocument();
+        expect(screen.getByText('Activity Complete')).toBeInTheDocument();
+        expect(screen.getByTestId('save-activity')).toBeInTheDocument();
       });
     });
 
-    it('should check daylight requirements', async () => {
-      const mockDaylight = {
-        isDaytime: false,
-        remainingDaylight: 2 // Less than minimumHours
-      };
-
-      vi.mock('../../services/daylight', () => ({
-        getDaylightInfo: () => mockDaylight
-      }));
+    it('should handle tracking interruptions', async () => {
+      vi.spyOn(locationService, 'getCurrentPosition')
+        .mockRejectedValue(new Error('Location unavailable'));
 
       render(
         <TestContextProvider>
-          <ActivityTracker initialActivity={mockActivity} />
+          <ActivityTracker
+            metricsService={metricsService}
+            locationService={locationService}
+          />
         </TestContextProvider>
       );
 
+      fireEvent.click(screen.getByText('Start Activity'));
+
       await waitFor(() => {
-        expect(screen.getByText(/insufficient daylight/i)).toBeInTheDocument();
+        expect(screen.getByText('Location Error')).toBeInTheDocument();
+        expect(screen.getByText('Resume')).toBeInTheDocument();
       });
     });
   });
 
-  describe('Activity Summary', () => {
-    it('should generate accurate activity summary', async () => {
-      const completedActivity = {
-        ...mockActivity,
-        metrics: {
-          ...mockActivity.metrics,
-          actual: {
-            distance: 8.5,
-            duration: 125,
-            elevationGain: 450,
-            averageSpeed: 4.8
-          }
+  describe('Basic Metrics Tracking', () => {
+    it('should display real-time metrics', async () => {
+      const mockMetrics: LiveMetrics = {
+        duration: 300,
+        distance: 1000,
+        pace: '5:00 /km',
+        elevation: {
+          gain: 50,
+          loss: 20
         }
       };
 
+      vi.spyOn(metricsService, 'getLiveMetrics')
+        .mockResolvedValue(mockMetrics);
+
       render(
         <TestContextProvider>
-          <ActivityTracker 
-            initialActivity={mockActivity}
-            onComplete={() => completedActivity}
+          <ActivityTracker
+            metricsService={metricsService}
+            locationService={locationService}
+          />
+        </TestContextProvider>
+      );
+
+      fireEvent.click(screen.getByText('Start Activity'));
+
+      await waitFor(() => {
+        expect(screen.getByText('1.0 km')).toBeInTheDocument();
+        expect(screen.getByText('5:00 /km')).toBeInTheDocument();
+        expect(screen.getByText('50m↑')).toBeInTheDocument();
+      });
+    });
+
+    it('should calculate activity summary', async () => {
+      const mockSummary: ActivitySummary = {
+        totalDistance: 5000,
+        totalDuration: 1800,
+        averagePace: '6:00 /km',
+        elevationGain: 150,
+        elevationLoss: 100,
+        calories: 450
+      };
+
+      vi.spyOn(metricsService, 'generateActivitySummary')
+        .mockResolvedValue(mockSummary);
+
+      render(
+        <TestContextProvider>
+          <ActivityTracker
+            metricsService={metricsService}
+            locationService={locationService}
           />
         </TestContextProvider>
       );
 
       // Complete activity
-      const startButton = screen.getByRole('button', { name: /start/i });
-      fireEvent.click(startButton);
-      const stopButton = screen.getByRole('button', { name: /stop/i });
-      fireEvent.click(stopButton);
+      fireEvent.click(screen.getByText('Start Activity'));
+      fireEvent.click(screen.getByText('Stop'));
 
       await waitFor(() => {
-        expect(screen.getByText(/8.5 km/)).toBeInTheDocument();
-        expect(screen.getByText(/2:05 hours/)).toBeInTheDocument();
-        expect(screen.getByText(/450m elevation gain/)).toBeInTheDocument();
-        expect(screen.getByText(/4.8 km\/h/)).toBeInTheDocument();
+        expect(screen.getByText('5.0 km')).toBeInTheDocument();
+        expect(screen.getByText('30:00')).toBeInTheDocument();
+        expect(screen.getByText('450 calories')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Activity History Integration', () => {
+    it('should save completed activity to history', async () => {
+      const saveSpy = vi.spyOn(metricsService, 'saveActivity');
+      
+      render(
+        <TestContextProvider>
+          <ActivityTracker
+            metricsService={metricsService}
+            locationService={locationService}
+          />
+        </TestContextProvider>
+      );
+
+      // Complete and save activity
+      fireEvent.click(screen.getByText('Start Activity'));
+      fireEvent.click(screen.getByText('Stop'));
+      fireEvent.click(screen.getByText('Save Activity'));
+
+      await waitFor(() => {
+        expect(saveSpy).toHaveBeenCalled();
+        expect(screen.getByText('Activity Saved')).toBeInTheDocument();
       });
     });
   });

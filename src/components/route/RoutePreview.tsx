@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useSpring, animated } from '@react-spring/web';
 import type { ActivityType } from '@/types/routes';
+import { getActivityColor, projectToCanvas } from '@/utils/routeUtils';
 
 interface Props {
   points: [number, number][];
@@ -12,6 +13,32 @@ interface Props {
   mapInstance?: mapboxgl.Map;
   className?: string;
 }
+
+const drawEndpoints = (
+  ctx: CanvasRenderingContext2D,
+  points: [number, number][],
+  mapInstance: mapboxgl.Map
+) => {
+  if (points.length < 2) return;
+  
+  const [startPoint] = points;
+  const endPoint = points[points.length - 1];
+  
+  const [startX, startY] = projectToCanvas(startPoint, mapInstance, ctx.canvas);
+  const [endX, endY] = projectToCanvas(endPoint, mapInstance, ctx.canvas);
+  
+  // Draw start point
+  ctx.beginPath();
+  ctx.arc(startX, startY, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#22c55e';
+  ctx.fill();
+  
+  // Draw end point
+  ctx.beginPath();
+  ctx.arc(endX, endY, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#ef4444';
+  ctx.fill();
+};
 
 export const RoutePreview: React.FC<Props> = ({
   points,

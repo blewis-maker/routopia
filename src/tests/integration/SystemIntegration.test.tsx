@@ -1,118 +1,188 @@
-import React from 'react';
-import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, fireEvent, waitFor } from '@testing-library/react';
-import { SystemManager } from '@/components/integration/SystemManager';
-import { MapProviderSystem } from '@/services/integration/MapProviderSystem';
-import { ServiceAdapterFramework } from '@/services/integration/ServiceAdapterFramework';
-import { PluginSystem } from '@/services/plugins/PluginSystem';
-import type { 
-  MapProvider,
-  AdapterType,
-  PluginIdentifier,
-  SystemManagerProps
-} from '@/types/system';
+import { describe, test, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { TestContextProvider } from '../utils/TestContextProvider';
+import { AppRouter } from '@/components/routing/AppRouter';
+import { MockAPIClient } from '../services/connectivity/apiEndpoints.test';
+import { MockAuthService } from '../services/connectivity/authFlow.test';
+import { IntegrationMonitor } from '@/services/monitoring/IntegrationMonitor';
+import { DataSyncManager } from '@/services/data/DataSyncManager';
+import { SystemHealthCheck } from '@/services/monitoring/SystemHealthCheck';
 
-describe('System Integration Tests', () => {
-  let mapSystem: MapProviderSystem;
-  let adapterFramework: ServiceAdapterFramework;
-  let pluginSystem: PluginSystem;
+describe('System Integration', () => {
+  let apiClient: MockAPIClient;
+  let authService: MockAuthService;
+  let integrationMonitor: IntegrationMonitor;
+  let dataSyncManager: DataSyncManager;
+  let systemHealth: SystemHealthCheck;
 
   beforeEach(() => {
-    mapSystem = new MapProviderSystem();
-    adapterFramework = new ServiceAdapterFramework();
-    pluginSystem = new PluginSystem();
-  });
-
-  afterEach(() => {
+    apiClient = new MockAPIClient();
+    authService = new MockAuthService();
+    integrationMonitor = new IntegrationMonitor();
+    dataSyncManager = new DataSyncManager();
+    systemHealth = new SystemHealthCheck();
     vi.clearAllMocks();
   });
 
-  describe('Map Provider Integration', () => {
-    test('should switch map providers successfully', async () => {
-      const switchSpy = vi.spyOn(mapSystem, 'switchProvider');
-      
-      const { getByText } = render(
-        <SystemManager
-          mapSystem={mapSystem}
-          adapterFramework={adapterFramework}
-          pluginSystem={pluginSystem}
-        />
+  describe('User Flow Integration', () => {
+    test('should complete full user journey', async () => {
+      const user = userEvent.setup();
+      render(
+        <TestContextProvider>
+          <AppRouter />
+        </TestContextProvider>
       );
 
-      fireEvent.click(getByText('Mapbox'));
-      
+      // Login
+      await user.type(screen.getByLabelText('Email'), 'test@example.com');
+      await user.type(screen.getByLabelText('Password'), 'password123');
+      await user.click(screen.getByRole('button', { name: 'Login' }));
+
+      // Create new route
+      await user.click(screen.getByRole('button', { name: 'Create Route' }));
+      await user.type(screen.getByLabelText('Route Name'), 'Mountain Trail');
+      await user.selectOptions(screen.getByLabelText('Difficulty'), 'moderate');
+      await user.click(screen.getByRole('button', { name: 'Generate' }));
+
+      // Verify route creation
       await waitFor(() => {
-        expect(switchSpy).toHaveBeenCalledWith('mapbox' as MapProvider);
+        expect(screen.getByText('Route created successfully')).toBeInTheDocument();
+        expect(screen.getByTestId('route-map')).toBeInTheDocument();
+        expect(screen.getByTestId('elevation-profile')).toBeInTheDocument();
       });
-    });
 
-    test('should handle provider switch errors', async () => {
-      vi.spyOn(mapSystem, 'switchProvider').mockRejectedValue(
-        new Error('Switch failed')
-      );
-      
-      const { getByText } = render(
-        <SystemManager
-          mapSystem={mapSystem}
-          adapterFramework={adapterFramework}
-          pluginSystem={pluginSystem}
-        />
-      );
+      // Save and share
+      await user.click(screen.getByRole('button', { name: 'Save Route' }));
+      await user.click(screen.getByRole('button', { name: 'Share' }));
 
-      fireEvent.click(getByText('Google Maps'));
-      
-      await waitFor(() => {
-        expect(getByText('Error: Switch failed')).toBeInTheDocument();
-      });
+      // Verify integration points
+      expect(apiClient.post).toHaveBeenCalledWith('/api/routes', expect.any(Object));
+      expect(dataSyncManager.getLastSync()).toBeDefined();
     });
   });
 
-  describe('Service Adapter Integration', () => {
-    test('should set active adapters', async () => {
-      const setAdapterSpy = vi.spyOn(adapterFramework, 'setActiveAdapter');
-      
-      const { getByText } = render(
-        <SystemManager
-          mapSystem={mapSystem}
-          adapterFramework={adapterFramework}
-          pluginSystem={pluginSystem}
-        />
+  describe('Data Integration', () => {
+    test('should maintain data consistency across services', async () => {
+      const testRoute = {
+        id: 'route-123',
+        name: 'Test Route',
+        points: [[0, 0], [1, 1]]
+      };
+
+      // Simulate multi-service updates
+      await dataSyncManager.syncRoute(testRoute);
+
+      const databaseRoute = await apiClient.get(`/api/routes/${testRoute.id}`);
+      const cachedRoute = await dataSyncManager.getCachedRoute(testRoute.id);
+      const analyticsData = await apiClient.get(`/api/analytics/routes/${testRoute.id}`);
+
+      // Verify data consistency
+      expect(databaseRoute.data).toMatchObject(testRoute);
+      expect(cachedRoute).toMatchObject(testRoute);
+      expect(analyticsData.data.routeId).toBe(testRoute.id);
+    });
+
+    test('should handle concurrent operations', async () => {
+      const operations = Array(5).fill(null).map((_, i) => ({
+        type: 'update',
+        data: { id: `route-${i}`, name: `Route ${i}` }
+      }));
+
+      // Execute concurrent operations
+      const results = await Promise.all(
+        operations.map(op => dataSyncManager.processOperation(op))
       );
 
-      fireEvent.click(getByText('Routing Adapter'));
-      
-      await waitFor(() => {
-        expect(setAdapterSpy).toHaveBeenCalledWith('routing' as AdapterType);
-      });
+      // Verify consistency
+      expect(results.every(r => r.success)).toBe(true);
+      expect(await dataSyncManager.verifyConsistency()).toBe(true);
     });
   });
 
-  describe('Plugin System Integration', () => {
-    test('should activate and deactivate plugins', async () => {
-      const activateSpy = vi.spyOn(pluginSystem, 'activatePlugin');
-      const deactivateSpy = vi.spyOn(pluginSystem, 'deactivatePlugin');
-      
-      const { getByText } = render(
-        <SystemManager
-          mapSystem={mapSystem}
-          adapterFramework={adapterFramework}
-          pluginSystem={pluginSystem}
-        />
+  describe('Service Integration', () => {
+    test('should coordinate between multiple services', async () => {
+      render(
+        <TestContextProvider>
+          <AppRouter />
+        </TestContextProvider>
       );
 
-      const testPluginId: PluginIdentifier = 'test-plugin';
+      // Trigger multi-service operation
+      fireEvent.click(screen.getByTestId('generate-route'));
 
-      // Test activation
-      fireEvent.click(getByText('Test Plugin'));
       await waitFor(() => {
-        expect(activateSpy).toHaveBeenCalledWith(testPluginId);
+        // Verify service coordination
+        expect(apiClient.get).toHaveBeenCalledWith('/api/elevation');
+        expect(apiClient.get).toHaveBeenCalledWith('/api/weather');
+        expect(apiClient.get).toHaveBeenCalledWith('/api/points-of-interest');
       });
 
-      // Test deactivation
-      fireEvent.click(getByText('Test Plugin'));
-      await waitFor(() => {
-        expect(deactivateSpy).toHaveBeenCalledWith(testPluginId);
+      // Verify data integration
+      expect(screen.getByTestId('elevation-profile')).toBeInTheDocument();
+      expect(screen.getByTestId('weather-overlay')).toBeInTheDocument();
+      expect(screen.getByTestId('poi-markers')).toBeInTheDocument();
+    });
+
+    test('should maintain service health', async () => {
+      const healthReport = await systemHealth.checkAllServices();
+
+      expect(healthReport.api).toBe('healthy');
+      expect(healthReport.database).toBe('healthy');
+      expect(healthReport.cache).toBe('healthy');
+      expect(healthReport.analytics).toBe('healthy');
+    });
+  });
+
+  describe('Performance Integration', () => {
+    test('should maintain performance under load', async () => {
+      const metrics = await integrationMonitor.measureIntegrationPerformance(async () => {
+        // Simulate heavy load
+        const requests = Array(20).fill(null).map(() =>
+          apiClient.get('/api/routes')
+        );
+        await Promise.all(requests);
       });
+
+      expect(metrics.averageResponseTime).toBeLessThan(200);
+      expect(metrics.errorRate).toBeLessThan(0.01);
+      expect(metrics.successfulRequests).toBe(20);
+    });
+
+    test('should optimize resource usage', async () => {
+      const resourceMetrics = await integrationMonitor.measureResourceUsage(() => {
+        render(
+          <TestContextProvider>
+            <AppRouter />
+          </TestContextProvider>
+        );
+      });
+
+      expect(resourceMetrics.memoryUsage).toBeLessThan(50 * 1024 * 1024); // 50MB
+      expect(resourceMetrics.cpuUsage).toBeLessThan(80); // 80%
+      expect(resourceMetrics.networkRequests).toBeLessThan(50);
+    });
+  });
+
+  describe('Error Integration', () => {
+    test('should handle cascading failures', async () => {
+      // Simulate primary service failure
+      vi.spyOn(apiClient, 'get').mockRejectedValueOnce(new Error('Primary failed'));
+
+      render(
+        <TestContextProvider>
+          <AppRouter />
+        </TestContextProvider>
+      );
+
+      // Verify fallback to secondary
+      await waitFor(() => {
+        expect(screen.getByText('Using backup service')).toBeInTheDocument();
+      });
+
+      // Verify system stability
+      expect(systemHealth.getSystemStatus()).toBe('degraded');
+      expect(integrationMonitor.getErrorRate()).toBeLessThan(0.1);
     });
   });
 }); 

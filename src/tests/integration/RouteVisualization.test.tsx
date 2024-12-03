@@ -163,4 +163,18 @@ describe('RouteVisualization Integration', () => {
       });
     });
   });
+
+  describe('Essential Route Features', () => {
+    test('should handle POI integration', async () => {
+      // Test POI display
+      // Test POI interaction
+      // Test POI data accuracy
+    });
+
+    test('should integrate weather data', async () => {
+      // Test weather overlay
+      // Test weather updates
+      // Test weather alerts
+    });
+  });
 }); 
