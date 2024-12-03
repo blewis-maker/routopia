@@ -1,203 +1,269 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useSpring, animated } from '@react-spring/web';
-import type { ActivityType } from '@/types/routes';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityType } from '../../types/routes';
 
-interface DrawingPoint {
-  coordinates: [number, number];
-  timestamp: number;
-}
+type Point = [number, number];
 
-interface Props {
-  activityType: ActivityType;
-  isDrawing: boolean;
-  onDrawComplete: (points: [number, number][]) => void;
-  onDrawCancel: () => void;
-  mapInstance?: mapboxgl.Map;
+interface RouteDrawingProps {
   className?: string;
-  onDrawProgress?: (progress: number) => void;
-  enableUndo?: boolean;
+  activityType: ActivityType;
+  isDrawing?: boolean;
+  onDrawComplete?: (points: Point[]) => void;
+  onDrawProgress?: (points: Point[]) => void;
+  onDrawCancel?: () => void;
+  onDrawError?: (error: Error) => void;
+  mapInstance?: any;
   snapToRoads?: boolean;
+  enableUndo?: boolean;
 }
 
-export const RouteDrawing: React.FC<Props> = ({
-  activityType,
-  isDrawing,
-  onDrawComplete,
-  onDrawCancel,
-  mapInstance,
+const getActivityColor = (activityType: ActivityType): string => {
+  switch (activityType) {
+    case 'walk': return '#4CAF50';
+    case 'bike': return '#2196F3';
+    case 'car': return '#FF5722';
+    case 'ski': return '#9C27B0';
+    default: return '#000000';
+  }
+};
+
+export const RouteDrawing: React.FC<RouteDrawingProps> = ({
   className = '',
+  activityType,
+  isDrawing: isDrawingProp = false,
+  onDrawComplete,
   onDrawProgress,
-  enableUndo = true,
-  snapToRoads = true,
+  onDrawCancel,
+  onDrawError,
+  mapInstance,
+  snapToRoads = false,
+  enableUndo = false
 }) => {
-  const [points, setPoints] = useState<DrawingPoint[]>([]);
-  const [isSmoothing, setIsSmoothing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawingTimeoutRef = useRef<NodeJS.Timeout>();
-  const [drawingHistory, setDrawingHistory] = useState<DrawingPoint[][]>([]);
-  const lastPointRef = useRef<DrawingPoint | null>(null);
+  const [isDrawingActive, setIsDrawingActive] = useState(false);
+  const [isDrawingCancelled, setIsDrawingCancelled] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const isCancellingRef = useRef(false);
+  const pointsRef = useRef<Point[]>([]);
+  const isDrawingRef = useRef(isDrawingProp);
+  const contextRef = useRef<CanvasRenderingContext2D | null>(null);
 
-  const pathAnimation = useSpring({
-    opacity: isDrawing ? 1 : 0,
-    config: { tension: 280, friction: 20 }
-  });
+  const clearCanvas = useCallback(() => {
+    const ctx = contextRef.current;
+    if (!ctx || !canvasRef.current) return;
+    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+  }, []);
 
-  const handleUndo = useCallback(() => {
-    if (drawingHistory.length > 0) {
-      const newHistory = [...drawingHistory];
-      newHistory.pop();
-      setDrawingHistory(newHistory);
-      setPoints(newHistory[newHistory.length - 1] || []);
-    }
-  }, [drawingHistory]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'z' && (e.ctrlKey || e.metaKey) && enableUndo) {
-        handleUndo();
-      } else if (e.key === 'Escape') {
-        onDrawCancel();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, onDrawCancel, enableUndo]);
-
-  const snapPointToRoad = async (point: [number, number]): Promise<[number, number]> => {
-    if (!snapToRoads) return point;
+  const handleCancel = useCallback(() => {
+    if (isCancellingRef.current) return;
+    
+    isCancellingRef.current = true;
+    
     try {
-      // Implement road snapping logic here
-      return point;
-    } catch (error) {
-      console.error('Failed to snap point to road:', error);
-      return point;
-    }
-  };
-
-  const addPoint = async (newPoint: DrawingPoint) => {
-    if (snapToRoads) {
-      const snappedCoords = await snapPointToRoad(newPoint.coordinates);
-      newPoint = { ...newPoint, coordinates: snappedCoords };
-    }
-
-    setPoints(prev => {
-      const updated = [...prev, newPoint];
-      onDrawProgress?.(updated.length / 100); // Arbitrary progress calculation
-      return updated;
-    });
-  };
-
-  useEffect(() => {
-    if (!mapInstance || !isDrawing) return;
-
-    const handleMouseMove = (e: mapboxgl.MapMouseEvent) => {
-      const { lng, lat } = e.lngLat;
-      addPoint({ coordinates: [lng, lat], timestamp: Date.now() });
-    };
-
-    const handleMouseUp = (e: mapboxgl.MapMouseEvent) => {
-      if (points.length < 2) return;
-      
-      setIsSmoothing(true);
-      const smoothedPoints = smoothPath(points.map(p => p.coordinates));
-      onDrawComplete(smoothedPoints);
-      setIsSmoothing(false);
-      setPoints([]);
-    };
-
-    mapInstance.on('mousemove', handleMouseMove);
-    mapInstance.on('mouseup', handleMouseUp);
-
-    return () => {
-      mapInstance.off('mousemove', handleMouseMove);
-      mapInstance.off('mouseup', handleMouseUp);
-    };
-  }, [mapInstance, isDrawing, onDrawComplete, onDrawProgress, enableUndo, snapToRoads]);
-
-  useEffect(() => {
-    if (!canvasRef.current || points.length < 2) return;
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-
-    // Clear previous drawing
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-    // Draw the path
-    ctx.beginPath();
-    ctx.strokeStyle = getActivityColor(activityType);
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    points.forEach((point, index) => {
-      const [x, y] = projectToCanvas(point.coordinates, mapInstance!, ctx.canvas);
-      if (index === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
+      const ctx = contextRef.current;
+      if (ctx) {
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       }
-    });
+      
+      const points = [...pointsRef.current];
+      pointsRef.current = [];
+      onDrawCancel?.();
+      
+      if (canvasRef.current?.parentElement) {
+        canvasRef.current.parentElement.setAttribute('data-drawing-state', 'idle');
+      }
+    } finally {
+      isCancellingRef.current = false;
+    }
+  }, [onDrawCancel]);
 
+  useEffect(() => {
+    isDrawingRef.current = isDrawingProp;
+  }, [isDrawingProp]);
+
+  useEffect(() => {
+    try {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        throw new Error('Canvas not available');
+      }
+      
+      canvas.width = canvas.offsetWidth || 800;
+      canvas.height = canvas.offsetHeight || 600;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Canvas context not available');
+      }
+      
+      ctx.strokeStyle = getActivityColor(activityType);
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      contextRef.current = ctx;
+      
+      canvas.parentElement?.setAttribute('data-drawing-state', isDrawingActive ? 'active' : 'idle');
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error('Canvas initialization error');
+      setHasError(true);
+      onDrawError?.(err);
+      handleCancel();
+    }
+  }, [activityType, onDrawError, handleCancel]);
+
+  useEffect(() => {
+    if (!mapInstance && snapToRoads) {
+      const error = new Error('Map instance not available');
+      setHasError(true);
+      onDrawError?.(error);
+      handleCancel();
+    }
+  }, [mapInstance, onDrawError, handleCancel, snapToRoads]);
+
+  const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLElement>): [number, number] | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    return [x, y];
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    if (!isDrawingActive || hasError) return;
+
+    const point = getCanvasPoint(e);
+    if (!point) return;
+
+    if (!mapInstance && snapToRoads) {
+      const error = new Error('Map instance not available');
+      setHasError(true);
+      onDrawError?.(error);
+      handleCancel();
+      return;
+    }
+
+    const ctx = contextRef.current;
+    if (!ctx) {
+      const error = new Error('Canvas context not available');
+      setHasError(true);
+      onDrawError?.(error);
+      handleCancel();
+      return;
+    }
+
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.beginPath();
+    ctx.moveTo(point[0], point[1]);
     ctx.stroke();
-  }, [points, activityType, mapInstance]);
+
+    pointsRef.current = [point];
+    onDrawProgress?.([point]);
+
+    if (canvasRef.current?.parentElement) {
+      canvasRef.current.parentElement.setAttribute('data-drawing-state', 'drawing');
+    }
+  }, [getCanvasPoint, hasError, onDrawProgress, handleCancel, onDrawError, mapInstance, snapToRoads, isDrawingActive]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    if (!isDrawingActive || hasError || e.buttons !== 1) return;
+
+    const point = getCanvasPoint(e);
+    if (!point) return;
+
+    const ctx = contextRef.current;
+    if (!ctx) {
+      const error = new Error('Canvas context not available');
+      setHasError(true);
+      onDrawError?.(error);
+      handleCancel();
+      return;
+    }
+
+    const points = [...pointsRef.current, point];
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.beginPath();
+    ctx.moveTo(points[0][0], points[0][1]);
+
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i][0], points[i][1]);
+    }
+    ctx.stroke();
+
+    pointsRef.current = points;
+    onDrawProgress?.(points);
+  }, [getCanvasPoint, hasError, onDrawProgress, onDrawError, handleCancel, isDrawingActive]);
+
+  const handleMouseUp = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    if (!isDrawingActive || hasError) return;
+
+    const point = getCanvasPoint(e);
+    if (!point) return;
+
+    const points = [...pointsRef.current, point];
+    if (points.length < 2) {
+      handleCancel();
+      return;
+    }
+
+    onDrawComplete?.(points);
+    pointsRef.current = [];
+
+    if (canvasRef.current?.parentElement) {
+      canvasRef.current.parentElement.setAttribute('data-drawing-state', 'idle');
+    }
+  }, [getCanvasPoint, hasError, onDrawComplete, handleCancel, isDrawingActive]);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    if (isDrawingActive && !isCancellingRef.current) {
+      handleCancel();
+    }
+  }, [handleCancel, isDrawingActive]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape' && isDrawingActive && !isCancellingRef.current) {
+      handleCancel();
+    }
+  }, [handleCancel, isDrawingActive]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
+
+  useEffect(() => {
+    if (hasError) {
+      handleCancel();
+    }
+  }, [hasError, handleCancel]);
+
+  useEffect(() => {
+    isDrawingRef.current = isDrawingActive;
+    if (canvasRef.current?.parentElement) {
+      canvasRef.current.parentElement.setAttribute('data-drawing-state', isDrawingActive ? 'active' : 'idle');
+    }
+  }, [isDrawingActive]);
 
   return (
-    <animated.div 
-      style={pathAnimation}
-      className={`route-drawing-container ${className}`}
+    <div 
+      className={`route-drawing ${className}`}
+      data-drawing-state={isDrawingActive ? 'active' : 'idle'}
+      data-testid="route-drawing"
       role="application"
       aria-label="Route drawing canvas"
     >
       <canvas
         ref={canvasRef}
-        className="route-drawing-canvas"
-        width={window.innerWidth}
-        height={window.innerHeight}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onContextMenu={handleContextMenu}
+        role="none"
+        aria-hidden="true"
       />
-      {isSmoothing && (
-        <div className="smoothing-indicator" role="status">
-          Smoothing route...
-        </div>
-      )}
-    </animated.div>
+    </div>
   );
 };
-
-// Helper functions
-const getActivityColor = (activity: ActivityType): string => {
-  switch (activity) {
-    case 'car': return '#3F51B5';
-    case 'bike': return '#4CAF50';
-    case 'walk': return '#FF9800';
-    case 'ski': return '#2196F3';
-    default: return '#9E9E9E';
-  }
-};
-
-const projectToCanvas = (
-  coordinates: [number, number], 
-  map: mapboxgl.Map, 
-  canvas: HTMLCanvasElement
-): [number, number] => {
-  const point = map.project(coordinates as mapboxgl.LngLatLike);
-  return [point.x, point.y];
-};
-
-const smoothPath = (points: [number, number][]): [number, number][] => {
-  if (points.length < 3) return points;
-  
-  // Simple bezier curve smoothing
-  const smoothed: [number, number][] = [];
-  for (let i = 0; i < points.length - 2; i++) {
-    const xc = (points[i][0] + points[i + 1][0]) / 2;
-    const yc = (points[i][1] + points[i + 1][1]) / 2;
-    smoothed.push([xc, yc]);
-  }
-  
-  // Add first and last points
-  smoothed.unshift(points[0]);
-  smoothed.push(points[points.length - 1]);
-  
-  return smoothed;
-}; 

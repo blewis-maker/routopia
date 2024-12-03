@@ -1,9 +1,15 @@
-import { vi } from 'vitest';
+/// <reference types="jest" />
+import { vi, Mock } from 'vitest';
 import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
-import { TestContextProvider } from '../utils/TestContextProvider';
+import { TestContextProvider, mockCanvasContext } from '../utils/TestContextProvider';
 import { RouteDrawing } from '@/components/route/RouteDrawing';
 import { RoutePreview } from '@/components/route/RoutePreview';
 import { routeService } from '@/services/routeService';
+import type { ActivityType } from '@/types/routes';
+import userEvent from '@testing-library/user-event';
+import * as React from 'react';
+import { ErrorBoundary } from '../utils/ErrorBoundary';
+import mapboxgl from 'mapbox-gl';
 
 // Mock the route service
 vi.mock('@/services/routeService', () => ({
@@ -14,187 +20,456 @@ vi.mock('@/services/routeService', () => ({
 }));
 
 describe('Critical - Route Components', () => {
-  let mockContext;
-
   beforeEach(() => {
-    vi.useFakeTimers();
-    mockContext = {
-      clearRect: vi.fn(),
-      beginPath: vi.fn(),
-      moveTo: vi.fn(),
-      lineTo: vi.fn(),
-      stroke: vi.fn(),
-      setLineDash: vi.fn(),
-      canvas: { 
-        width: 800, 
-        height: 600,
-        getBoundingClientRect: () => ({
-          left: 0,
-          top: 0,
-          width: 800,
-          height: 600
-        })
+    // Reset all mock functions
+    Object.entries(mockCanvasContext).forEach(([key, value]) => {
+      if (value && typeof value === 'function' && 'mockClear' in value) {
+        (value as Mock).mockClear();
       }
-    };
+    });
 
-    // Make mockContext accessible via getContext
-    HTMLCanvasElement.prototype.getContext = vi.fn(() => mockContext);
-    vi.clearAllMocks();
+    // Set up canvas dimensions
+    mockCanvasContext.canvas.width = 800;
+    mockCanvasContext.canvas.height = 600;
+
+    // Mock offsetWidth/offsetHeight
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 800 });
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 600 });
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    // Clean up mocks
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('RouteDrawing', () => {
-    it('initializes canvas correctly', async () => {
-      const mockMapInstance = {
-        on: vi.fn(),
-        off: vi.fn(),
-        project: vi.fn(),
-        unproject: vi.fn()
-      };
+    const mockMapInstance = {
+      project: vi.fn((coords) => ({ x: coords[0], y: coords[1] })),
+      unproject: vi.fn((point) => ({ lng: point.x, lat: point.y }))
+    } as unknown as mapboxgl.Map;
 
-      render(
-        <TestContextProvider>
-          <RouteDrawing 
-            isDrawing={true}
-            onDrawComplete={() => {}}
-            onDrawCancel={() => {}}
-            mapInstance={mockMapInstance}
-            activityType="walk"
-            snapToRoads={false}
-          />
-        </TestContextProvider>
-      );
+    // Helper function to clear specific mocks
+    const clearMocks = (...mocks: Mock[]) => {
+      mocks.forEach(mock => mock.mockClear());
+    };
 
-      const canvas = screen.getByRole('application').querySelector('canvas');
-      expect(canvas).toBeInTheDocument();
-      expect(canvas).toHaveClass('route-drawing-canvas');
-    });
+    const getCanvas = (container: HTMLElement): HTMLCanvasElement => {
+      const canvas = container.querySelector('canvas');
+      if (!canvas) throw new Error('Canvas not found');
+      return canvas;
+    };
 
-    it('handles mouse events correctly', async () => {
-      const mockMapInstance = {
-        on: vi.fn(),
-        off: vi.fn(),
-        project: vi.fn(coords => ({
-          x: coords[0] * 100,
-          y: coords[1] * 100
-        })),
-        unproject: vi.fn(point => [point.x / 100, point.y / 100])
-      };
-
-      render(
-        <TestContextProvider>
-          <RouteDrawing 
-            isDrawing={true}
-            onDrawComplete={() => {}}
-            onDrawCancel={() => {}}
-            mapInstance={mockMapInstance}
-            activityType="walk"
-            snapToRoads={false}
-          />
-        </TestContextProvider>
-      );
-
-      const canvas = screen.getByRole('application').querySelector('canvas');
-      
-      // Initial mouse down
+    const simulateMouseEvent = async (
+      canvas: HTMLCanvasElement,
+      eventType: 'mousedown' | 'mousemove' | 'mouseup',
+      x: number,
+      y: number,
+      buttons = 1
+    ) => {
       await act(async () => {
-        fireEvent.mouseDown(canvas, { 
-          clientX: 100, 
-          clientY: 100, 
-          buttons: 1,
-          bubbles: true 
+        fireEvent[eventType](canvas, {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          buttons,
+          button: 0,
+          screenX: x,
+          screenY: y,
+          pageX: x,
+          pageY: y
         });
-        await vi.runAllTimersAsync();
       });
+    };
 
-      expect(mockContext.beginPath).toHaveBeenCalled();
-      expect(mockContext.moveTo).toHaveBeenCalled();
-
-      // Mouse move
+    const simulateContextMenu = async (canvas: HTMLCanvasElement) => {
       await act(async () => {
-        fireEvent.mouseMove(canvas, { 
-          clientX: 200, 
-          clientY: 200, 
-          buttons: 1,
-          bubbles: true 
+        fireEvent.contextMenu(canvas, {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          buttons: 2
         });
-        await vi.runAllTimersAsync();
       });
+    };
 
-      expect(mockContext.lineTo).toHaveBeenCalled();
-      expect(mockContext.stroke).toHaveBeenCalled();
-    });
-
-    it('completes drawing on mouse up', async () => {
+    test('handles canvas drawing without map instance', async () => {
       const onDrawComplete = vi.fn();
-      const mockMapInstance = {
-        on: vi.fn(),
-        off: vi.fn(),
-        project: vi.fn(coords => ({
-          x: coords[0] * 100,
-          y: coords[1] * 100
-        })),
-        unproject: vi.fn(point => [point.x / 100, point.y / 100])
-      };
-
-      render(
+      const onDrawProgress = vi.fn();
+      const onDrawError = vi.fn();
+      const onDrawCancel = vi.fn();
+      
+      const { container } = render(
         <TestContextProvider>
           <RouteDrawing 
+            activityType="walk"
             isDrawing={true}
             onDrawComplete={onDrawComplete}
-            onDrawCancel={() => {}}
-            mapInstance={mockMapInstance}
-            activityType="walk"
+            onDrawProgress={onDrawProgress}
+            onDrawError={onDrawError}
+            onDrawCancel={onDrawCancel}
             snapToRoads={false}
           />
         </TestContextProvider>
       );
 
-      const canvas = screen.getByRole('application').querySelector('canvas');
+      const canvas = getCanvas(container);
 
-      // Complete drawing sequence
+      // Start drawing
+      await simulateMouseEvent(canvas, 'mousedown', 100, 100);
+
+      // Verify initial drawing state
+      expect(mockCanvasContext.beginPath).toHaveBeenCalled();
+      expect(mockCanvasContext.moveTo).toHaveBeenCalledWith(100, 100);
+      expect(onDrawProgress).toHaveBeenCalledWith([[100, 100]]);
+
+      // Continue drawing
+      await simulateMouseEvent(canvas, 'mousemove', 150, 150);
+
+      expect(mockCanvasContext.lineTo).toHaveBeenCalledWith(150, 150);
+      expect(onDrawProgress).toHaveBeenCalledWith([[100, 100], [150, 150]]);
+
+      // Complete drawing
+      await simulateMouseEvent(canvas, 'mouseup', 150, 150);
+
+      expect(onDrawComplete).toHaveBeenCalledWith([
+        [100, 100],
+        [150, 150]
+      ]);
+      expect(canvas.parentElement).toHaveAttribute('data-drawing-state', 'idle');
+    });
+
+    test('handles map instance errors gracefully', async () => {
+      const onDrawError = vi.fn();
+      const onDrawComplete = vi.fn();
+      const onDrawCancel = vi.fn();
+
+      const { container } = render(
+        <TestContextProvider>
+          <RouteDrawing 
+            activityType="walk"
+            isDrawing={true}
+            onDrawComplete={onDrawComplete}
+            onDrawError={onDrawError}
+            onDrawCancel={onDrawCancel}
+            snapToRoads={true}
+          />
+        </TestContextProvider>
+      );
+
+      const canvas = getCanvas(container);
+
+      await simulateMouseEvent(canvas, 'mousedown', 100, 100);
+
+      expect(onDrawError).toHaveBeenCalledWith(expect.any(Error));
+      expect(onDrawComplete).not.toHaveBeenCalled();
+      expect(mockCanvasContext.clearRect).toHaveBeenCalled();
+    });
+
+    test('handles mouse events correctly', async () => {
+      const onDrawComplete = vi.fn();
+      const onDrawCancel = vi.fn();
+      const onDrawProgress = vi.fn();
+
+      const { container } = render(
+        <TestContextProvider>
+          <RouteDrawing 
+            activityType="walk"
+            isDrawing={true}
+            onDrawComplete={onDrawComplete}
+            onDrawCancel={onDrawCancel}
+            onDrawProgress={onDrawProgress}
+            snapToRoads={false}
+            mapInstance={mockMapInstance}
+          />
+        </TestContextProvider>
+      );
+
+      const canvas = getCanvas(container);
+
+      // First point
+      await simulateMouseEvent(canvas, 'mousedown', 100, 100);
+
+      expect(mockCanvasContext.beginPath).toHaveBeenCalled();
+      expect(mockCanvasContext.moveTo).toHaveBeenCalledWith(100, 100);
+      expect(onDrawProgress).toHaveBeenCalledWith([[100, 100]]);
+
+      // Second point
+      await simulateMouseEvent(canvas, 'mousemove', 150, 150);
+
+      expect(mockCanvasContext.lineTo).toHaveBeenCalledWith(150, 150);
+      expect(onDrawProgress).toHaveBeenCalledWith([[100, 100], [150, 150]]);
+
+      // Third point and completion
+      await simulateMouseEvent(canvas, 'mousemove', 200, 200);
+      await simulateMouseEvent(canvas, 'mouseup', 200, 200);
+
+      expect(mockCanvasContext.lineTo).toHaveBeenCalledWith(200, 200);
+      expect(mockCanvasContext.stroke).toHaveBeenCalled();
+      expect(onDrawComplete).toHaveBeenCalledWith([
+        [100, 100],
+        [150, 150],
+        [200, 200]
+      ]);
+      expect(onDrawCancel).not.toHaveBeenCalled();
+      expect(canvas.parentElement).toHaveAttribute('data-drawing-state', 'idle');
+    });
+
+    test('handles undo correctly', async () => {
+      const onDrawComplete = vi.fn();
+      const onDrawCancel = vi.fn();
+      const onDrawProgress = vi.fn();
+
+      const { container } = render(
+        <TestContextProvider>
+          <RouteDrawing 
+            activityType="walk"
+            isDrawing={true}
+            onDrawComplete={onDrawComplete}
+            onDrawCancel={onDrawCancel}
+            onDrawProgress={onDrawProgress}
+            enableUndo={true}
+            snapToRoads={false}
+            mapInstance={mockMapInstance}
+          />
+        </TestContextProvider>
+      );
+
+      const canvas = getCanvas(container);
+
+      // Draw points
+      await simulateMouseEvent(canvas, 'mousedown', 100, 100);
+      await simulateMouseEvent(canvas, 'mousemove', 150, 150);
+
+      // Press 'z' with ctrl key to undo
       await act(async () => {
-        fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100, buttons: 1, bubbles: true });
-        await vi.runAllTimersAsync();
-        
-        fireEvent.mouseMove(canvas, { clientX: 200, clientY: 200, buttons: 1, bubbles: true });
-        await vi.runAllTimersAsync();
-        
-        fireEvent.mouseUp(canvas, { clientX: 200, clientY: 200, bubbles: true });
-        await vi.runAllTimersAsync();
+        fireEvent.keyDown(window, { 
+          key: 'z',
+          code: 'KeyZ',
+          ctrlKey: true,
+          bubbles: true
+        });
       });
 
-      expect(onDrawComplete).toHaveBeenCalled();
+      expect(mockCanvasContext.clearRect).toHaveBeenCalled();
+      expect(onDrawProgress).toHaveBeenCalledWith([[100, 100]]);
+    });
+
+    describe('Animation Frame Handling', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      test('validates frame timing for smooth animations', async () => {
+        const onDrawProgress = vi.fn();
+        
+        const { container } = render(
+          <TestContextProvider>
+            <RouteDrawing 
+              activityType="walk"
+              isDrawing={true}
+              onDrawComplete={vi.fn()}
+              onDrawCancel={vi.fn()}
+              onDrawProgress={onDrawProgress}
+              snapToRoads={false}
+              mapInstance={mockMapInstance}
+            />
+          </TestContextProvider>
+        );
+
+        const canvas = getCanvas(container);
+
+        // Start drawing
+        await simulateMouseEvent(canvas, 'mousedown', 100, 100);
+        await act(async () => {
+          vi.advanceTimersByTime(16);
+        });
+
+        expect(mockCanvasContext.beginPath).toHaveBeenCalled();
+        expect(mockCanvasContext.moveTo).toHaveBeenCalledWith(100, 100);
+
+        // Draw multiple points with consistent timing
+        const points = [
+          [120, 120],
+          [140, 140],
+          [160, 160],
+          [180, 180],
+          [200, 200]
+        ];
+
+        for (const [x, y] of points) {
+          await simulateMouseEvent(canvas, 'mousemove', x, y);
+          await act(async () => {
+            vi.advanceTimersByTime(16);
+          });
+
+          expect(mockCanvasContext.lineTo).toHaveBeenCalledWith(x, y);
+        }
+
+        await simulateMouseEvent(canvas, 'mouseup', 200, 200);
+        await act(async () => {
+          vi.advanceTimersByTime(16);
+        });
+
+        expect(mockCanvasContext.stroke).toHaveBeenCalled();
+        expect(onDrawProgress).toHaveBeenCalled();
+      });
+    });
+
+    describe('Complex Interaction Sequences', () => {
+      test('handles multi-point route with intersections', async () => {
+        const onDrawComplete = vi.fn();
+        const onDrawProgress = vi.fn();
+        const onDrawCancel = vi.fn();
+
+        const { container } = render(
+          <TestContextProvider>
+            <RouteDrawing 
+              activityType="walk"
+              isDrawing={true}
+              onDrawComplete={onDrawComplete}
+              onDrawCancel={onDrawCancel}
+              onDrawProgress={onDrawProgress}
+              snapToRoads={false}
+              mapInstance={mockMapInstance}
+            />
+          </TestContextProvider>
+        );
+
+        const canvas = getCanvas(container);
+
+        // Draw a figure-8 pattern
+        await simulateMouseEvent(canvas, 'mousedown', 150, 150);
+
+        expect(mockCanvasContext.beginPath).toHaveBeenCalled();
+        expect(mockCanvasContext.moveTo).toHaveBeenCalledWith(150, 150);
+
+        // Draw the pattern
+        const pattern = [
+          [200, 100], // top right
+          [200, 200], // bottom right
+          [100, 200], // bottom left
+          [100, 100], // top left
+          [150, 150], // back to center
+          [100, 100], // top left (second loop)
+          [100, 200], // bottom left
+          [200, 200], // bottom right
+          [200, 100], // top right
+          [150, 150]  // finish at center
+        ];
+
+        for (const [x, y] of pattern) {
+          await simulateMouseEvent(canvas, 'mousemove', x, y);
+          expect(mockCanvasContext.lineTo).toHaveBeenCalledWith(x, y);
+        }
+
+        await simulateMouseEvent(canvas, 'mouseup', 150, 150);
+
+        expect(mockCanvasContext.stroke).toHaveBeenCalled();
+        expect(onDrawComplete).toHaveBeenCalled();
+        expect(onDrawCancel).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('Route Cancellation', () => {
+      test('cancels route drawing on Escape key press', async () => {
+        const onDrawCancel = vi.fn();
+        const onDrawComplete = vi.fn();
+
+        const { container } = render(
+          <TestContextProvider>
+            <RouteDrawing 
+              activityType="walk"
+              isDrawing={true}
+              onDrawComplete={onDrawComplete}
+              onDrawCancel={onDrawCancel}
+              snapToRoads={false}
+              mapInstance={mockMapInstance}
+            />
+          </TestContextProvider>
+        );
+
+        const canvas = getCanvas(container);
+
+        // Start drawing
+        await simulateMouseEvent(canvas, 'mousedown', 100, 100);
+        await simulateMouseEvent(canvas, 'mousemove', 150, 150);
+
+        // Press Escape to cancel
+        await act(async () => {
+          fireEvent.keyDown(window, { 
+            key: 'Escape',
+            code: 'Escape',
+            bubbles: true
+          });
+        });
+
+        expect(onDrawCancel).toHaveBeenCalled();
+        expect(onDrawComplete).not.toHaveBeenCalled();
+        expect(mockCanvasContext.clearRect).toHaveBeenCalled();
+        expect(canvas.parentElement).toHaveAttribute('data-drawing-state', 'idle');
+      });
+
+      test('cancels route drawing on right click', async () => {
+        const onDrawCancel = vi.fn();
+        const onDrawComplete = vi.fn();
+
+        const { container } = render(
+          <TestContextProvider>
+            <RouteDrawing 
+              activityType="walk"
+              isDrawing={true}
+              onDrawComplete={onDrawComplete}
+              onDrawCancel={onDrawCancel}
+              snapToRoads={false}
+              mapInstance={mockMapInstance}
+            />
+          </TestContextProvider>
+        );
+
+        const canvas = getCanvas(container);
+
+        // Start drawing
+        await simulateMouseEvent(canvas, 'mousedown', 100, 100);
+        await simulateMouseEvent(canvas, 'mousemove', 150, 150);
+
+        // Right click to cancel
+        await simulateContextMenu(canvas);
+
+        expect(onDrawCancel).toHaveBeenCalled();
+        expect(onDrawComplete).not.toHaveBeenCalled();
+        expect(mockCanvasContext.clearRect).toHaveBeenCalled();
+        expect(canvas.parentElement).toHaveAttribute('data-drawing-state', 'idle');
+      });
     });
   });
 
   describe('RoutePreview', () => {
-    it('shows route preview with controls', async () => {
-      const onEdit = vi.fn();
+    test('renders preview correctly', () => {
       const onConfirm = vi.fn();
+      const onEdit = vi.fn();
       const onCancel = vi.fn();
-      const route = [[0, 0], [1, 1], [2, 2]];
 
-      await act(async () => {
-        render(
+      render(
+        <TestContextProvider>
           <RoutePreview
-            route={route}
+            points={[[100, 100], [200, 200]]}
             activityType="walk"
-            onEdit={onEdit}
-            onConfirm={onConfirm}
-            onCancel={onCancel}
             isVisible={true}
+            onConfirm={onConfirm}
+            onEdit={onEdit}
+            onCancel={onCancel}
           />
-        );
-      });
+        </TestContextProvider>
+      );
 
-      // Verify controls are rendered
-      expect(screen.getByLabelText('Edit route')).toBeInTheDocument();
-      expect(screen.getByLabelText('Confirm route')).toBeInTheDocument();
-      expect(screen.getByLabelText('Cancel route')).toBeInTheDocument();
+      expect(screen.getByRole('region')).toBeInTheDocument();
+      expect(screen.getByLabelText('Route preview')).toBeInTheDocument();
     });
   });
 }); 

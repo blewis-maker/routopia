@@ -1,0 +1,17 @@
+.route-drawing-canvas {
+  cursor: crosshair;
+  touch-action: none; /* Prevents default touch behaviors */
+}
+
+.route-drawing-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Allow map interaction when not drawing */
+}
+
+.route-drawing-container.active {
+  pointer-events: all; /* Enable canvas interaction when drawing */
+} 
