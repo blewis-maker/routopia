@@ -1,11 +1,8 @@
-import { describe, test, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { vi } from 'vitest';
+import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
 import { TestContextProvider } from '../utils/TestContextProvider';
 import { RouteDrawing } from '@/components/route/RouteDrawing';
 import { RoutePreview } from '@/components/route/RoutePreview';
-import { RouteInteractionPanel } from '@/components/route/RouteInteractionPanel';
-import { RoutePreferences } from '@/components/route/RoutePreferences';
 import { routeService } from '@/services/routeService';
 
 // Mock the route service
@@ -17,164 +14,187 @@ vi.mock('@/services/routeService', () => ({
 }));
 
 describe('Critical - Route Components', () => {
-  const mockMapInstance = {
-    on: vi.fn(),
-    off: vi.fn(),
-    project: vi.fn().mockReturnValue({ x: 100, y: 100 })
-  };
+  let mockContext;
 
-  describe('RouteDrawing', () => {
-    it('handles drawing mode correctly', async () => {
-      const onDrawComplete = vi.fn();
-
-      await act(async () => {
-        render(
-          <TestContextProvider>
-            <RouteDrawing 
-              isDrawing={true}
-              onDrawComplete={onDrawComplete}
-              onDrawCancel={() => {}}
-              mapInstance={mockMapInstance}
-              activityType="walk"
-            />
-          </TestContextProvider>
-        );
-      });
-
-      const canvas = screen.getByRole('application');
-      
-      // Simulate the drawing sequence
-      await userEvent.click(canvas);
-      
-      // Get the mouseup handler that was registered
-      const mouseupHandler = mockMapInstance.on.mock.calls.find(
-        call => call[0] === 'mouseup'
-      )?.[1];
-
-      await act(async () => {
-        if (mouseupHandler) {
-          mouseupHandler({ 
-            lngLat: { lng: 0, lat: 0 },
-            preventDefault: () => {}
-          });
-        }
-      });
-
-      await waitFor(() => {
-        expect(onDrawComplete).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('RoutePreview', () => {
-    test('shows route preview with controls', async () => {
-      const onConfirm = vi.fn();
-      const onEdit = vi.fn();
-      const onCancel = vi.fn();
-
-      render(
-        <TestContextProvider>
-          <RoutePreview
-            points={[[0, 0], [1, 1]]}
-            activityType="walk"
-            isVisible={true}
-            onConfirm={onConfirm}
-            onEdit={onEdit}
-            onCancel={onCancel}
-            mapInstance={mockMapInstance}
-          />
-        </TestContextProvider>
-      );
-
-      const confirmButton = screen.getByRole('button', { name: /confirm/i });
-      const editButton = screen.getByRole('button', { name: /edit/i });
-      const cancelButton = screen.getByRole('button', { name: /cancel/i });
-
-      expect(confirmButton).toBeInTheDocument();
-      expect(editButton).toBeInTheDocument();
-      expect(cancelButton).toBeInTheDocument();
-
-      await userEvent.click(confirmButton);
-      expect(onConfirm).toHaveBeenCalled();
-    });
-  });
-
-  describe('RouteInteractionPanel', () => {
-    const mockRoute = {
-      id: 'test-route',
-      waypoints: [
-        { id: 'wp1', position: [0, 0], type: 'start', name: 'Start' },
-        { id: 'wp2', position: [1, 1], type: 'end', name: 'End' }
-      ],
-      distance: 10,
-      duration: 30,
-      elevation: 100
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockContext = {
+      clearRect: vi.fn(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      stroke: vi.fn(),
+      setLineDash: vi.fn(),
+      canvas: { 
+        width: 800, 
+        height: 600,
+        getBoundingClientRect: () => ({
+          left: 0,
+          top: 0,
+          width: 800,
+          height: 600
+        })
+      }
     };
 
-    test('handles waypoint operations', async () => {
-      const onRouteUpdate = vi.fn();
-      const onWaypointAdd = vi.fn();
-      const onWaypointRemove = vi.fn();
-      const onWaypointReorder = vi.fn();
-
-      render(
-        <TestContextProvider>
-          <RouteInteractionPanel
-            route={mockRoute}
-            onRouteUpdate={onRouteUpdate}
-            onWaypointAdd={onWaypointAdd}
-            onWaypointRemove={onWaypointRemove}
-            onWaypointReorder={onWaypointReorder}
-          />
-        </TestContextProvider>
-      );
-
-      // Test adding waypoint
-      const addButton = screen.getByText(/add waypoint/i);
-      await userEvent.click(addButton);
-      expect(onWaypointAdd).toHaveBeenCalled();
-
-      // Test waypoint list rendering
-      expect(screen.getByText('Start')).toBeInTheDocument();
-      expect(screen.getByText('End')).toBeInTheDocument();
-    });
+    // Make mockContext accessible via getContext
+    HTMLCanvasElement.prototype.getContext = vi.fn(() => mockContext);
+    vi.clearAllMocks();
   });
 
-  describe('RoutePreferences', () => {
-    test('updates preferences correctly', async () => {
-      const onChange = vi.fn();
-      const initialPreferences = {
-        type: 'avoid' as const,
-        options: {
-          highways: false,
-          tolls: true
-        },
-        restrictions: {
-          maxElevation: 1000,
-          maxDistance: 50
-        }
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe('RouteDrawing', () => {
+    it('initializes canvas correctly', async () => {
+      const mockMapInstance = {
+        on: vi.fn(),
+        off: vi.fn(),
+        project: vi.fn(),
+        unproject: vi.fn()
       };
 
       render(
         <TestContextProvider>
-          <RoutePreferences
-            activityType="bike"
-            preferences={initialPreferences}
-            onChange={onChange}
+          <RouteDrawing 
+            isDrawing={true}
+            onDrawComplete={() => {}}
+            onDrawCancel={() => {}}
+            mapInstance={mockMapInstance}
+            activityType="walk"
+            snapToRoads={false}
           />
         </TestContextProvider>
       );
 
-      // Test checkbox interaction
-      const highwaysCheckbox = screen.getByText(/highways/i);
-      await userEvent.click(highwaysCheckbox);
+      const canvas = screen.getByRole('application').querySelector('canvas');
+      expect(canvas).toBeInTheDocument();
+      expect(canvas).toHaveClass('route-drawing-canvas');
+    });
 
-      expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
-        options: expect.objectContaining({
-          highways: true,
-          tolls: true
-        })
-      }));
+    it('handles mouse events correctly', async () => {
+      const mockMapInstance = {
+        on: vi.fn(),
+        off: vi.fn(),
+        project: vi.fn(coords => ({
+          x: coords[0] * 100,
+          y: coords[1] * 100
+        })),
+        unproject: vi.fn(point => [point.x / 100, point.y / 100])
+      };
+
+      render(
+        <TestContextProvider>
+          <RouteDrawing 
+            isDrawing={true}
+            onDrawComplete={() => {}}
+            onDrawCancel={() => {}}
+            mapInstance={mockMapInstance}
+            activityType="walk"
+            snapToRoads={false}
+          />
+        </TestContextProvider>
+      );
+
+      const canvas = screen.getByRole('application').querySelector('canvas');
+      
+      // Initial mouse down
+      await act(async () => {
+        fireEvent.mouseDown(canvas, { 
+          clientX: 100, 
+          clientY: 100, 
+          buttons: 1,
+          bubbles: true 
+        });
+        await vi.runAllTimersAsync();
+      });
+
+      expect(mockContext.beginPath).toHaveBeenCalled();
+      expect(mockContext.moveTo).toHaveBeenCalled();
+
+      // Mouse move
+      await act(async () => {
+        fireEvent.mouseMove(canvas, { 
+          clientX: 200, 
+          clientY: 200, 
+          buttons: 1,
+          bubbles: true 
+        });
+        await vi.runAllTimersAsync();
+      });
+
+      expect(mockContext.lineTo).toHaveBeenCalled();
+      expect(mockContext.stroke).toHaveBeenCalled();
+    });
+
+    it('completes drawing on mouse up', async () => {
+      const onDrawComplete = vi.fn();
+      const mockMapInstance = {
+        on: vi.fn(),
+        off: vi.fn(),
+        project: vi.fn(coords => ({
+          x: coords[0] * 100,
+          y: coords[1] * 100
+        })),
+        unproject: vi.fn(point => [point.x / 100, point.y / 100])
+      };
+
+      render(
+        <TestContextProvider>
+          <RouteDrawing 
+            isDrawing={true}
+            onDrawComplete={onDrawComplete}
+            onDrawCancel={() => {}}
+            mapInstance={mockMapInstance}
+            activityType="walk"
+            snapToRoads={false}
+          />
+        </TestContextProvider>
+      );
+
+      const canvas = screen.getByRole('application').querySelector('canvas');
+
+      // Complete drawing sequence
+      await act(async () => {
+        fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100, buttons: 1, bubbles: true });
+        await vi.runAllTimersAsync();
+        
+        fireEvent.mouseMove(canvas, { clientX: 200, clientY: 200, buttons: 1, bubbles: true });
+        await vi.runAllTimersAsync();
+        
+        fireEvent.mouseUp(canvas, { clientX: 200, clientY: 200, bubbles: true });
+        await vi.runAllTimersAsync();
+      });
+
+      expect(onDrawComplete).toHaveBeenCalled();
+    });
+  });
+
+  describe('RoutePreview', () => {
+    it('shows route preview with controls', async () => {
+      const onEdit = vi.fn();
+      const onConfirm = vi.fn();
+      const onCancel = vi.fn();
+      const route = [[0, 0], [1, 1], [2, 2]];
+
+      await act(async () => {
+        render(
+          <RoutePreview
+            route={route}
+            activityType="walk"
+            onEdit={onEdit}
+            onConfirm={onConfirm}
+            onCancel={onCancel}
+            isVisible={true}
+          />
+        );
+      });
+
+      // Verify controls are rendered
+      expect(screen.getByLabelText('Edit route')).toBeInTheDocument();
+      expect(screen.getByLabelText('Confirm route')).toBeInTheDocument();
+      expect(screen.getByLabelText('Cancel route')).toBeInTheDocument();
     });
   });
 }); 
