@@ -39,13 +39,18 @@ export const RouteDrawing: React.FC<RouteDrawingProps> = ({
   enableUndo = false
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawingActive, setIsDrawingActive] = useState(false);
+  const [isDrawingActive, setIsDrawingActive] = useState(isDrawingProp);
   const [isDrawingCancelled, setIsDrawingCancelled] = useState(false);
   const [hasError, setHasError] = useState(false);
   const isCancellingRef = useRef(false);
   const pointsRef = useRef<Point[]>([]);
   const isDrawingRef = useRef(isDrawingProp);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+
+  useEffect(() => {
+    setIsDrawingActive(isDrawingProp);
+    isDrawingRef.current = isDrawingProp;
+  }, [isDrawingProp]);
 
   const clearCanvas = useCallback(() => {
     const ctx = contextRef.current;
@@ -75,10 +80,6 @@ export const RouteDrawing: React.FC<RouteDrawingProps> = ({
       isCancellingRef.current = false;
     }
   }, [onDrawCancel]);
-
-  useEffect(() => {
-    isDrawingRef.current = isDrawingProp;
-  }, [isDrawingProp]);
 
   useEffect(() => {
     try {
