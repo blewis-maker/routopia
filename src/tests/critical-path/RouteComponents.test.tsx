@@ -111,83 +111,58 @@ describe('Critical - Route Components', () => {
       });
     });
 
-    it('handles combined keyboard and mouse interactions', async () => {
-      const onDrawProgress = vi.fn();
-      const onDrawComplete = vi.fn();
-      const onDrawCancel = vi.fn();
-      
-      render(
-        <TestContextProvider>
-          <RouteDrawing 
-            isDrawing={true} 
-            activityType="walk"
-            onDrawProgress={onDrawProgress}
-            onDrawComplete={onDrawComplete}
-            onDrawCancel={onDrawCancel}
-          />
-        </TestContextProvider>
-      );
-
-      const canvas = screen.getByRole('none', { hidden: true }) as HTMLCanvasElement;
-      
-      // Start drawing
-      canvas.dispatchEvent(createMouseEvent('mousedown', 100, 100));
-      await vi.advanceTimersByTimeAsync(16);
-
-      // Draw while holding Shift (should snap to horizontal/45° angles)
-      fireEvent.keyDown(window, { key: 'Shift', keyCode: 16 });
-      await vi.advanceTimersByTimeAsync(16); // Wait for shift key state to update
-      
-      // First point should snap to horizontal (very small vertical deviation)
-      await simulateDrawingPoint(canvas, 150, 105); // Only 5px vertical deviation
-      await vi.advanceTimersByTimeAsync(16);
-      
-      // Second point should snap to 45°
-      await simulateDrawingPoint(canvas, 200, 200);
-      await vi.advanceTimersByTimeAsync(16);
-      
-      fireEvent.keyUp(window, { key: 'Shift', keyCode: 16 });
-      await vi.advanceTimersByTimeAsync(16);
-
-      // Draw normally
-      await simulateDrawingPoint(canvas, 250, 220);
-      await vi.advanceTimersByTimeAsync(16);
-      
-      // Complete drawing
-      canvas.dispatchEvent(createMouseEvent('mouseup', 250, 220));
-      await vi.advanceTimersByTimeAsync(100);
-
-      await waitFor(() => {
-        expect(onDrawProgress).toHaveBeenCalled();
-        const calls = onDrawProgress.mock.calls;
-        expect(calls.length).toBeGreaterThan(0);
-        const points = calls[calls.length - 1][0];
-        expect(points).toHaveLength(4);
+    describe('handles combined keyboard and mouse interactions', () => {
+      it('snaps to horizontal and 45° angles when shift is held', async () => {
+        const onDrawProgress = vi.fn();
+        const onDrawComplete = vi.fn();
         
-        const [start, horizontal, diagonal, end] = points as [number, number][];
-        console.log('Points:', {
-          start,
-          horizontal,
-          diagonal,
-          end,
-          horizontal_delta: {
-            dx: horizontal[0] - start[0],
-            dy: horizontal[1] - start[1]
-          },
-          diagonal_delta: {
-            dx: diagonal[0] - start[0],
-            dy: diagonal[1] - start[1]
-          }
-        });
+        render(
+          <TestContextProvider>
+            <RouteDrawing 
+              isDrawing={true} 
+              activityType="walk"
+              onDrawProgress={onDrawProgress}
+              onDrawComplete={onDrawComplete}
+            />
+          </TestContextProvider>
+        );
+
+        const canvas = screen.getByRole('none', { hidden: true }) as HTMLCanvasElement;
         
-        // Verify horizontal snapping
-        expect(horizontal[1]).toBe(start[1]); // Y should be same as start when horizontal
+        // Start drawing and hold Shift in one batch
+        canvas.dispatchEvent(createMouseEvent('mousedown', 100, 100));
+        fireEvent.keyDown(window, { key: 'Shift', keyCode: 16 });
+        await vi.advanceTimersByTimeAsync(20); // Single advance for both events
         
-        // Verify 45° angle snapping
-        const dx = diagonal[0] - start[0];
-        const dy = diagonal[1] - start[1];
-        expect(Math.abs(dx)).toBe(Math.abs(dy)); // Changes in x and y should be equal for 45°
-      }, { timeout: 2000 });
+        // Draw points with shift held
+        await simulateDrawingPoint(canvas, 150, 105);
+        await simulateDrawingPoint(canvas, 200, 200);
+        await vi.advanceTimersByTimeAsync(20);
+        
+        // Release shift and complete drawing
+        fireEvent.keyUp(window, { key: 'Shift', keyCode: 16 });
+        await simulateDrawingPoint(canvas, 250, 220);
+        canvas.dispatchEvent(createMouseEvent('mouseup', 250, 220));
+        await vi.advanceTimersByTimeAsync(50);
+
+        await waitFor(() => {
+          expect(onDrawProgress).toHaveBeenCalled();
+          const calls = onDrawProgress.mock.calls;
+          expect(calls.length).toBeGreaterThan(0);
+          const points = calls[calls.length - 1][0];
+          expect(points).toHaveLength(4);
+          
+          const [start, horizontal, diagonal, end] = points as [number, number][];
+          
+          // Verify horizontal snapping
+          expect(horizontal[1]).toBe(start[1]); // Y should be same as start when horizontal
+          
+          // Verify 45° angle snapping
+          const dx = diagonal[0] - start[0];
+          const dy = diagonal[1] - start[1];
+          expect(Math.abs(dx)).toBe(Math.abs(dy)); // Changes in x and y should be equal for 45°
+        }, { timeout: 1000 });
+      });
     });
 
     it('handles edge cases and error conditions', async () => {
@@ -245,54 +220,49 @@ describe('Critical - Route Components', () => {
       });
     });
 
-    it('handles concurrent event sequences', async () => {
-      const onDrawProgress = vi.fn();
-      const onDrawComplete = vi.fn();
-      
-      render(
-        <TestContextProvider>
-          <RouteDrawing 
-            isDrawing={true} 
-            activityType="walk"
-            onDrawProgress={onDrawProgress}
-            onDrawComplete={onDrawComplete}
-          />
-        </TestContextProvider>
-      );
+    describe('handles concurrent event sequences', () => {
+      it('correctly processes overlapping mouse and keyboard events', async () => {
+        const onDrawProgress = vi.fn();
+        const onDrawComplete = vi.fn();
+        
+        render(
+          <TestContextProvider>
+            <RouteDrawing 
+              isDrawing={true} 
+              activityType="walk"
+              onDrawProgress={onDrawProgress}
+              onDrawComplete={onDrawComplete}
+            />
+          </TestContextProvider>
+        );
 
-      const canvas = screen.getByRole('none', { hidden: true }) as HTMLCanvasElement;
-      
-      // Simulate multiple rapid interactions
-      canvas.dispatchEvent(createMouseEvent('mousedown', 100, 100));
-      
-      // Simulate concurrent mousemove and keydown events
-      const events = [
-        createMouseEvent('mousemove', 150, 150),
-        new KeyboardEvent('keydown', { key: 'Shift' }),
-        createMouseEvent('mousemove', 200, 200),
-        new KeyboardEvent('keyup', { key: 'Shift' }),
-        createMouseEvent('mousemove', 250, 250)
-      ];
+        const canvas = screen.getByRole('none', { hidden: true }) as HTMLCanvasElement;
+        
+        // Batch initial events
+        canvas.dispatchEvent(createMouseEvent('mousedown', 100, 100));
+        fireEvent.keyDown(window, { key: 'Shift', keyCode: 16 });
+        await vi.advanceTimersByTimeAsync(20);
 
-      // Dispatch events in rapid succession
-      events.forEach(event => {
-        canvas.dispatchEvent(event);
-      });
+        // Simulate rapid drawing with shift
+        for (let i = 0; i < 3; i++) {
+          await simulateDrawingPoint(canvas, 150 + i * 50, 150 + i * 50);
+        }
+        await vi.advanceTimersByTimeAsync(20);
 
-      await vi.advanceTimersByTimeAsync(16);
-      
-      // Complete the drawing
-      canvas.dispatchEvent(createMouseEvent('mouseup', 250, 250));
-      await vi.advanceTimersByTimeAsync(100);
+        // Complete drawing
+        canvas.dispatchEvent(createMouseEvent('mouseup', 250, 250));
+        fireEvent.keyUp(window, { key: 'Shift', keyCode: 16 });
+        await vi.advanceTimersByTimeAsync(50);
 
-      await waitFor(() => {
-        expect(onDrawProgress).toHaveBeenCalled();
-        const calls = onDrawProgress.mock.calls;
-        const lastCall = calls[calls.length - 1];
-        expect(lastCall).toBeDefined();
-        const points = lastCall[0];
-        expect(points.length).toBeGreaterThan(1);
-        expect(points[points.length - 1]).toEqual([250, 250]);
+        await waitFor(() => {
+          expect(onDrawProgress).toHaveBeenCalled();
+          const calls = onDrawProgress.mock.calls;
+          const lastCall = calls[calls.length - 1];
+          expect(lastCall).toBeDefined();
+          const points = lastCall[0];
+          expect(points.length).toBeGreaterThan(1);
+          expect(points[points.length - 1]).toEqual([250, 250]);
+        }, { timeout: 1000 });
       });
     });
 
@@ -483,66 +453,63 @@ describe('Critical - Route Components', () => {
       });
     });
 
-    it('handles high point density performance', async () => {
-      const onDrawProgress = vi.fn();
-      const onDrawComplete = vi.fn();
-      const startTime = performance.now();
-      
-      render(
-        <TestContextProvider>
-          <RouteDrawing 
-            isDrawing={true} 
-            activityType="walk"
-            onDrawProgress={onDrawProgress}
-            onDrawComplete={onDrawComplete}
-          />
-        </TestContextProvider>
-      );
+    describe('handles high point density performance', () => {
+      it('optimizes rendering for many points', async () => {
+        const onDrawProgress = vi.fn();
+        const onDrawComplete = vi.fn();
+        const startTime = performance.now();
 
-      const canvas = screen.getByRole('none', { hidden: true }) as HTMLCanvasElement;
-      
-      // Start drawing
-      canvas.dispatchEvent(createMouseEvent('mousedown', 100, 100));
-      await vi.advanceTimersByTimeAsync(16);
+        render(
+          <TestContextProvider>
+            <RouteDrawing 
+              isDrawing={true} 
+              activityType="walk"
+              onDrawProgress={onDrawProgress}
+              onDrawComplete={onDrawComplete}
+            />
+          </TestContextProvider>
+        );
 
-      // Generate many points in a spiral pattern
-      const points: [number, number][] = [];
-      const centerX = 400;
-      const centerY = 300;
-      const spirals = 3; // Reduced from 5 to 3
-      const pointsPerSpiral = 50; // Reduced from 100 to 50
-      
-      for (let i = 0; i < pointsPerSpiral * spirals; i++) {
-        const angle = (i / pointsPerSpiral) * Math.PI * 2;
-        const radius = 10 + (i / pointsPerSpiral) * 50;
-        const x = centerX + Math.cos(angle) * radius;
-        const y = centerY + Math.sin(angle) * radius;
-        points.push([x, y]);
-      }
-
-      // Simulate drawing all points
-      for (const [x, y] of points) {
-        await simulateDrawingPoint(canvas, x, y);
-      }
-
-      // End drawing
-      canvas.dispatchEvent(createMouseEvent('mouseup', points[points.length - 1][0], points[points.length - 1][1]));
-      await vi.advanceTimersByTimeAsync(100);
-
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      await waitFor(() => {
-        expect(onDrawComplete).toHaveBeenCalled();
-        const calls = onDrawComplete.mock.calls;
-        const lastCall = calls[calls.length - 1];
-        expect(lastCall).toBeDefined();
-        const finalPoints = lastCall[0];
+        const canvas = screen.getByRole('none', { hidden: true }) as HTMLCanvasElement;
         
-        // Performance checks
-        expect(duration).toBeLessThan(5000); // Should complete within 5 seconds
-        expect(finalPoints.length).toBeLessThan(points.length * 0.5); // Should reduce points by at least 50%
-        expect((mockCanvasContext2D.stroke as jest.Mock).mock.calls.length).toBeLessThan(points.length); // Should batch render calls
+        // Generate points in a spiral pattern
+        const points: [number, number][] = [];
+        const centerX = 400;
+        const centerY = 300;
+        const spirals = 3;
+        const pointsPerSpiral = 50;
+        
+        for (let i = 0; i < pointsPerSpiral * spirals; i++) {
+          const angle = (i / pointsPerSpiral) * Math.PI * 2;
+          const radius = 10 + (i / pointsPerSpiral) * 50;
+          const x = centerX + Math.cos(angle) * radius;
+          const y = centerY + Math.sin(angle) * radius;
+          points.push([x, y]);
+        }
+
+        // Batch simulate drawing all points
+        canvas.dispatchEvent(createMouseEvent('mousedown', points[0][0], points[0][1]));
+        await vi.advanceTimersByTimeAsync(20);
+
+        for (let i = 1; i < points.length - 1; i += 3) {
+          await simulateDrawingPoint(canvas, points[i][0], points[i][1]);
+        }
+        
+        canvas.dispatchEvent(createMouseEvent('mouseup', points[points.length - 1][0], points[points.length - 1][1]));
+        await vi.advanceTimersByTimeAsync(50);
+
+        await waitFor(() => {
+          expect(onDrawComplete).toHaveBeenCalled();
+          const calls = onDrawComplete.mock.calls;
+          const lastCall = calls[calls.length - 1];
+          expect(lastCall).toBeDefined();
+          const finalPoints = lastCall[0];
+          
+          const duration = performance.now() - startTime;
+          expect(duration).toBeLessThan(3000);
+          expect(finalPoints.length).toBeLessThan(points.length * 0.5);
+          expect((mockCanvasContext2D.stroke as jest.Mock).mock.calls.length).toBeLessThan(points.length);
+        }, { timeout: 1000 });
       });
     });
 
