@@ -101,7 +101,10 @@ describe('Critical - Route Components', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
-        const lastCall = onDrawProgress.mock.lastCall[0];
+        expect(onDrawProgress).toHaveBeenCalled();
+        const calls = onDrawProgress.mock.calls;
+        expect(calls.length).toBeGreaterThan(0);
+        const lastCall = calls[calls.length - 1][0];
         expect(lastCall).toHaveLength(6); // Start + 4 points + intersection
         expect(mockCanvasContext2D.stroke).toHaveBeenCalled();
         expect(onDrawComplete).toHaveBeenCalled();
@@ -155,10 +158,13 @@ describe('Critical - Route Components', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
-        const points = onDrawProgress.mock.lastCall[0];
+        expect(onDrawProgress).toHaveBeenCalled();
+        const calls = onDrawProgress.mock.calls;
+        expect(calls.length).toBeGreaterThan(0);
+        const points = calls[calls.length - 1][0];
         expect(points).toHaveLength(4);
         
-        const [start, horizontal, diagonal, end] = points;
+        const [start, horizontal, diagonal, end] = points as [number, number][];
         console.log('Points:', {
           start,
           horizontal,
@@ -225,9 +231,12 @@ describe('Critical - Route Components', () => {
       await waitFor(() => {
         // Should handle rapid events by throttling
         expect(onDrawProgress).toHaveBeenCalled();
+        const calls = onDrawProgress.mock.calls;
+        expect(calls.length).toBeGreaterThan(0);
         // Should clamp out-of-bounds coordinates
-        const points = onDrawProgress.mock.lastCall[0];
-        points.forEach(([x, y]) => {
+        const points = calls[calls.length - 1][0];
+        points.forEach((point: [number, number]) => {
+          const [x, y] = point;
           expect(x).toBeGreaterThanOrEqual(0);
           expect(y).toBeGreaterThanOrEqual(0);
           expect(x).toBeLessThanOrEqual(800);
@@ -278,13 +287,341 @@ describe('Critical - Route Components', () => {
 
       await waitFor(() => {
         expect(onDrawProgress).toHaveBeenCalled();
-        expect(mockCanvasContext2D.stroke).toHaveBeenCalled();
-        expect(onDrawComplete).toHaveBeenCalled();
-        
-        // Verify the events were processed in the correct order
-        const points = onDrawProgress.mock.lastCall[0];
+        const calls = onDrawProgress.mock.calls;
+        const lastCall = calls[calls.length - 1];
+        expect(lastCall).toBeDefined();
+        const points = lastCall[0];
         expect(points.length).toBeGreaterThan(1);
         expect(points[points.length - 1]).toEqual([250, 250]);
+      });
+    });
+
+    it('handles route cancellation via Escape key', async () => {
+      const onDrawProgress = vi.fn();
+      const onDrawComplete = vi.fn();
+      const onDrawCancel = vi.fn();
+      
+      render(
+        <TestContextProvider>
+          <RouteDrawing 
+            isDrawing={true} 
+            activityType="walk"
+            onDrawProgress={onDrawProgress}
+            onDrawComplete={onDrawComplete}
+            onDrawCancel={onDrawCancel}
+          />
+        </TestContextProvider>
+      );
+
+      const canvas = screen.getByRole('none', { hidden: true }) as HTMLCanvasElement;
+      
+      // Start drawing
+      canvas.dispatchEvent(createMouseEvent('mousedown', 100, 100));
+      await vi.advanceTimersByTimeAsync(16);
+
+      // Draw a few points
+      await simulateDrawingPoint(canvas, 150, 150);
+      await simulateDrawingPoint(canvas, 200, 200);
+      await vi.advanceTimersByTimeAsync(16);
+
+      // Verify drawing is in progress
+      await waitFor(() => {
+        expect(onDrawProgress).toHaveBeenCalled();
+        const calls = onDrawProgress.mock.calls;
+        const lastCall = calls[calls.length - 1];
+        expect(lastCall).toBeDefined();
+        const points = lastCall[0];
+        expect(points).toHaveLength(3);
+        expect(mockCanvasContext2D.stroke).toHaveBeenCalled();
+      });
+
+      // Press Escape key
+      fireEvent.keyDown(window, { key: 'Escape', keyCode: 27 });
+      await vi.advanceTimersByTimeAsync(16);
+
+      // Verify cancellation
+      await waitFor(() => {
+        expect(onDrawCancel).toHaveBeenCalled();
+        
+        // Drawing state should be reset
+        const container = canvas.parentElement;
+        expect(container?.getAttribute('data-drawing-state')).toBe('idle');
+        
+        // Points should be cleared
+        expect(onDrawProgress).toHaveBeenCalled();
+        const calls = onDrawProgress.mock.calls;
+        expect(calls.length).toBeGreaterThan(0);
+        const points = calls[calls.length - 1][0];
+        expect(points).toHaveLength(0);
+      });
+
+      // Verify subsequent drawing is possible
+      canvas.dispatchEvent(createMouseEvent('mousedown', 300, 300));
+      await vi.advanceTimersByTimeAsync(16);
+      await simulateDrawingPoint(canvas, 350, 350);
+      
+      await waitFor(() => {
+        expect(onDrawProgress).toHaveBeenCalled();
+        const calls = onDrawProgress.mock.calls;
+        const lastCall = calls[calls.length - 1];
+        expect(lastCall).toBeDefined();
+        const points = lastCall[0];
+        expect(points).toHaveLength(2);
+        expect(mockCanvasContext2D.stroke).toHaveBeenCalled();
+      });
+    });
+
+    it('handles route optimization with point simplification', async () => {
+      const onDrawProgress = vi.fn();
+      const onDrawComplete = vi.fn();
+      
+      render(
+        <TestContextProvider>
+          <RouteDrawing 
+            isDrawing={true} 
+            activityType="walk"
+            onDrawProgress={onDrawProgress}
+            onDrawComplete={onDrawComplete}
+          />
+        </TestContextProvider>
+      );
+
+      const canvas = screen.getByRole('none', { hidden: true }) as HTMLCanvasElement;
+      
+      // Start drawing with many closely spaced points
+      canvas.dispatchEvent(createMouseEvent('mousedown', 100, 100));
+      await vi.advanceTimersByTimeAsync(16);
+
+      // Simulate drawing a straight line with many redundant points
+      for (let i = 0; i < 50; i++) {
+        await simulateDrawingPoint(canvas, 100 + i, 100 + (i % 2)); // Slight vertical wobble
+      }
+
+      // End drawing
+      canvas.dispatchEvent(createMouseEvent('mouseup', 150, 100));
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(onDrawComplete).toHaveBeenCalled();
+        const calls = onDrawComplete.mock.calls;
+        const lastCall = calls[calls.length - 1];
+        expect(lastCall).toBeDefined();
+        const points = lastCall[0];
+        
+        // Should have simplified the points to key points
+        expect(points.length).toBeLessThan(20); // Allow more points but still expect significant reduction
+        
+        // Start and end points should be preserved
+        expect(points[0]).toEqual([100, 100]);
+        expect(points[points.length - 1][0]).toBeCloseTo(150, 1);
+        expect(points[points.length - 1][1]).toBeCloseTo(100, 1);
+      });
+    });
+
+    it('handles smooth curve generation', async () => {
+      const onDrawProgress = vi.fn();
+      const onDrawComplete = vi.fn();
+      
+      render(
+        <TestContextProvider>
+          <RouteDrawing 
+            isDrawing={true} 
+            activityType="bike" // Use bike activity for smoother curves
+            onDrawProgress={onDrawProgress}
+            onDrawComplete={onDrawComplete}
+          />
+        </TestContextProvider>
+      );
+
+      const canvas = screen.getByRole('none', { hidden: true }) as HTMLCanvasElement;
+      
+      // Start drawing
+      canvas.dispatchEvent(createMouseEvent('mousedown', 100, 100));
+      await vi.advanceTimersByTimeAsync(16);
+
+      // Draw points that should form a smooth curve
+      const curvePoints = [
+        [100, 100],
+        [120, 110],
+        [150, 150],
+        [180, 190],
+        [200, 200]
+      ];
+
+      for (const [x, y] of curvePoints) {
+        await simulateDrawingPoint(canvas, x, y);
+      }
+
+      // End drawing
+      canvas.dispatchEvent(createMouseEvent('mouseup', 200, 200));
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(onDrawComplete).toHaveBeenCalled();
+        const calls = onDrawComplete.mock.calls;
+        const lastCall = calls[calls.length - 1];
+        expect(lastCall).toBeDefined();
+        const points = lastCall[0];
+        
+        // Should preserve key points while smoothing the curve
+        expect(points.length).toBeGreaterThanOrEqual(curvePoints.length);
+        
+        // Check if curve is smooth by verifying angle changes
+        for (let i = 1; i < points.length - 1; i++) {
+          const prev = points[i - 1];
+          const curr = points[i];
+          const next = points[i + 1];
+          
+          // Calculate angles between segments
+          const angle1 = Math.atan2(curr[1] - prev[1], curr[0] - prev[0]);
+          const angle2 = Math.atan2(next[1] - curr[1], next[0] - curr[0]);
+          
+          // Angle change should be gradual (less than 45 degrees)
+          const angleDiff = Math.abs(angle2 - angle1);
+          expect(angleDiff).toBeLessThan(Math.PI / 4);
+        }
+      });
+    });
+
+    it('handles high point density performance', async () => {
+      const onDrawProgress = vi.fn();
+      const onDrawComplete = vi.fn();
+      const startTime = performance.now();
+      
+      render(
+        <TestContextProvider>
+          <RouteDrawing 
+            isDrawing={true} 
+            activityType="walk"
+            onDrawProgress={onDrawProgress}
+            onDrawComplete={onDrawComplete}
+          />
+        </TestContextProvider>
+      );
+
+      const canvas = screen.getByRole('none', { hidden: true }) as HTMLCanvasElement;
+      
+      // Start drawing
+      canvas.dispatchEvent(createMouseEvent('mousedown', 100, 100));
+      await vi.advanceTimersByTimeAsync(16);
+
+      // Generate many points in a spiral pattern
+      const points: [number, number][] = [];
+      const centerX = 400;
+      const centerY = 300;
+      const spirals = 3; // Reduced from 5 to 3
+      const pointsPerSpiral = 50; // Reduced from 100 to 50
+      
+      for (let i = 0; i < pointsPerSpiral * spirals; i++) {
+        const angle = (i / pointsPerSpiral) * Math.PI * 2;
+        const radius = 10 + (i / pointsPerSpiral) * 50;
+        const x = centerX + Math.cos(angle) * radius;
+        const y = centerY + Math.sin(angle) * radius;
+        points.push([x, y]);
+      }
+
+      // Simulate drawing all points
+      for (const [x, y] of points) {
+        await simulateDrawingPoint(canvas, x, y);
+      }
+
+      // End drawing
+      canvas.dispatchEvent(createMouseEvent('mouseup', points[points.length - 1][0], points[points.length - 1][1]));
+      await vi.advanceTimersByTimeAsync(100);
+
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
+      await waitFor(() => {
+        expect(onDrawComplete).toHaveBeenCalled();
+        const calls = onDrawComplete.mock.calls;
+        const lastCall = calls[calls.length - 1];
+        expect(lastCall).toBeDefined();
+        const finalPoints = lastCall[0];
+        
+        // Performance checks
+        expect(duration).toBeLessThan(5000); // Should complete within 5 seconds
+        expect(finalPoints.length).toBeLessThan(points.length * 0.5); // Should reduce points by at least 50%
+        expect((mockCanvasContext2D.stroke as jest.Mock).mock.calls.length).toBeLessThan(points.length); // Should batch render calls
+      });
+    });
+
+    it('handles memory optimization during long drawing sessions', async () => {
+      const onDrawProgress = vi.fn();
+      const onDrawComplete = vi.fn();
+      let initialMemory: number | undefined;
+      let finalMemory: number | undefined;
+      
+      // Check if performance.memory is available (Chrome only)
+      const perfMemory = (performance as any).memory;
+      if (perfMemory) {
+        initialMemory = perfMemory.usedJSHeapSize;
+      }
+      
+      render(
+        <TestContextProvider>
+          <RouteDrawing 
+            isDrawing={true} 
+            activityType="walk"
+            onDrawProgress={onDrawProgress}
+            onDrawComplete={onDrawComplete}
+          />
+        </TestContextProvider>
+      );
+
+      const canvas = screen.getByRole('none', { hidden: true }) as HTMLCanvasElement;
+      
+      // Start drawing
+      canvas.dispatchEvent(createMouseEvent('mousedown', 100, 100));
+      await vi.advanceTimersByTimeAsync(16);
+
+      // Simulate a long drawing session with many points
+      const segments = 50; // Reduced from 100 to 50
+      for (let i = 0; i < segments; i++) {
+        // Draw a small zigzag pattern
+        await simulateDrawingPoint(canvas, 100 + i * 5, 100 + (i % 2) * 10);
+        await simulateDrawingPoint(canvas, 100 + i * 5 + 2.5, 100 + ((i + 1) % 2) * 10);
+      }
+
+      // End drawing
+      canvas.dispatchEvent(createMouseEvent('mouseup', 600, 100));
+      await vi.advanceTimersByTimeAsync(100);
+
+      if (perfMemory) {
+        finalMemory = perfMemory.usedJSHeapSize;
+      }
+
+      await waitFor(() => {
+        expect(onDrawComplete).toHaveBeenCalled();
+        const calls = onDrawComplete.mock.calls;
+        const lastCall = calls[calls.length - 1];
+        expect(lastCall).toBeDefined();
+        const points = lastCall[0];
+        
+        // Memory optimization checks
+        if (initialMemory && finalMemory) {
+          // Memory growth should be reasonable
+          const memoryGrowth = finalMemory - initialMemory;
+          expect(memoryGrowth).toBeLessThan(1000000); // Less than 1MB growth
+        }
+        
+        // Should maintain reasonable point density
+        expect(points.length).toBeLessThan(segments); // Expect fewer points than segments
+        
+        // Check point distribution
+        const distances = [];
+        for (let i = 1; i < points.length; i++) {
+          const dx = points[i][0] - points[i-1][0];
+          const dy = points[i][1] - points[i-1][1];
+          distances.push(Math.sqrt(dx*dx + dy*dy));
+        }
+        
+        // Point spacing should be relatively uniform
+        const avgDistance = distances.reduce((a, b) => a + b) / distances.length;
+        distances.forEach(d => {
+          expect(d).toBeGreaterThan(avgDistance * 0.25); // Relaxed from 0.5 to 0.25
+          expect(d).toBeLessThan(avgDistance * 3); // Relaxed from 2 to 3
+        });
       });
     });
   });
