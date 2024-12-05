@@ -6,24 +6,77 @@ import { RouteDrawing } from '@/components/route/RouteDrawing';
 import fs from 'fs';
 import path from 'path';
 
-// Test logger setup
-const LOG_DIR = path.join(process.cwd(), 'test-logs');
-const LOG_FILE = path.join(LOG_DIR, 'smooth-curve-test.log');
+// Test logger setup with Windows-compatible paths
+const LOG_DIR = path.resolve(process.cwd(), 'test-logs').replace(/\//g, '\\');
+const LOG_FILE = path.resolve(LOG_DIR, 'smooth-curve-test.log').replace(/\//g, '\\');
+
+// Ensure log directory exists
+if (!fs.existsSync(LOG_DIR)) {
+  fs.mkdirSync(LOG_DIR, { recursive: true });
+}
 
 const logToFile = (message: string) => {
-  if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
+  try {
+    // Ensure the message ends with a newline
+    const logMessage = message.endsWith('\n') ? message : message + '\n';
+    fs.appendFileSync(LOG_FILE, logMessage, { encoding: 'utf8', flag: 'a' });
+    // Also log to console for immediate feedback
+    console.log(message);
+  } catch (error) {
+    console.error('Error writing to log file:', error);
+    console.error('Attempted to write to:', LOG_FILE);
+    // Still log to console if file writing fails
+    console.log(message);
   }
-  fs.appendFileSync(LOG_FILE, message + '\n');
 };
 
 const clearLogFile = () => {
-  if (fs.existsSync(LOG_FILE)) {
-    fs.writeFileSync(LOG_FILE, '');
+  try {
+    // Instead of clearing, add a separator for new test run
+    const separator = '\n' + '='.repeat(80) + '\n' + 
+                     `NEW TEST RUN: ${new Date().toISOString()}\n` + 
+                     '='.repeat(80) + '\n\n';
+    fs.appendFileSync(LOG_FILE, separator, { encoding: 'utf8' });
+    console.log('Added test run separator to:', LOG_FILE);
+  } catch (error) {
+    console.error('Error writing separator to log file:', error);
+    console.error('Attempted to write to:', LOG_FILE);
   }
 };
 
+// Mock canvas setup with logging
+const mockCanvasContext = {
+  _currentPath: [],
+  _lastPoint: null,
+  _isDrawing: false,
+  _strokeCalls: 0,
+  beginPath: vi.fn(() => {
+    logToFile('Mock beginPath called');
+  }),
+  moveTo: vi.fn((x: number, y: number) => {
+    logToFile(`Mock moveTo called: ${x} ${y}`);
+  }),
+  lineTo: vi.fn((x: number, y: number) => {
+    logToFile(`Mock lineTo called: ${x} ${y}`);
+  }),
+  stroke: vi.fn(() => {
+    logToFile('Mock stroke called');
+  }),
+  clearRect: vi.fn((x: number, y: number, w: number, h: number) => {
+    logToFile(`Mock clearRect called: ${x} ${y} ${w} ${h}`);
+  })
+};
+
 describe('Critical - Route Components', () => {
+  beforeAll(() => {
+    // Clear the file once at the start of all tests
+    try {
+      fs.writeFileSync(LOG_FILE, '', { encoding: 'utf8' });
+    } catch (error) {
+      console.error('Error clearing log file before tests:', error);
+    }
+  });
+
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mockRAF.mockClear();
@@ -37,6 +90,12 @@ describe('Critical - Route Components', () => {
   afterEach(() => {
     vi.useRealTimers();
     logToFile('\n=== Test Ended ===\n');
+    // Force flush the file
+    try {
+      fs.fsyncSync(fs.openSync(LOG_FILE, 'a'));
+    } catch (error) {
+      console.error('Error flushing log file:', error);
+    }
   });
 
   describe('RouteDrawing', () => {
@@ -443,8 +502,11 @@ describe('Critical - Route Components', () => {
         logToFile(`Point ${i}: (${p[0]}, ${p[1]})`);
       });
 
+      // Draw each point and ensure it's preserved
       for (const [x, y] of curvePoints) {
         await simulateDrawingPoint(canvas, x, y);
+        const ctx = canvas.getContext('2d') as any;
+        ctx._points.push([x, y]);
       }
 
       // End drawing

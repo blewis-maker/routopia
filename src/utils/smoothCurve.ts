@@ -1,127 +1,100 @@
 import { Point } from '../types/route';
 
-// Neural network weights (pre-trained on smooth curve patterns)
-const HIDDEN_WEIGHTS = [
-    // 3 neurons, 6 inputs (x1,y1,x2,y2,angle1,angle2)
-    [0.3, -0.1, 0.4, 0.2, 0.5, -0.3],
-    [-0.2, 0.4, 0.1, -0.3, 0.2, 0.4],
-    [0.1, 0.3, -0.2, 0.4, -0.1, 0.3]
-];
-
-const OUTPUT_WEIGHTS = [
-    // 4 outputs (control point x1,y1,x2,y2), 3 inputs from hidden layer
-    [0.4, -0.2, 0.3],
-    [0.3, 0.4, -0.1],
-    [-0.3, 0.2, 0.4],
-    [0.2, -0.3, 0.4]
-];
-
-// Activation function (ReLU)
-const relu = (x: number): number => Math.max(0, x);
-
-// Normalize coordinates to [0,1] range
-const normalizeCoord = (value: number, min: number, max: number): number => {
-    return (value - min) / (max - min);
+const interpolatePoints = (p1: Point, p2: Point, t: number): Point => {
+  return [
+    p1[0] + (p2[0] - p1[0]) * t,
+    p1[1] + (p2[1] - p1[1]) * t
+  ];
 };
 
-// Denormalize coordinates back to original range
-const denormalizeCoord = (value: number, min: number, max: number): number => {
-    return value * (max - min) + min;
+const calculateAngle = (p1: Point, p2: Point, p3: Point): number => {
+  const angle1 = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]);
+  const angle2 = Math.atan2(p3[1] - p2[1], p3[0] - p2[0]);
+  let diff = angle2 - angle1;
+  while (diff > Math.PI) diff -= 2 * Math.PI;
+  while (diff < -Math.PI) diff += 2 * Math.PI;
+  return Math.abs(diff);
 };
 
-// Calculate angle between points
-const calculateAngle = (p1: Point, p2: Point): number => {
-    return Math.atan2(p2[1] - p1[1], p2[0] - p1[0]);
-};
-
-// Neural network forward pass
-const forwardPass = (input: number[]): number[] => {
-    // Hidden layer
-    const hidden = HIDDEN_WEIGHTS.map(weights => 
-        relu(weights.reduce((sum, w, i) => sum + w * input[i], 0))
-    );
-
-    // Output layer
-    return OUTPUT_WEIGHTS.map(weights =>
-        weights.reduce((sum, w, i) => sum + w * hidden[i], 0)
-    );
-};
-
-// Generate control points using neural network
-const generateControlPoints = (p1: Point, p2: Point, p3: Point): [Point, Point] => {
-    // Find bounding box for normalization
-    const minX = Math.min(p1[0], p2[0], p3[0]);
-    const maxX = Math.max(p1[0], p2[0], p3[0]);
-    const minY = Math.min(p1[1], p2[1], p3[1]);
-    const maxY = Math.max(p1[1], p2[1], p3[1]);
-
-    // Normalize input points
-    const x1n = normalizeCoord(p1[0], minX, maxX);
-    const y1n = normalizeCoord(p1[1], minY, maxY);
-    const x2n = normalizeCoord(p2[0], minX, maxX);
-    const y2n = normalizeCoord(p2[1], minY, maxY);
-
-    // Calculate angles
-    const angle1 = calculateAngle(p1, p2) / Math.PI; // Normalize to [-1,1]
-    const angle2 = calculateAngle(p2, p3) / Math.PI;
-
-    // Neural network input
-    const input = [x1n, y1n, x2n, y2n, angle1, angle2];
-    
-    // Get control points from network
-    const output = forwardPass(input);
-    
-    // Denormalize control points
-    const cp1: Point = [
-        denormalizeCoord(output[0], minX, maxX),
-        denormalizeCoord(output[1], minY, maxY)
-    ];
-    
-    const cp2: Point = [
-        denormalizeCoord(output[2], minX, maxX),
-        denormalizeCoord(output[3], minY, maxY)
-    ];
-
-    return [cp1, cp2];
+const calculateDistance = (p1: Point, p2: Point): number => {
+  const dx = p2[0] - p1[0];
+  const dy = p2[1] - p1[1];
+  return Math.sqrt(dx * dx + dy * dy);
 };
 
 export const smoothCurve = (points: Point[]): Point[] => {
-    if (points.length < 3) return points;
+  if (points.length < 3) return points;
 
-    const result: Point[] = [points[0]];
+  // First pass: identify sharp angles and split them
+  let smoothedPoints: Point[] = [points[0]];
+  
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const next = points[i + 1];
     
-    // Process points in groups of three
-    for (let i = 0; i < points.length - 2; i++) {
-        const p1 = points[i];
-        const p2 = points[i + 1];
-        const p3 = points[i + 2];
-
-        // Generate control points
-        const [cp1, cp2] = generateControlPoints(p1, p2, p3);
-
-        // Add cubic Bezier curve points
-        const segments = 10; // Number of points per curve
-        for (let t = 1; t <= segments; t++) {
-            const t1 = t / segments;
-            const t2 = 1 - t1;
-            
-            // Cubic Bezier curve formula
-            const x = t2 * t2 * t2 * p1[0] +
-                     3 * t2 * t2 * t1 * cp1[0] +
-                     3 * t2 * t1 * t1 * cp2[0] +
-                     t1 * t1 * t1 * p2[0];
-                     
-            const y = t2 * t2 * t2 * p1[1] +
-                     3 * t2 * t2 * t1 * cp1[1] +
-                     3 * t2 * t1 * t1 * cp2[1] +
-                     t1 * t1 * t1 * p2[1];
-                     
-            result.push([x, y]);
-        }
+    const angle = calculateAngle(prev, curr, next);
+    
+    if (angle > Math.PI / 4) {
+      // Calculate distances
+      const d1 = calculateDistance(prev, curr);
+      const d2 = calculateDistance(curr, next);
+      
+      // Calculate the number of intermediate points needed
+      const numPoints = Math.ceil(angle / (Math.PI / 8));
+      
+      // Create a smooth curve through the sharp angle
+      for (let j = 1; j <= numPoints; j++) {
+        const t = j / (numPoints + 1);
+        
+        // Calculate offset distance based on angle severity
+        const offset = Math.min(d1, d2) * 0.25 * Math.sin(t * Math.PI);
+        
+        // Calculate base point along the line
+        const basePoint = interpolatePoints(prev, next, t);
+        
+        // Calculate perpendicular vector
+        const dx = next[0] - prev[0];
+        const dy = next[1] - prev[1];
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const perpX = -dy / len;
+        const perpY = dx / len;
+        
+        // Add point with perpendicular offset
+        smoothedPoints.push([
+          basePoint[0] + perpX * offset,
+          basePoint[1] + perpY * offset
+        ]);
+      }
+    } else {
+      smoothedPoints.push(curr);
     }
-
-    // Add last point
-    result.push(points[points.length - 1]);
-
-    return result;
+  }
+  
+  smoothedPoints.push(points[points.length - 1]);
+  
+  // Second pass: ensure no angles exceed 45 degrees
+  let result: Point[] = [smoothedPoints[0]];
+  
+  for (let i = 1; i < smoothedPoints.length - 1; i++) {
+    const prev = smoothedPoints[i - 1];
+    const curr = smoothedPoints[i];
+    const next = smoothedPoints[i + 1];
+    
+    const angle = calculateAngle(prev, curr, next);
+    
+    if (angle > Math.PI / 4) {
+      // Add intermediate points to reduce the angle
+      const mid1 = interpolatePoints(prev, curr, 0.75);
+      const mid2 = interpolatePoints(curr, next, 0.25);
+      result.push(mid1);
+      result.push(interpolatePoints(mid1, mid2, 0.5));
+      result.push(mid2);
+    } else {
+      result.push(curr);
+    }
+  }
+  
+  result.push(smoothedPoints[smoothedPoints.length - 1]);
+  return result;
 }; 

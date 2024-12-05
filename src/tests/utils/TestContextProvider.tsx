@@ -6,6 +6,7 @@ interface MockCanvasState {
   _lastPoint: [number, number] | null;
   _isDrawing: boolean;
   _strokeCalls: number;
+  _points: [number, number][];
 }
 
 // Create mock RAF
@@ -22,6 +23,7 @@ interface MockCanvasContext extends Partial<CanvasRenderingContext2D> {
   _lastPoint: [number, number] | null;
   _isDrawing: boolean;
   _strokeCalls: number;
+  _points: [number, number][];
   canvas: HTMLCanvasElement | undefined;
   fillStyle: string;
   strokeStyle: string;
@@ -42,6 +44,7 @@ const createMockCanvasContext = (): MockCanvasContext => {
     _lastPoint: null,
     _isDrawing: false,
     _strokeCalls: 0,
+    _points: []
   };
 
   const mockContext: MockCanvasContext = {
@@ -66,6 +69,7 @@ const createMockCanvasContext = (): MockCanvasContext => {
       console.log('Mock moveTo called:', x, y);
       mockContext._lastPoint = [x, y];
       mockContext._currentPath = [[x, y]];
+      mockContext._points = [[x, y]];
     }),
 
     lineTo: vi.fn((x: number, y: number) => {
@@ -73,6 +77,7 @@ const createMockCanvasContext = (): MockCanvasContext => {
       if (mockContext._isDrawing) {
         mockContext._lastPoint = [x, y];
         mockContext._currentPath.push([x, y]);
+        mockContext._points.push([x, y]);
       }
     }),
 
@@ -80,6 +85,11 @@ const createMockCanvasContext = (): MockCanvasContext => {
       console.log('Mock stroke called');
       if (mockContext._isDrawing) {
         mockContext._strokeCalls++;
+        // Use the actual points for the test
+        if (mockContext._points.length >= 2) {
+          const points = mockContext._points;
+          mockContext._currentPath = [...points];
+        }
       }
     }),
 
@@ -88,6 +98,7 @@ const createMockCanvasContext = (): MockCanvasContext => {
       mockContext._currentPath = [];
       mockContext._lastPoint = null;
       mockContext._isDrawing = false;
+      mockContext._points = [];
     }),
 
     // State management
@@ -95,7 +106,8 @@ const createMockCanvasContext = (): MockCanvasContext => {
       _currentPath: mockContext._currentPath,
       _lastPoint: mockContext._lastPoint,
       _isDrawing: mockContext._isDrawing,
-      _strokeCalls: mockContext._strokeCalls
+      _strokeCalls: mockContext._strokeCalls,
+      _points: mockContext._points
     }),
 
     resetState: () => {
@@ -103,6 +115,7 @@ const createMockCanvasContext = (): MockCanvasContext => {
       mockContext._lastPoint = null;
       mockContext._isDrawing = false;
       mockContext._strokeCalls = 0;
+      mockContext._points = [];
       console.log('Mock context state after reset:', mockContext.getState());
     },
 
