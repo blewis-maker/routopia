@@ -3,6 +3,25 @@ import { vi, Mock } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { TestContextProvider, mockCanvasContext2D, mockRAF } from '../utils/TestContextProvider';
 import { RouteDrawing } from '@/components/route/RouteDrawing';
+import fs from 'fs';
+import path from 'path';
+
+// Test logger setup
+const LOG_DIR = path.join(process.cwd(), 'test-logs');
+const LOG_FILE = path.join(LOG_DIR, 'smooth-curve-test.log');
+
+const logToFile = (message: string) => {
+  if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+  }
+  fs.appendFileSync(LOG_FILE, message + '\n');
+};
+
+const clearLogFile = () => {
+  if (fs.existsSync(LOG_FILE)) {
+    fs.writeFileSync(LOG_FILE, '');
+  }
+};
 
 describe('Critical - Route Components', () => {
   beforeEach(() => {
@@ -11,18 +30,16 @@ describe('Critical - Route Components', () => {
     Object.values(mockCanvasContext2D)
       .filter((value): value is Mock => typeof value === 'function' && 'mockReset' in value)
       .forEach(mock => mock.mockClear());
+    clearLogFile();
+    logToFile('\n=== Test Started ===\n');
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    logToFile('\n=== Test Ended ===\n');
   });
 
   describe('RouteDrawing', () => {
-    beforeEach(() => {
-      console.log('Setting up drawing component...');
-      mockCanvasContext2D.resetState();
-    });
-
     const createMouseEvent = (type: string, x: number, y: number, button = 0, buttons = 1) => {
       return new MouseEvent(type, {
         clientX: x,
@@ -389,6 +406,8 @@ describe('Critical - Route Components', () => {
     });
 
     it('handles smooth curve generation', async () => {
+      logToFile('\n==== SMOOTH CURVE TEST START ====\n');
+      
       const onDrawProgress = vi.fn();
       const onDrawComplete = vi.fn();
       
@@ -396,7 +415,7 @@ describe('Critical - Route Components', () => {
         <TestContextProvider>
           <RouteDrawing 
             isDrawing={true} 
-            activityType="bike" // Use bike activity for smoother curves
+            activityType="bike"
             onDrawProgress={onDrawProgress}
             onDrawComplete={onDrawComplete}
           />
@@ -410,13 +429,19 @@ describe('Critical - Route Components', () => {
       await vi.advanceTimersByTimeAsync(16);
 
       // Draw points that should form a smooth curve
-      const curvePoints = [
+      const curvePoints: [number, number][] = [
         [100, 100],
         [120, 110],
         [150, 150],
         [180, 190],
         [200, 200]
       ];
+
+      // Debug input points
+      logToFile('\nInput Points:');
+      curvePoints.forEach((p: [number, number], i: number) => {
+        logToFile(`Point ${i}: (${p[0]}, ${p[1]})`);
+      });
 
       for (const [x, y] of curvePoints) {
         await simulateDrawingPoint(canvas, x, y);
@@ -436,21 +461,39 @@ describe('Critical - Route Components', () => {
         // Should preserve key points while smoothing the curve
         expect(points.length).toBeGreaterThanOrEqual(curvePoints.length);
         
-        // Check if curve is smooth by verifying angle changes
+        // Analyze all segments
+        logToFile('\nSegment Analysis:');
         for (let i = 1; i < points.length - 1; i++) {
           const prev = points[i - 1];
           const curr = points[i];
           const next = points[i + 1];
           
-          // Calculate angles between segments
           const angle1 = Math.atan2(curr[1] - prev[1], curr[0] - prev[0]);
           const angle2 = Math.atan2(next[1] - curr[1], next[0] - curr[0]);
+          let angleDiff = Math.abs(angle2 - angle1);
           
-          // Angle change should be gradual (less than 45 degrees)
-          const angleDiff = Math.abs(angle2 - angle1);
+          // Normalize angle
+          while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+          while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+          angleDiff = Math.abs(angleDiff);
+          
+          logToFile(`\nSegment ${i}:`);
+          logToFile(`  Previous: (${prev[0]}, ${prev[1]})`);
+          logToFile(`  Current:  (${curr[0]}, ${curr[1]})`);
+          logToFile(`  Next:     (${next[0]}, ${next[1]})`);
+          logToFile(`  Angle 1:  ${(angle1 * 180 / Math.PI).toFixed(2)}°`);
+          logToFile(`  Angle 2:  ${(angle2 * 180 / Math.PI).toFixed(2)}°`);
+          logToFile(`  Diff:     ${(angleDiff * 180 / Math.PI).toFixed(2)}°`);
+          
+          if (angleDiff >= Math.PI / 4) {
+            logToFile('  ⚠️ SHARP ANGLE DETECTED ⚠️');
+          }
+          
           expect(angleDiff).toBeLessThan(Math.PI / 4);
         }
       });
+      
+      logToFile('\n==== SMOOTH CURVE TEST END ====\n');
     });
 
     describe('handles high point density performance', () => {

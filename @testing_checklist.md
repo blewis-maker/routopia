@@ -37,7 +37,9 @@
 
 5. Route Optimization
    - [x] Point simplification
-   - [x] Smooth curve generation
+   - [❌] Smooth curve generation (4 attempts failed)
+     - Attempted: Circular arcs, Bezier curves, Spring optimization, Catmull-Rom splines
+     - Next to try: Subdivision curves, Hermite splines, Hybrid approach
    - [🔄] High point density performance
    - [x] Memory optimization
    - [x] Point distribution uniformity
@@ -62,7 +64,13 @@ Tests in progress:
    - [ ] Ensure proper sequence tracking
    - [ ] Verify event order handling
 
-3. Performance Optimization
+3. Smooth Curve Generation
+   - [ ] Fix angle constraint (must be < 45°)
+   - [ ] Maintain curve smoothness
+   - [ ] Ensure consistent point spacing
+   - [ ] Try next approaches (subdivision, Hermite, hybrid)
+
+4. Performance Optimization
    - [ ] Reduce stroke call count below 150
    - [ ] Optimize point batching
    - [ ] Improve memory usage
@@ -76,6 +84,7 @@ Tests in progress:
    - [ ] Test different map projections
 
 2. Documentation
+   - [x] Track smooth curve implementation attempts
    - [ ] Add inline documentation for test cases
    - [ ] Document test patterns and best practices
    - [ ] Create test coverage report
@@ -91,11 +100,12 @@ Tests in progress:
 
 ## Testing Strategy 🎯
 1. Fix Current Issues
-   - Fix 45° angle calculation
+   - Try next approaches for smooth curve generation
    - Fix concurrent sequence handling
    - Optimize performance and memory usage
 
 2. Improve Documentation
+   - Keep tracking implementation attempts
    - Document test patterns
    - Create testing guidelines
    - Add setup instructions
@@ -110,6 +120,8 @@ Tests in progress:
 
 ## Notes 📝
 - Three critical tests currently failing
+- Four smooth curve approaches attempted and documented
+- Three new approaches planned for tomorrow
 - Working on angle calculation fixes
 - Improving concurrent event handling
 - Optimizing performance and memory usage

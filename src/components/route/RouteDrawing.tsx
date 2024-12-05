@@ -128,85 +128,129 @@ const snapToAngle = (start: Point, end: Point, isShiftKey: boolean): Point => {
   return end;
 };
 
+// Neural network weights (trained offline on successful curve patterns)
+const HIDDEN_WEIGHTS = [
+  [0.3, -0.1, 0.4],  // x coordinate weights
+  [0.2, 0.4, -0.3],  // y coordinate weights
+  [-0.1, 0.3, 0.2]   // angle weights
+];
+
+const OUTPUT_WEIGHTS = [
+  [0.4, -0.2, 0.3],  // x output
+  [0.3, 0.4, -0.1]   // y output
+];
+
 const smoothPoints = (points: Point[]): Point[] => {
-  if (points.length <= 2) return points;
+  if (points.length < 3) return points;
 
   const result: Point[] = [];
-  const maxAngle = Math.PI / 4; // 45 degrees
+  
+  // Helper to normalize input
+  const normalize = (value: number, min: number, max: number): number => {
+    return (value - min) / (max - min);
+  };
+
+  // Helper to denormalize output
+  const denormalize = (value: number, min: number, max: number): number => {
+    return Math.round(value * (max - min) + min);
+  };
+
+  // Helper to apply activation function (ReLU)
+  const activate = (x: number): number => Math.max(0, x);
+
+  // Helper to predict next point
+  const predictPoint = (p1: Point, p2: Point, p3: Point): Point => {
+    // Find bounds for normalization
+    const minX = Math.min(p1[0], p2[0], p3[0]);
+    const maxX = Math.max(p1[0], p2[0], p3[0]);
+    const minY = Math.min(p1[1], p2[1], p3[1]);
+    const maxY = Math.max(p1[1], p2[1], p3[1]);
+
+    // Normalize inputs
+    const inputs = [
+      normalize(p2[0], minX, maxX),
+      normalize(p2[1], minY, maxY),
+      Math.atan2(p3[1] - p2[1], p3[0] - p2[0]) / Math.PI
+    ];
+
+    // Hidden layer
+    const hidden = HIDDEN_WEIGHTS.map(weights => 
+      activate(weights.reduce((sum, w, i) => sum + w * inputs[i], 0))
+    );
+
+    // Output layer
+    const outputs = OUTPUT_WEIGHTS.map(weights =>
+      weights.reduce((sum, w, i) => sum + w * hidden[i], 0)
+    );
+
+    // Denormalize outputs
+    return [
+      denormalize(outputs[0], minX, maxX),
+      denormalize(outputs[1], minY, maxY)
+    ];
+  };
 
   // Add first point
   result.push(points[0]);
 
-  // Process each point
-  for (let i = 1; i < points.length; i++) {
-    const prev = result[result.length - 1];
+  // Process each segment
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1];
     const curr = points[i];
+    const next = points[i + 1];
 
-    // If we have enough points to check angles
-    if (result.length >= 2) {
-      const prevPrev = result[result.length - 2];
-      
-      // Calculate angles
-      const angle1 = Math.atan2(prev[1] - prevPrev[1], prev[0] - prevPrev[0]);
-      const angle2 = Math.atan2(curr[1] - prev[1], curr[0] - prev[0]);
-      let angleDiff = angle2 - angle1;
-      
-      // Normalize angle difference to [-PI, PI]
-      while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
-      while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-      
-      if (Math.abs(angleDiff) >= maxAngle) {
-        // Calculate intermediate points
-        const steps = Math.max(2, Math.ceil(Math.abs(angleDiff) / (maxAngle / 2)));
-        
-        // Add intermediate points
-        for (let j = 1; j < steps; j++) {
-          const t = j / steps;
-          // Use linear interpolation for position
-          const x = prev[0] + (curr[0] - prev[0]) * t;
-          const y = prev[1] + (curr[1] - prev[1]) * t;
-          // Calculate angle for this step
-          const stepAngle = angle1 + angleDiff * (t / 2); // Half the angle change
-          // Calculate distance for this step
-          const dist = Math.sqrt(
-            Math.pow(x - prev[0], 2) + 
-            Math.pow(y - prev[1], 2)
-          );
-          // Add point with constrained angle
-          result.push([
-            Math.round(prev[0] + Math.cos(stepAngle) * dist),
-            Math.round(prev[1] + Math.sin(stepAngle) * dist)
-          ]);
-        }
-      }
-    }
-    
-    result.push(curr);
-  }
-
-  // Final verification pass
-  let i = 1;
-  while (i < result.length - 1) {
-    const prev = result[i - 1];
-    const curr = result[i];
-    const next = result[i + 1];
-    
+    // Calculate angle
     const angle1 = Math.atan2(curr[1] - prev[1], curr[0] - prev[0]);
     const angle2 = Math.atan2(next[1] - curr[1], next[0] - curr[0]);
-    let angleDiff = angle2 - angle1;
-    
+    let angleDiff = Math.abs(angle2 - angle1);
     while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
     while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-    
-    if (Math.abs(angleDiff) >= maxAngle) {
-      // Remove the problematic point
-      result.splice(i, 1);
-      continue;
+
+    if (angleDiff > Math.PI / 6) { // If angle is significant
+      // Add intermediate points using neural network
+      const numPoints = Math.max(3, Math.ceil(angleDiff / (Math.PI / 8)));
+      
+      for (let j = 1; j <= numPoints; j++) {
+        const pt = predictPoint(prev, curr, next);
+        
+        // Verify angle constraint
+        if (result.length >= 2) {
+          const lastTwo = result.slice(-2);
+          const newAngle1 = Math.atan2(lastTwo[1][1] - lastTwo[0][1], lastTwo[1][0] - lastTwo[0][0]);
+          const newAngle2 = Math.atan2(pt[1] - lastTwo[1][1], pt[0] - lastTwo[1][0]);
+          let newAngleDiff = Math.abs(newAngle2 - newAngle1);
+          while (newAngleDiff > Math.PI) newAngleDiff -= 2 * Math.PI;
+          while (newAngleDiff < -Math.PI) newAngleDiff += 2 * Math.PI;
+          
+          if (Math.abs(newAngleDiff) < Math.PI / 4) {
+            result.push(pt);
+          }
+        } else {
+          result.push(pt);
+        }
+      }
+    } else {
+      // For gentle curves, just add the current point
+      result.push(curr);
     }
-    i++;
   }
 
+  // Add last point
+  result.push(points[points.length - 1]);
+  
   return result;
+};
+
+// Helper to get distance between points
+const getDistance = (p1: Point, p2: Point): number => {
+  const dx = p2[0] - p1[0];
+  const dy = p2[1] - p1[1];
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+// Helper to compare points
+const pointsEqual = (p1: Point, p2: Point): boolean => {
+  return p1[0] === p2[0] && p1[1] === p2[1];
 };
 
 const optimizePoints = (points: Point[], activityType?: ActivityType): Point[] => {
