@@ -1,199 +1,257 @@
-import Anthropic from '@anthropic-ai/sdk';
-import Redis from 'ioredis';
+import { AIService } from '../../services/ai/AIService';
+import { POIService } from '../server/src/services/POIService';
+import { WeatherService } from '../server/src/services/WeatherService';
 import {
-  MCPConfig,
   RouteContext,
   MCPResponse,
-  MCPError,
-  MCPErrorCode
+  RouteSegment,
+  ActivityType,
+  POIRecommendation,
+  GeoPoint,
+  WeatherConditions,
+  TrafficConditions,
+  AIRequest,
+  AIResponse
 } from '../types/mcp.types';
+import logger from '../server/src/utils/logger';
 
 export class MCPService {
-  private claude: Anthropic;
-  private cache: Redis;
-  private metrics: Map<string, number>;
-  private lastMetricsFlush: number;
+  private aiService: AIService;
+  private poiService: POIService;
+  private weatherService: WeatherService;
+  private routeCache: Map<string, MCPResponse>;
 
-  constructor(private config: MCPConfig) {
-    this.claude = new Anthropic({
-      apiKey: config.claude.apiKey
-    });
-
-    this.cache = new Redis({
-      host: config.cache.host,
-      port: config.cache.port,
-      password: config.cache.password
-    });
-
-    this.metrics = new Map();
-    this.lastMetricsFlush = Date.now();
-    
-    if (config.monitoring.enabled) {
-      this.startMetricsCollection();
-    }
+  constructor() {
+    this.aiService = AIService.getInstance();
+    this.poiService = new POIService();
+    this.weatherService = new WeatherService();
+    this.routeCache = new Map();
   }
 
   async generateRoute(context: RouteContext): Promise<MCPResponse> {
     try {
-      // Check cache first
       const cacheKey = this.generateCacheKey(context);
-      const cachedResponse = await this.getCachedResponse(cacheKey);
-      if (cachedResponse) {
-        this.incrementMetric('cache_hits');
-        return cachedResponse;
+      if (this.routeCache.has(cacheKey)) {
+        return this.routeCache.get(cacheKey)!;
       }
 
-      this.incrementMetric('cache_misses');
+      // Generate main route segments
+      const mainSegments = await this.generateMainRouteSegments(context);
 
-      // Generate route using Claude
-      const response = await this.generateRouteWithClaude(context);
-      
-      // Cache the response
-      await this.cacheResponse(cacheKey, response);
-      
-      return response;
-    } catch (error) {
-      this.incrementMetric('errors');
-      throw this.handleError(error);
-    }
-  }
+      // Find suitable POIs
+      const pois = await this.findRelevantPOIs(context, mainSegments);
 
-  private async generateRouteWithClaude(context: RouteContext): Promise<MCPResponse> {
-    try {
-      const prompt = this.buildRoutePrompt(context);
-      
-      const response = await this.claude.messages.create({
-        model: this.config.claude.modelVersion,
-        max_tokens: this.config.claude.maxTokens,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
+      // Get weather and traffic conditions
+      const conditions = await this.getRouteConditions(context);
+
+      // Enhance route with AI
+      const enhancedRoute = await this.enhanceRouteWithAI({
+        route: mainSegments,
+        context,
+        type: 'ROUTE_ENHANCEMENT'
       });
 
-      return this.parseClaudeResponse(response);
+      const response: MCPResponse = {
+        route: enhancedRoute.route || mainSegments,
+        suggestedPOIs: pois,
+        metadata: {
+          totalDistance: this.calculateTotalDistance(mainSegments),
+          totalDuration: this.calculateTotalDuration(mainSegments),
+          totalElevationGain: this.calculateTotalElevation(mainSegments),
+          difficulty: this.calculateDifficulty(mainSegments),
+          scenicRating: this.calculateScenicRating(mainSegments),
+          mainRouteType: context.preferences.activityType,
+          tributaryActivities: this.getUniqueActivities(mainSegments),
+          conditions: {
+            weather: conditions.weather,
+            traffic: conditions.traffic
+          },
+          timing: this.calculateTiming(mainSegments, context)
+        }
+      };
+
+      this.routeCache.set(cacheKey, response);
+      return response;
     } catch (error) {
-      throw new Error('Failed to generate route with Claude: ' + error.message);
+      logger.error('Error generating route:', error);
+      throw error;
     }
   }
 
-  private buildRoutePrompt(context: RouteContext): string {
-    // Convert context into a natural language prompt for Claude
-    return `Generate a ${context.preferences.activityType.toLowerCase()} route from 
-      (${context.startPoint.lat}, ${context.startPoint.lng}) to 
-      (${context.endPoint.lat}, ${context.endPoint.lng}) 
-      ${this.getPreferencesString(context)}
-      ${this.getConstraintsString(context)}`;
+  private async generateMainRouteSegments(context: RouteContext): Promise<RouteSegment[]> {
+    // Generate route segments based on activity type
+    const segments: RouteSegment[] = [{
+      points: [context.startPoint, context.endPoint],
+      distance: this.calculateDistance(context.startPoint, context.endPoint),
+      duration: this.estimateDuration(context),
+      elevationGain: await this.calculateElevationGain(context),
+      activityType: context.preferences.activityType,
+      segmentType: 'MAIN',
+      conditions: {
+        weather: await this.weatherService.getWeatherForRoute({
+          startPoint: context.startPoint,
+          endPoint: context.endPoint,
+          preferences: context.preferences
+        }),
+        surface: this.getDefaultSurface(context.preferences.activityType),
+        difficulty: 'moderate',
+        safety: 'moderate'
+      }
+    }];
+
+    return segments;
   }
 
-  private getPreferencesString(context: RouteContext): string {
-    const prefs = [];
-    if (context.preferences.avoidHills) prefs.push('avoiding hills');
-    if (context.preferences.preferScenic) prefs.push('preferring scenic routes');
-    if (context.preferences.maxDistance) prefs.push(`with maximum distance of ${context.preferences.maxDistance}m`);
-    return prefs.length ? 'with preferences: ' + prefs.join(', ') : '';
-  }
-
-  private getConstraintsString(context: RouteContext): string {
-    if (!context.constraints) return '';
-    const constraints = [];
-    if (context.constraints.maxElevationGain) {
-      constraints.push(`maximum elevation gain of ${context.constraints.maxElevationGain}m`);
-    }
-    if (context.constraints.maxDuration) {
-      constraints.push(`maximum duration of ${context.constraints.maxDuration} minutes`);
-    }
-    if (context.constraints.requiredPOIs?.length) {
-      constraints.push(`including these POIs: ${context.constraints.requiredPOIs.join(', ')}`);
-    }
-    return constraints.length ? 'with constraints: ' + constraints.join(', ') : '';
-  }
-
-  private parseClaudeResponse(response: any): MCPResponse {
-    try {
-      // Parse and validate Claude's response
-      // This will need to be implemented based on Claude's actual response format
-      return JSON.parse(response.content[0].text);
-    } catch (error) {
-      throw new Error('Failed to parse Claude response: ' + error.message);
+  private getDefaultSurface(activityType: ActivityType): string[] {
+    switch (activityType) {
+      case 'WALK':
+      case 'RUN':
+        return ['pavement', 'trail'];
+      case 'BIKE':
+        return ['road', 'trail'];
+      case 'SKI':
+        return ['snow', 'groomed'];
+      case 'CAR':
+        return ['road'];
+      default:
+        return ['unknown'];
     }
   }
 
-  private generateCacheKey(context: RouteContext): string {
-    return `route:${JSON.stringify({
-      start: context.startPoint,
-      end: context.endPoint,
-      prefs: context.preferences,
-      constraints: context.constraints
-    })}`;
+  private async findRelevantPOIs(
+    context: RouteContext,
+    segments: RouteSegment[]
+  ): Promise<POIRecommendation[]> {
+    const searchRadius = this.calculateSearchRadius(segments);
+    
+    const searchResult = await this.poiService.searchPOIs({
+      location: context.startPoint,
+      radius: searchRadius,
+      activityType: context.preferences.activityType,
+      categories: this.getRelevantCategories(context.preferences)
+    });
+
+    return searchResult.results;
   }
 
-  private async getCachedResponse(key: string): Promise<MCPResponse | null> {
-    try {
-      const cached = await this.cache.get(key);
-      return cached ? JSON.parse(cached) : null;
-    } catch (error) {
-      console.error('Cache retrieval error:', error);
-      return null;
-    }
-  }
+  private async getRouteConditions(context: RouteContext): Promise<{
+    weather: WeatherConditions;
+    traffic?: TrafficConditions;
+  }> {
+    const weather = await this.weatherService.getWeatherForRoute({
+      startPoint: context.startPoint,
+      endPoint: context.endPoint,
+      preferences: context.preferences
+    });
 
-  private async cacheResponse(key: string, response: MCPResponse): Promise<void> {
-    try {
-      await this.cache.set(key, JSON.stringify(response), 'EX', this.config.cache.ttl);
-    } catch (error) {
-      console.error('Cache storage error:', error);
-    }
-  }
-
-  private handleError(error: any): MCPError {
-    const mcpError: MCPError = {
-      name: 'MCPError',
-      message: error.message || 'Unknown error occurred',
-      code: MCPErrorCode.CLAUDE_API_ERROR,
-      retryable: true,
-      details: error
+    // Implement traffic conditions retrieval
+    const traffic: TrafficConditions = {
+      congestionLevel: 'low',
+      averageSpeed: 65,
+      predictedDelays: 0
     };
 
-    if (error.name === 'RateLimitError') {
-      mcpError.code = MCPErrorCode.RATE_LIMIT_EXCEEDED;
-      mcpError.retryable = true;
-    } else if (error.name === 'ValidationError') {
-      mcpError.code = MCPErrorCode.INVALID_REQUEST;
-      mcpError.retryable = false;
+    return { weather, traffic };
+  }
+
+  private async enhanceRouteWithAI(request: AIRequest): Promise<AIResponse> {
+    return this.aiService.process(request);
+  }
+
+  // Helper methods
+  private generateCacheKey(context: RouteContext): string {
+    return `${context.startPoint.lat}-${context.startPoint.lng}-${context.endPoint.lat}-${context.endPoint.lng}-${context.preferences.activityType}`;
+  }
+
+  private calculateSearchRadius(segments: RouteSegment[]): number {
+    const totalDistance = this.calculateTotalDistance(segments);
+    return Math.min(totalDistance * 0.1, 5000); // 10% of route distance, max 5km
+  }
+
+  private getRelevantCategories(preferences: RouteContext['preferences']): string[] {
+    switch (preferences.activityType) {
+      case 'WALK':
+        return ['park', 'cafe', 'restaurant', 'shopping'];
+      case 'BIKE':
+        return ['bike_shop', 'park', 'trail_head'];
+      case 'RUN':
+        return ['park', 'trail_head', 'sports_complex'];
+      case 'SKI':
+        return ['ski_resort', 'lodge', 'equipment_rental'];
+      case 'CAR':
+        return ['parking', 'gas_station', 'rest_area'];
+      default:
+        return [];
     }
-
-    return mcpError;
   }
 
-  private incrementMetric(name: string) {
-    const current = this.metrics.get(name) || 0;
-    this.metrics.set(name, current + 1);
+  private calculateDistance(point1: GeoPoint, point2: GeoPoint): number {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = (point1.lat * Math.PI) / 180;
+    const φ2 = (point2.lat * Math.PI) / 180;
+    const Δφ = ((point2.lat - point1.lat) * Math.PI) / 180;
+    const Δλ = ((point2.lng - point1.lng) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
   }
 
-  private startMetricsCollection() {
-    setInterval(() => {
-      const now = Date.now();
-      const duration = (now - this.lastMetricsFlush) / 1000;
-
-      // Calculate rates
-      const metrics = Object.fromEntries(
-        Array.from(this.metrics.entries()).map(([key, value]) => [
-          key + '_rate',
-          value / duration
-        ])
-      );
-
-      // Log metrics
-      console.log('MCP Metrics:', metrics);
-
-      // Reset metrics
-      this.metrics.clear();
-      this.lastMetricsFlush = now;
-    }, this.config.monitoring.metricsInterval);
+  private estimateDuration(context: RouteContext): number {
+    const distance = this.calculateDistance(context.startPoint, context.endPoint);
+    const speedMap: Record<ActivityType, number> = {
+      WALK: 5000,    // 5 km/h
+      RUN: 10000,    // 10 km/h
+      BIKE: 20000,   // 20 km/h
+      CAR: 60000,    // 60 km/h
+      SKI: 15000     // 15 km/h
+    };
+    const speed = speedMap[context.preferences.activityType] || 5000;
+    return (distance / speed) * 3600; // Convert to seconds
   }
 
-  async cleanup(): Promise<void> {
-    await this.cache.quit();
+  private async calculateElevationGain(context: RouteContext): Promise<number> {
+    // Implement elevation calculation logic
+    return 100; // Placeholder value
+  }
+
+  private calculateTotalDistance(segments: RouteSegment[]): number {
+    return segments.reduce((total, segment) => total + segment.distance, 0);
+  }
+
+  private calculateTotalDuration(segments: RouteSegment[]): number {
+    return segments.reduce((total, segment) => total + segment.duration, 0);
+  }
+
+  private calculateTotalElevation(segments: RouteSegment[]): number {
+    return segments.reduce((total, segment) => total + segment.elevationGain, 0);
+  }
+
+  private calculateDifficulty(segments: RouteSegment[]): 'EASY' | 'MODERATE' | 'HARD' {
+    const totalDistance = this.calculateTotalDistance(segments);
+    const totalElevation = this.calculateTotalElevation(segments);
+    
+    if (totalElevation > totalDistance * 0.1) return 'HARD';
+    if (totalElevation > totalDistance * 0.05) return 'MODERATE';
+    return 'EASY';
+  }
+
+  private calculateScenicRating(segments: RouteSegment[]): number {
+    // Implement scenic rating calculation logic
+    return 4;
+  }
+
+  private getUniqueActivities(segments: RouteSegment[]): ActivityType[] {
+    return Array.from(new Set(segments.map(segment => segment.activityType)));
+  }
+
+  private calculateTiming(segments: RouteSegment[], context: RouteContext) {
+    return {
+      optimalDepartureTime: new Date().toISOString(),
+      estimatedArrivalTime: new Date(Date.now() + this.calculateTotalDuration(segments) * 1000).toISOString()
+    };
   }
 } 

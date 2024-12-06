@@ -1,111 +1,79 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MCPServer } from '../../index';
-import { POIRequest, ErrorCode } from '../../types';
-import logger from '../../utils/logger';
-import Anthropic from '@anthropic-ai/sdk';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { POIService } from '../../services/POIService';
+import { POICategory } from '../../types';
+import { ActivityType } from '../../../../types/mcp.types';
 
-// Mock logger
-vi.mock('../../utils/logger', () => ({
-  default: {
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn()
-  }
-}));
+describe('POI Service', () => {
+  let service: POIService;
 
-describe('POI Search', () => {
-  let server: MCPServer;
-  
   beforeEach(() => {
-    server = new MCPServer();
+    service = new POIService();
   });
 
-  it('should handle valid POI search request', async () => {
-    const request: POIRequest = {
-      location: { lat: 37.7749, lng: -122.4194 },
-      radius: 1000,
-      categories: ['restaurant', 'cafe'],
-      limit: 5
-    };
+  describe('Search Functionality', () => {
+    it('should find nearby POIs', async () => {
+      const request = {
+        location: { lat: 37.7749, lng: -122.4194 },
+        radius: 1000,
+        activityType: ActivityType.WALK,
+        categories: [POICategory.RESTAURANT, POICategory.CAFE]
+      };
 
-    const response = await server.handlePOISearch(request);
-    expect(response).toBeDefined();
-    expect(response.content).toBeInstanceOf(Array);
-    expect(logger.info).toHaveBeenCalled();
+      const result = await service.searchPOIs(request);
+      expect(result.results.length).toBeGreaterThan(0);
+      expect(result.metadata.categories).toContain(POICategory.RESTAURANT);
+      expect(result.metadata.radius).toBe(1000);
+    });
+
+    it('should validate location coordinates', async () => {
+      const request = {
+        location: { lat: 91, lng: -122.4194 }, // Invalid latitude
+        radius: 1000,
+        activityType: ActivityType.WALK,
+        categories: [POICategory.RESTAURANT]
+      };
+
+      await expect(service.searchPOIs(request)).rejects.toThrow();
+    });
+
+    it('should validate search radius', async () => {
+      const request = {
+        location: { lat: 37.7749, lng: -122.4194 },
+        radius: -1000, // Invalid radius
+        activityType: ActivityType.WALK,
+        categories: [POICategory.RESTAURANT]
+      };
+
+      await expect(service.searchPOIs(request)).rejects.toThrow();
+    });
+
+    it('should validate POI categories', async () => {
+      const request = {
+        location: { lat: 37.7749, lng: -122.4194 },
+        radius: 1000,
+        activityType: ActivityType.WALK,
+        categories: ['invalid' as POICategory]
+      };
+
+      await expect(service.searchPOIs(request)).rejects.toThrow();
+    });
   });
 
-  it('should handle invalid POI search request', async () => {
-    const invalidRequest = {
-      location: { lat: 37.7749 }, // Missing lng
-      radius: 1000
-    };
+  describe('Caching', () => {
+    it('should use cache when available', async () => {
+      const request = {
+        location: { lat: 37.7749, lng: -122.4194 },
+        radius: 500,
+        activityType: ActivityType.WALK,
+        categories: [POICategory.RESTAURANT]
+      };
 
-    await expect(server.handlePOISearch(invalidRequest as any))
-      .rejects
-      .toThrow(`${ErrorCode.VALIDATION_ERROR}: Invalid POI request parameters`);
-    expect(logger.error).toHaveBeenCalled();
-  });
+      // First call should miss cache
+      const firstResult = await service.searchPOIs(request);
+      // Second call should hit cache
+      const secondResult = await service.searchPOIs(request);
 
-  it('should handle Claude API errors gracefully', async () => {
-    // Mock Claude API to throw an error
-    const mockError = new Anthropic.APIError('Rate limit exceeded', 429);
-    (Anthropic as any).mockCreate.mockRejectedValueOnce(mockError);
-
-    const request: POIRequest = {
-      location: { lat: 37.7749, lng: -122.4194 },
-      radius: 1000,
-      categories: ['restaurant']
-    };
-
-    await expect(server.handlePOISearch(request))
-      .rejects
-      .toThrow(`${ErrorCode.CLAUDE_API_ERROR}: Rate limit exceeded`);
-    expect(logger.error).toHaveBeenCalled();
-  });
-
-  it('should respect category filters', async () => {
-    const request: POIRequest = {
-      location: { lat: 37.7749, lng: -122.4194 },
-      radius: 1000,
-      categories: ['museum', 'park']
-    };
-
-    const response = await server.handlePOISearch(request);
-    expect(response).toBeDefined();
-    expect(response.content).toBeInstanceOf(Array);
-    
-    // Verify categories were passed to Claude
-    expect(server['claude'].messages.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        messages: expect.arrayContaining([
-          expect.objectContaining({
-            content: expect.stringContaining('museum, park')
-          })
-        ])
-      })
-    );
-  });
-
-  it('should respect search radius', async () => {
-    const request: POIRequest = {
-      location: { lat: 37.7749, lng: -122.4194 },
-      radius: 500,
-      limit: 10
-    };
-
-    const response = await server.handlePOISearch(request);
-    expect(response).toBeDefined();
-    expect(response.content).toBeInstanceOf(Array);
-    
-    // Verify radius was passed to Claude
-    expect(server['claude'].messages.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        messages: expect.arrayContaining([
-          expect.objectContaining({
-            content: expect.stringContaining('500m radius')
-          })
-        ])
-      })
-    );
+      expect(firstResult).toEqual(secondResult);
+    });
   });
 }); 

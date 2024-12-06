@@ -24,10 +24,17 @@ vi.mock('ioredis', () => {
 
 // Mock Anthropic
 vi.mock('@anthropic-ai/sdk', () => {
-  class APIError extends Error {
-    constructor(message: string, public status?: number) {
+  class MockAPIError extends Error {
+    status: number;
+    type: string;
+    raw: any;
+
+    constructor(status: number, message: string, type: string, raw: any) {
       super(message);
       this.name = 'APIError';
+      this.status = status;
+      this.type = type;
+      this.raw = raw;
     }
   }
 
@@ -49,7 +56,7 @@ vi.mock('@anthropic-ai/sdk', () => {
 
   // Add APIError to the default export and expose mockCreate for tests
   const Anthropic = Object.assign(AnthropicMock, {
-    APIError,
+    APIError: MockAPIError,
     mockCreate // Expose the mock for tests to use
   });
 
@@ -61,7 +68,8 @@ vi.mock('../utils/logger', () => ({
   default: {
     info: vi.fn(),
     error: vi.fn(),
-    warn: vi.fn()
+    warn: vi.fn(),
+    debug: vi.fn()
   }
 }));
 

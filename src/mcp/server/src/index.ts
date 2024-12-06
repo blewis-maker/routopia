@@ -10,6 +10,7 @@ import {
   McpError
 } from "@modelcontextprotocol/sdk/types.js";
 import Anthropic from '@anthropic-ai/sdk';
+import Redis from 'ioredis';
 import dotenv from "dotenv";
 import { 
   RouteGenerationRequest,
@@ -24,6 +25,9 @@ import {
   isServerError
 } from "./types.js";
 import logger from './utils/logger';
+import { RateLimiter } from './utils/rateLimiter';
+import { CircuitBreaker } from './utils/fallback';
+import { POIService } from './services/POIService';
 
 dotenv.config();
 
@@ -31,18 +35,51 @@ interface MCPServerConfig {
   port?: number;
   redisUrl?: string;
   anthropicApiKey?: string;
+  metricsEnabled?: boolean;
+  metricsInterval?: number;
+  rateLimitWindow?: number;
+  maxRequestsPerWindow?: number;
+  burstLimit?: number;
+}
+
+interface MCPMetrics {
+  requestCount: number;
+  errorCount: number;
+  latencyMs: number[];
+  cacheHits: number;
+  cacheMisses: number;
+  tokenUsage: number;
+  routeGenerationCount: number;
+  poiSearchCount: number;
+  lastFlush: number;
 }
 
 export class MCPServer {
   private server: Server;
   private claude: Anthropic;
   private activeRoutes: Map<string, RouteResource>;
+  private redis: Redis;
+  private rateLimiter: RateLimiter;
+  private circuitBreaker: CircuitBreaker;
+  private metrics: MCPMetrics;
+  private poiService: POIService;
 
   constructor(config?: MCPServerConfig) {
     const apiKey = config?.anthropicApiKey || process.env.CLAUDE_API_KEY;
     if (!apiKey) {
       throw createServerError(ErrorCode.INTERNAL_ERROR, "CLAUDE_API_KEY is required");
     }
+
+    this.redis = new Redis(config?.redisUrl || process.env.REDIS_URL || 'redis://localhost:6379');
+    
+    this.rateLimiter = new RateLimiter(
+      this.redis,
+      config?.rateLimitWindow || 60,
+      config?.maxRequestsPerWindow || 1000,
+      config?.burstLimit || 50
+    );
+
+    this.circuitBreaker = new CircuitBreaker(this.redis, 'claude-api');
 
     this.server = new Server({
       name: "routopia-mcp-server",
@@ -59,6 +96,24 @@ export class MCPServer {
     });
 
     this.activeRoutes = new Map();
+
+    this.metrics = {
+      requestCount: 0,
+      errorCount: 0,
+      latencyMs: [],
+      cacheHits: 0,
+      cacheMisses: 0,
+      tokenUsage: 0,
+      routeGenerationCount: 0,
+      poiSearchCount: 0,
+      lastFlush: Date.now()
+    };
+
+    this.poiService = new POIService(this.redis);
+
+    if (config?.metricsEnabled) {
+      this.startMetricsCollection(config.metricsInterval || 60000);
+    }
 
     this.setupHandlers();
     this.setupErrorHandling();
@@ -245,62 +300,154 @@ export class MCPServer {
     );
   }
 
-  public async handleRouteGeneration(args: unknown): Promise<ToolResponse> {
-    if (!isValidRouteRequest(args)) {
-      logger.error('Invalid route request parameters');
-      throw createServerError(
-        ErrorCode.VALIDATION_ERROR,
-        `${ErrorCode.VALIDATION_ERROR}: Invalid route request parameters`
-      );
-    }
+  private startMetricsCollection(interval: number): void {
+    setInterval(() => {
+      const now = Date.now();
+      const duration = (now - this.metrics.lastFlush) / 1000;
 
-    try {
-      logger.info('Generating route with Claude', { args });
-      const response = await this.claude.messages.create({
-        model: "claude-3-opus-20240229",
-        max_tokens: 2048,
-        messages: [{
-          role: 'user',
-          content: this.buildRoutePrompt(args)
-        }]
+      const avgLatency = this.metrics.latencyMs.length > 0
+        ? this.metrics.latencyMs.reduce((a, b) => a + b, 0) / this.metrics.latencyMs.length
+        : 0;
+
+      logger.info('MCP Server Metrics', {
+        metrics: {
+          requests_per_second: this.metrics.requestCount / duration,
+          errors_per_second: this.metrics.errorCount / duration,
+          average_latency_ms: avgLatency,
+          cache_hit_ratio: this.metrics.requestCount > 0
+            ? this.metrics.cacheHits / this.metrics.requestCount
+            : 0,
+          token_usage_per_second: this.metrics.tokenUsage / duration,
+          route_generations_per_second: this.metrics.routeGenerationCount / duration,
+          poi_searches_per_second: this.metrics.poiSearchCount / duration
+        }
       });
 
-      logger.info('Successfully generated route');
-      return {
-        content: [{
-          type: 'text',
-          text: response.content[0].text
-        }]
+      // Reset metrics
+      this.metrics = {
+        requestCount: 0,
+        errorCount: 0,
+        latencyMs: [],
+        cacheHits: 0,
+        cacheMisses: 0,
+        tokenUsage: 0,
+        routeGenerationCount: 0,
+        poiSearchCount: 0,
+        lastFlush: now
       };
+    }, interval);
+  }
+
+  private recordMetrics(startTime: number, type: 'route' | 'poi', tokenUsage: number, isError = false, isCacheHit = false): void {
+    const latency = Date.now() - startTime;
+    
+    this.metrics.requestCount++;
+    this.metrics.latencyMs.push(latency);
+    this.metrics.tokenUsage += tokenUsage;
+    
+    if (isError) this.metrics.errorCount++;
+    if (isCacheHit) this.metrics.cacheHits++;
+    else this.metrics.cacheMisses++;
+    
+    if (type === 'route') this.metrics.routeGenerationCount++;
+    else this.metrics.poiSearchCount++;
+
+    logger.debug('Request metrics', {
+      type,
+      latency,
+      tokenUsage,
+      isError,
+      isCacheHit
+    });
+  }
+
+  private async handleClaudeRequest<T>(
+    operation: () => Promise<T>,
+    context: { type: 'route' | 'poi'; key: string }
+  ): Promise<T> {
+    const startTime = Date.now();
+    let isError = false;
+    let isCacheHit = false;
+
+    try {
+      if (await this.rateLimiter.isRateLimited(context.key)) {
+        throw createServerError(
+          ErrorCode.RATE_LIMIT_EXCEEDED,
+          'Rate limit exceeded',
+          true
+        );
+      }
+
+      if (!await this.circuitBreaker.canRequest()) {
+        throw createServerError(
+          ErrorCode.SERVICE_UNAVAILABLE,
+          'Service temporarily unavailable',
+          true
+        );
+      }
+
+      const result = await operation();
+      await this.circuitBreaker.recordSuccess();
+      return result;
     } catch (error) {
+      isError = true;
       if (error instanceof Anthropic.APIError) {
-        logger.error('Claude API error', { error });
+        await this.circuitBreaker.recordFailure();
         throw createServerError(
           ErrorCode.CLAUDE_API_ERROR,
-          `${ErrorCode.CLAUDE_API_ERROR}: ${error.message}`,
+          `Claude API error: ${error.message}`,
           error.status === 429
         );
       }
-      logger.error('Internal server error', { error });
-      throw createServerError(
-        ErrorCode.INTERNAL_ERROR,
-        `${ErrorCode.INTERNAL_ERROR}: Internal server error`,
-        false,
-        error
-      );
+      throw error;
+    } finally {
+      this.recordMetrics(startTime, context.type, 0, isError, isCacheHit);
     }
   }
 
+  private async handleRouteGeneration(request: RouteGenerationRequest): Promise<ToolResponse> {
+    return this.handleClaudeRequest(
+      async () => {
+        const response = await this.claude.messages.create({
+          model: "claude-3-opus-20240229",
+          max_tokens: 2048,
+          messages: [{
+            role: 'user',
+            content: this.buildRoutePrompt(request)
+          }]
+        });
+
+        if (!isClaudeResponse(response)) {
+          throw createServerError(
+            ErrorCode.CLAUDE_API_ERROR,
+            'Invalid response from Claude API'
+          );
+        }
+
+        return {
+          content: response.content,
+          tools: this.getAvailableTools()
+        };
+      },
+      { type: 'route', key: `route:${request.startPoint.lat}:${request.startPoint.lng}` }
+    );
+  }
+
   public async handlePOISearch(args: unknown): Promise<ToolResponse> {
-    if (!isValidPOIRequest(args)) {
-      logger.error('Invalid POI request parameters');
-      throw createServerError(
-        ErrorCode.VALIDATION_ERROR,
-        `${ErrorCode.VALIDATION_ERROR}: Invalid POI request parameters`
-      );
-    }
+    const startTime = Date.now();
+    let tokenUsage = 0;
+    let isError = false;
 
     try {
+      if (!isValidPOIRequest(args)) {
+        isError = true;
+        logger.error('Invalid POI request parameters');
+        throw createServerError(
+          ErrorCode.VALIDATION_ERROR,
+          `${ErrorCode.VALIDATION_ERROR}: Invalid POI request parameters`
+        );
+      }
+
       logger.info('Searching POIs with Claude', { args });
       const response = await this.claude.messages.create({
         model: "claude-3-opus-20240229",
@@ -311,14 +458,33 @@ export class MCPServer {
         }]
       });
 
+      tokenUsage = response.usage?.total_tokens || 0;
       logger.info('Successfully found POIs');
-      return {
+
+      const result = {
         content: [{
           type: 'text',
           text: response.content[0].text
+        }],
+        tools: [{
+          name: 'search_poi',
+          description: 'Search for points of interest',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              location: { type: 'object' },
+              radius: { type: 'number' },
+              categories: { type: 'array' }
+            }
+          }
         }]
       };
+
+      this.recordMetrics(startTime, 'poi', tokenUsage);
+      return result;
+
     } catch (error) {
+      isError = true;
       if (error instanceof Anthropic.APIError) {
         logger.error('Claude API error', { error });
         throw createServerError(
@@ -334,17 +500,21 @@ export class MCPServer {
         false,
         error
       );
+    } finally {
+      this.recordMetrics(startTime, 'poi', tokenUsage, isError);
     }
   }
 
-  private buildRoutePrompt(context: RouteGenerationRequest): string {
-    const { preferences, startPoint, endPoint } = context;
-    return `Generate a ${preferences.activityType} route from 
+  private buildRoutePrompt(request: RouteGenerationRequest): string {
+    const { startPoint, endPoint, preferences } = request;
+    return `Generate a route from 
       (${startPoint.lat}, ${startPoint.lng}) to 
       (${endPoint.lat}, ${endPoint.lng})
       ${preferences.avoidHills ? 'avoiding hills' : ''}
-      ${preferences.preferScenic ? 'preferring scenic routes' : ''}
-      ${preferences.maxDistance ? `with maximum distance of ${preferences.maxDistance}m` : ''}`;
+      ${preferences.maxDistance ? `with maximum distance of ${preferences.maxDistance}m` : ''}
+      ${preferences.maxDuration ? `with maximum duration of ${preferences.maxDuration} seconds` : ''}
+      ${preferences.includePointsOfInterest ? 'including points of interest' : ''}
+      ${preferences.poiCategories?.length ? `with POI categories: ${preferences.poiCategories.join(', ')}` : ''}`;
   }
 
   private buildPOIPrompt(context: POIRequest): string {
@@ -354,6 +524,83 @@ export class MCPServer {
       within ${radius}m radius
       ${categories?.length ? `in categories: ${categories.join(', ')}` : ''}
       ${context.limit ? `limit to ${context.limit} results` : ''}`;
+  }
+
+  public async generateRoute(request: RouteGenerationRequest): Promise<ToolResponse> {
+    const includesPOIs = request.preferences.includePointsOfInterest;
+    
+    if (includesPOIs && request.preferences.poiCategories?.length) {
+      // Search for POIs along the route
+      const poiRequest: POIRequest = {
+        location: request.startPoint,
+        radius: 1000, // Default 1km radius
+        categories: request.preferences.poiCategories
+      };
+
+      try {
+        const pois = await this.poiService.searchPOIs(poiRequest);
+        // Include POI information in route generation prompt
+        return this.handleRouteGeneration({
+          ...request,
+          metadata: {
+            pois: pois.results
+          }
+        });
+      } catch (error) {
+        if (error instanceof Error && 'code' in error && error.code === ErrorCode.NO_RESULTS) {
+          // Continue without POIs if none found
+          logger.warn('No POIs found for route, continuing without POIs', { request });
+          return this.handleRouteGeneration(request);
+        }
+        throw error;
+      }
+    }
+
+    return this.handleRouteGeneration(request);
+  }
+
+  public async searchPOIs(request: POIRequest): Promise<ToolResponse> {
+    return this.handlePOISearch(request);
+  }
+
+  public getAvailableTools(): Array<{
+    name: string;
+    description: string;
+    inputSchema: {
+      type: 'object';
+      properties: Record<string, unknown>;
+    };
+  }> {
+    return [
+      {
+        name: 'generate_route',
+        description: 'Generate a route based on user preferences',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            startPoint: { type: 'object' },
+            endPoint: { type: 'object' },
+            preferences: { type: 'object' }
+          }
+        }
+      },
+      {
+        name: 'search_poi',
+        description: 'Search for points of interest',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            location: { type: 'object' },
+            radius: { type: 'number' },
+            categories: { type: 'array' }
+          }
+        }
+      }
+    ];
+  }
+
+  public getMetrics(): MCPMetrics {
+    return { ...this.metrics };
   }
 
   async run(): Promise<void> {

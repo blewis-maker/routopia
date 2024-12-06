@@ -1,0 +1,131 @@
+name: MCP Server CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/mcp/server/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/mcp/server/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'src/mcp/server/package-lock.json'
+
+    - name: Install dependencies
+      run: |
+        cd src/mcp/server
+        npm ci
+
+    - name: Run linting
+      run: |
+        cd src/mcp/server
+        npm run lint
+
+    - name: Run unit tests
+      run: |
+        cd src/mcp/server
+        npm test
+      env:
+        CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+
+    - name: Run integration tests
+      run: |
+        cd src/mcp/server
+        npm run test:integration
+      env:
+        CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+
+    - name: Run performance tests
+      run: |
+        cd src/mcp/server
+        npm run test:performance
+      env:
+        CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'src/mcp/server/package-lock.json'
+
+    - name: Install dependencies
+      run: |
+        cd src/mcp/server
+        npm ci
+
+    - name: Build
+      run: |
+        cd src/mcp/server
+        npm run build
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: mcp-server-build
+        path: src/mcp/server/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: mcp-server-build
+        path: dist
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Deploy to ECS
+      run: |
+        aws ecs update-service --cluster mcp-cluster --service mcp-server --force-new-deployment
+      env:
+        AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }} 

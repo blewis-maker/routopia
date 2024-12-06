@@ -1,0 +1,56 @@
+graph TB
+    subgraph Client Layer
+        Web[Web Application]
+        Mobile[Mobile Apps]
+        API[API Gateway]
+    end
+
+    subgraph Core Services
+        Auth[Auth Service ✓]
+        Route[Route Service ✓]
+        AI[AI Service ✓]
+        POI[POI Service 🚧]
+        Activity[Activity Service ⬜]
+    end
+
+    subgraph Data Layer
+        DB[(PostgreSQL ✓)]
+        Cache[(Redis Cache ✓)]
+        Queue[(Message Queue 🚧)]
+    end
+
+    subgraph External Services
+        Maps[Map Services ✓]
+        Claude[Claude Integration ✓]
+        Weather[Weather APIs 🚧]
+        Places[Places APIs 🚧]
+    end
+
+    Web --> API
+    Mobile --> API
+    API --> Auth
+    API --> Route
+    API --> AI
+    API --> POI
+    API --> Activity
+
+    Route --> Maps
+    AI --> Claude
+    POI --> Places
+    Route --> Weather
+
+    Route --> DB
+    Activity --> DB
+    POI --> DB
+
+    Route --> Cache
+    AI --> Cache
+    POI --> Cache
+
+    classDef complete fill:#4CAF50,stroke:#2E7D32,color:#fff
+    classDef progress fill:#FFA726,stroke:#EF6C00,color:#fff
+    classDef pending fill:#90A4AE,stroke:#546E7A,color:#fff
+    
+    class Auth,Route,AI,DB,Cache,Maps,Claude complete
+    class POI,Queue,Weather,Places progress
+    class Activity pending

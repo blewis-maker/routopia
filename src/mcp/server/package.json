@@ -8,16 +8,29 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "start": "node dist/index.js",
     "test": "vitest run --config ./vitest.config.ts",
-    "test:watch": "vitest watch --config ./vitest.config.ts"
+    "test:watch": "vitest watch --config ./vitest.config.ts",
+    "test:integration": "vitest run --config ./vitest.config.ts src/__tests__/integration/**/*.test.ts",
+    "test:performance": "vitest run --config ./src/__tests__/performance/performance.config.ts",
+    "test:coverage": "vitest run --coverage",
+    "lint": "tsc --noEmit && eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "prepare:production": "node scripts/prepare-production.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
+    "@googlemaps/google-maps-services-js": "^3.3.42",
     "@modelcontextprotocol/sdk": "^1.0.3",
+    "axios": "^1.6.7",
     "ioredis": "^5.4.1",
     "dotenv": "^16.4.7",
     "winston": "^3.11.0"
   },
   "devDependencies": {
+    "@types/node": "^20.11.19",
+    "@types/googlemaps": "^3.43.3",
+    "@typescript-eslint/eslint-plugin": "^7.0.1",
+    "@typescript-eslint/parser": "^7.0.1",
+    "eslint": "^8.56.0",
     "rimraf": "^5.0.5",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.3.3",

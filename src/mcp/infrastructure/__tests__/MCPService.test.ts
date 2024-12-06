@@ -1,170 +1,284 @@
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { MCPService } from '../MCPService';
-import { MCPConfig, RouteContext, MCPResponse } from '../../types/mcp.types';
-import Redis from 'ioredis';
-import Anthropic from '@anthropic-ai/sdk';
+import { AIService } from '../../../services/ai/AIService';
+import { POIService } from '../../server/src/services/POIService';
+import { WeatherService } from '../../server/src/services/WeatherService';
+import type {
+  RouteContext,
+  MCPResponse,
+  WeatherConditions,
+  TrafficConditions,
+  POIRecommendation
+} from '../../types/mcp.types';
 
-// Mock dependencies
-jest.mock('ioredis');
-jest.mock('@anthropic-ai/sdk');
+// Mock services
+vi.mock('../../../services/ai/AIService', () => ({
+  AIService: {
+    getInstance: vi.fn().mockReturnValue({
+      process: vi.fn().mockResolvedValue({
+        content: JSON.stringify({
+          route: [],
+          metadata: {
+            totalDistance: 1000,
+            totalDuration: 720,
+            totalElevationGain: 10,
+            difficulty: 'EASY',
+            scenicRating: 4,
+            mainRouteType: 'CAR',
+            tributaryActivities: ['WALK', 'BIKE'],
+            conditions: {
+              weather: {},
+              traffic: {}
+            },
+            timing: {}
+          }
+        })
+      })
+    })
+  }
+}));
+
+vi.mock('../../server/src/services/POIService');
+vi.mock('../../server/src/services/WeatherService');
 
 describe('MCPService', () => {
-  let mcpService: MCPService;
-  let mockConfig: MCPConfig;
+  let service: MCPService;
+  let mockWeather: WeatherConditions;
+  let mockTraffic: TrafficConditions;
+  let mockPOIs: POIRecommendation[];
 
   beforeEach(() => {
-    // Reset mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
-    // Setup mock config
-    mockConfig = {
-      claude: {
-        apiKey: 'test-api-key',
-        modelVersion: 'claude-3-opus-20240229',
-        maxTokens: 1024
+    mockWeather = {
+      temperature: 20,
+      windSpeed: 10,
+      precipitation: {
+        type: 'none',
+        intensity: 'none'
       },
-      cache: {
-        host: 'localhost',
-        port: 6379,
-        ttl: 3600
-      },
-      monitoring: {
-        enabled: false,
-        metricsInterval: 60000,
-        errorThreshold: 0.1
-      }
+      visibility: 10000
     };
 
-    mcpService = new MCPService(mockConfig);
+    mockTraffic = {
+      congestionLevel: 'low',
+      averageSpeed: 65,
+      predictedDelays: 0
+    };
+
+    mockPOIs = [{
+      id: 'poi1',
+      name: 'Test POI',
+      location: { lat: 40.0150, lng: -105.2705 },
+      category: 'park',
+      recommendedActivities: ['WALK', 'RUN'],
+      confidence: 0.9,
+      details: {
+        ratings: {
+          overall: 4.5,
+          aspects: {
+            safety: 0.9
+          }
+        }
+      }
+    }];
+
+    // Setup mocks
+    vi.mocked(POIService.prototype.searchPOIs).mockResolvedValue(mockPOIs);
+    vi.mocked(WeatherService.prototype.getWeatherForRoute).mockResolvedValue(mockWeather);
+
+    service = new MCPService();
   });
 
-  describe('generateRoute', () => {
-    const mockContext: RouteContext = {
-      startPoint: { lat: 40.0150, lng: -105.2705 },
-      endPoint: { lat: 40.0177, lng: -105.2805 },
-      preferences: {
-        activityType: 'WALK',
-        preferScenic: true
-      }
-    };
+  describe('Route Generation', () => {
+    it('should generate a basic route', async () => {
+      const context: RouteContext = {
+        startPoint: { lat: 40.0150, lng: -105.2705 },
+        endPoint: { lat: 40.0177, lng: -105.2805 },
+        preferences: {
+          activityType: 'WALK'
+        }
+      };
 
-    const mockResponse: MCPResponse = {
-      route: [{
-        points: [
-          { lat: 40.0150, lng: -105.2705 },
-          { lat: 40.0177, lng: -105.2805 }
-        ],
-        distance: 1000,
-        duration: 720,
-        elevationGain: 10,
-        type: 'SCENIC'
-      }],
-      metadata: {
-        totalDistance: 1000,
-        totalDuration: 720,
-        totalElevationGain: 10,
-        difficulty: 'EASY',
-        scenicRating: 4
-      }
-    };
+      const result = await service.generateRoute(context);
 
-    it('should generate a route successfully', async () => {
-      // Mock Claude response
-      (Anthropic.prototype.messages.create as jest.Mock).mockResolvedValueOnce({
-        content: [{ text: JSON.stringify(mockResponse) }]
-      });
-
-      const result = await mcpService.generateRoute(mockContext);
-      
-      expect(result).toEqual(mockResponse);
-      expect(Anthropic.prototype.messages.create).toHaveBeenCalledTimes(1);
+      expect(result).toBeDefined();
+      expect(result.route[0].activityType).toBe('WALK');
+      expect(result.metadata.mainRouteType).toBe('WALK');
     });
 
-    it('should return cached response if available', async () => {
-      // Mock cache hit
-      (Redis.prototype.get as jest.Mock).mockResolvedValueOnce(
-        JSON.stringify(mockResponse)
-      );
+    it('should include POI recommendations', async () => {
+      const context: RouteContext = {
+        startPoint: { lat: 40.0150, lng: -105.2705 },
+        endPoint: { lat: 40.0177, lng: -105.2805 },
+        preferences: {
+          activityType: 'WALK',
+          urbanPreferences: {
+            safetyPriority: 'high'
+          }
+        }
+      };
 
-      const result = await mcpService.generateRoute(mockContext);
-      
-      expect(result).toEqual(mockResponse);
-      expect(Anthropic.prototype.messages.create).not.toHaveBeenCalled();
+      const result = await service.generateRoute(context);
+
+      expect(result.suggestedPOIs).toBeDefined();
+      expect(result.suggestedPOIs?.length).toBeGreaterThan(0);
+      expect(result.suggestedPOIs?.[0].recommendedActivities).toContain('WALK');
     });
 
-    it('should handle Claude API errors gracefully', async () => {
-      // Mock Claude API error
-      (Anthropic.prototype.messages.create as jest.Mock).mockRejectedValueOnce(
-        new Error('API Error')
-      );
+    it('should include weather and traffic conditions', async () => {
+      const context: RouteContext = {
+        startPoint: { lat: 40.0150, lng: -105.2705 },
+        endPoint: { lat: 40.0177, lng: -105.2805 },
+        preferences: {
+          activityType: 'WALK'
+        }
+      };
 
-      await expect(mcpService.generateRoute(mockContext)).rejects.toThrow();
-    });
+      const result = await service.generateRoute(context);
 
-    it('should handle cache errors gracefully', async () => {
-      // Mock cache error
-      (Redis.prototype.get as jest.Mock).mockRejectedValueOnce(
-        new Error('Cache Error')
-      );
-
-      // Mock successful Claude response
-      (Anthropic.prototype.messages.create as jest.Mock).mockResolvedValueOnce({
-        content: [{ text: JSON.stringify(mockResponse) }]
-      });
-
-      const result = await mcpService.generateRoute(mockContext);
-      
-      expect(result).toEqual(mockResponse);
-      expect(Anthropic.prototype.messages.create).toHaveBeenCalledTimes(1);
+      expect(result.metadata.conditions.weather).toBeDefined();
+      expect(result.metadata.conditions.traffic).toBeDefined();
+      expect(result.metadata.conditions.weather.temperature).toBe(20);
+      expect(result.metadata.conditions.traffic?.congestionLevel).toBe('low');
     });
   });
 
-  describe('prompt generation', () => {
-    it('should generate correct prompt with preferences', async () => {
+  describe('Caching', () => {
+    it('should cache and return cached responses', async () => {
+      const context: RouteContext = {
+        startPoint: { lat: 40.0150, lng: -105.2705 },
+        endPoint: { lat: 40.0177, lng: -105.2805 },
+        preferences: {
+          activityType: 'WALK'
+        }
+      };
+
+      // First call
+      const result1 = await service.generateRoute(context);
+
+      // Second call with same context
+      const result2 = await service.generateRoute(context);
+
+      expect(result1).toEqual(result2);
+      expect(POIService.prototype.searchPOIs).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not use cache for different contexts', async () => {
+      const context1: RouteContext = {
+        startPoint: { lat: 40.0150, lng: -105.2705 },
+        endPoint: { lat: 40.0177, lng: -105.2805 },
+        preferences: {
+          activityType: 'WALK'
+        }
+      };
+
+      const context2: RouteContext = {
+        startPoint: { lat: 40.0150, lng: -105.2705 },
+        endPoint: { lat: 40.0177, lng: -105.2805 },
+        preferences: {
+          activityType: 'BIKE'
+        }
+      };
+
+      await service.generateRoute(context1);
+      await service.generateRoute(context2);
+
+      expect(POIService.prototype.searchPOIs).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should handle POI service errors', async () => {
+      vi.mocked(POIService.prototype.searchPOIs).mockRejectedValueOnce(
+        new Error('POI service error')
+      );
+
+      const context: RouteContext = {
+        startPoint: { lat: 40.0150, lng: -105.2705 },
+        endPoint: { lat: 40.0177, lng: -105.2805 },
+        preferences: {
+          activityType: 'WALK'
+        }
+      };
+
+      await expect(service.generateRoute(context)).rejects.toThrow('POI service error');
+    });
+
+    it('should handle weather service errors', async () => {
+      vi.mocked(WeatherService.prototype.getWeatherForRoute).mockRejectedValueOnce(
+        new Error('Weather service error')
+      );
+
+      const context: RouteContext = {
+        startPoint: { lat: 40.0150, lng: -105.2705 },
+        endPoint: { lat: 40.0177, lng: -105.2805 },
+        preferences: {
+          activityType: 'WALK'
+        }
+      };
+
+      await expect(service.generateRoute(context)).rejects.toThrow('Weather service error');
+    });
+  });
+
+  describe('Activity-Specific Behavior', () => {
+    it('should handle walking routes', async () => {
+      const context: RouteContext = {
+        startPoint: { lat: 40.0150, lng: -105.2705 },
+        endPoint: { lat: 40.0177, lng: -105.2805 },
+        preferences: {
+          activityType: 'WALK',
+          urbanPreferences: {
+            safetyPriority: 'high',
+            lightingRequired: true
+          }
+        }
+      };
+
+      const result = await service.generateRoute(context);
+
+      expect(result.route[0].activityType).toBe('WALK');
+      expect(result.metadata.difficulty).toBeDefined();
+      expect(result.metadata.scenicRating).toBeDefined();
+    });
+
+    it('should handle biking routes', async () => {
       const context: RouteContext = {
         startPoint: { lat: 40.0150, lng: -105.2705 },
         endPoint: { lat: 40.0177, lng: -105.2805 },
         preferences: {
           activityType: 'BIKE',
-          avoidHills: true,
-          preferScenic: true,
-          maxDistance: 5000
+          trainingPreferences: {
+            targetPower: 250,
+            intervalType: 'threshold'
+          }
         }
       };
 
-      await mcpService.generateRoute(context);
+      const result = await service.generateRoute(context);
 
-      const createCall = (Anthropic.prototype.messages.create as jest.Mock).mock.calls[0][0];
-      const prompt = createCall.messages[0].content;
-
-      expect(prompt).toContain('Generate a bike route');
-      expect(prompt).toContain('avoiding hills');
-      expect(prompt).toContain('preferring scenic routes');
-      expect(prompt).toContain('maximum distance of 5000m');
+      expect(result.route[0].activityType).toBe('BIKE');
+      expect(result.metadata.totalElevationGain).toBeGreaterThan(0);
     });
 
-    it('should generate correct prompt with constraints', async () => {
+    it('should handle skiing routes', async () => {
       const context: RouteContext = {
         startPoint: { lat: 40.0150, lng: -105.2705 },
-        endPoint: { lat: 40.0177, lng: -105.2805 },
+        endPoint: { lat: 39.6403, lng: -106.3742 },
         preferences: {
-          activityType: 'RUN'
-        },
-        constraints: {
-          maxElevationGain: 100,
-          maxDuration: 30,
-          requiredPOIs: ['cafe-1', 'park-2']
+          activityType: 'SKI',
+          winterPreferences: {
+            difficulty: 'advanced',
+            minSnowDepth: 20
+          }
         }
       };
 
-      await mcpService.generateRoute(context);
+      const result = await service.generateRoute(context);
 
-      const createCall = (Anthropic.prototype.messages.create as jest.Mock).mock.calls[0][0];
-      const prompt = createCall.messages[0].content;
-
-      expect(prompt).toContain('Generate a run route');
-      expect(prompt).toContain('maximum elevation gain of 100m');
-      expect(prompt).toContain('maximum duration of 30 minutes');
-      expect(prompt).toContain('including these POIs: cafe-1, park-2');
+      expect(result.route[0].activityType).toBe('SKI');
+      expect(result.metadata.conditions.weather.snowDepth).toBeDefined();
     });
   });
 }); 

@@ -1,104 +1,78 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MCPServer } from '../../index';
-import { RouteGenerationRequest, ErrorCode } from '../../types';
-import logger from '../../utils/logger';
-import Anthropic from '@anthropic-ai/sdk';
+import { POIService } from '../../services/POIService';
+import { WeatherService } from '../../services/WeatherService';
+import { ActivityType, POIRecommendation } from '../../../../types/mcp.types';
+import { POICategory } from '../../types';
 
-// Mock logger
-vi.mock('../../utils/logger', () => ({
-  default: {
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn()
-  }
-}));
+vi.mock('../../services/POIService');
+vi.mock('../../services/WeatherService');
 
 describe('Route Generation', () => {
   let server: MCPServer;
-  
+
   beforeEach(() => {
-    server = new MCPServer();
+    server = new MCPServer({
+      anthropicApiKey: 'test-key',
+      metricsEnabled: true
+    });
   });
 
-  it('should handle valid route generation request', async () => {
-    const request: RouteGenerationRequest = {
+  it('should generate a route with POIs', async () => {
+    const mockPOIs = {
+      results: [{
+        id: 'test-poi',
+        name: 'Test POI',
+        category: POICategory.RESTAURANT,
+        location: { lat: 37.7749, lng: -122.4194 },
+        recommendedActivities: [ActivityType.WALK],
+        confidence: 0.9,
+        details: {
+          description: 'Test description',
+          openingHours: '9:00-17:00',
+          amenities: ['parking', 'wifi'],
+          ratings: {
+            overall: 4.5,
+            aspects: {
+              safety: 0.9
+            }
+          }
+        }
+      }],
+      metadata: {
+        total: 1,
+        radius: 1000,
+        categories: [POICategory.RESTAURANT],
+        searchTime: Date.now()
+      }
+    };
+
+    const mockWeather = {
+      temperature: 20,
+      windSpeed: 5,
+      precipitation: {
+        type: 'none',
+        intensity: 'none'
+      },
+      visibility: 10000
+    };
+
+    vi.mocked(POIService.prototype.searchPOIs).mockResolvedValue(mockPOIs);
+    vi.mocked(WeatherService.prototype.getWeatherForRoute).mockResolvedValue(mockWeather);
+
+    const request = {
       startPoint: { lat: 37.7749, lng: -122.4194 },
-      endPoint: { lat: 37.3382, lng: -121.8863 },
+      endPoint: { lat: 37.7751, lng: -122.4196 },
       preferences: {
-        activityType: 'WALK',
-        avoidHills: false,
-        preferScenic: false,
-        maxDistance: 5000
+        activityType: ActivityType.WALK,
+        includePointsOfInterest: true,
+        poiCategories: [POICategory.RESTAURANT]
       }
     };
 
-    const response = await server.handleRouteGeneration(request);
-    expect(response).toBeDefined();
-    expect(response.content).toBeInstanceOf(Array);
-    expect(logger.info).toHaveBeenCalled();
-  });
-
-  it('should handle invalid route generation request', async () => {
-    const invalidRequest = {
-      startPoint: { lat: 37.7749 }, // Missing lng
-      endPoint: { lat: 37.3382, lng: -121.8863 },
-      preferences: {
-        activityType: 'WALK'
-      }
-    };
-
-    await expect(server.handleRouteGeneration(invalidRequest as any))
-      .rejects
-      .toThrow(`${ErrorCode.VALIDATION_ERROR}: Invalid route request parameters`);
-    expect(logger.error).toHaveBeenCalled();
-  });
-
-  it('should handle Claude API errors gracefully', async () => {
-    // Mock Claude API to throw an error
-    const mockError = new Anthropic.APIError('Rate limit exceeded', 429);
-    (Anthropic as any).mockCreate.mockRejectedValueOnce(mockError);
-
-    const request: RouteGenerationRequest = {
-      startPoint: { lat: 37.7749, lng: -122.4194 },
-      endPoint: { lat: 37.3382, lng: -121.8863 },
-      preferences: {
-        activityType: 'RUN',
-        preferScenic: true,
-        maxDistance: 10000
-      }
-    };
-
-    await expect(server.handleRouteGeneration(request))
-      .rejects
-      .toThrow(`${ErrorCode.CLAUDE_API_ERROR}: Rate limit exceeded`);
-    expect(logger.error).toHaveBeenCalled();
-  });
-
-  it('should respect route preferences', async () => {
-    const request: RouteGenerationRequest = {
-      startPoint: { lat: 37.7749, lng: -122.4194 },
-      endPoint: { lat: 37.3382, lng: -121.8863 },
-      preferences: {
-        activityType: 'BIKE',
-        avoidHills: true,
-        preferScenic: true,
-        maxDistance: 15000
-      }
-    };
-
-    const response = await server.handleRouteGeneration(request);
-    expect(response).toBeDefined();
-    expect(response.content).toBeInstanceOf(Array);
-    
-    // Verify preferences were passed to Claude
-    expect(server['claude'].messages.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        messages: expect.arrayContaining([
-          expect.objectContaining({
-            content: expect.stringContaining('BIKE')
-          })
-        ])
-      })
-    );
+    const response = await server.generateRoute(request);
+    expect(response.route).toBeDefined();
+    expect(response.suggestedPOIs).toBeDefined();
+    expect(response.suggestedPOIs?.length).toBeGreaterThan(0);
   });
 }); 
