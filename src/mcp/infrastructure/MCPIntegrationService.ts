@@ -398,7 +398,16 @@ export class MCPIntegrationService {
     segment: RouteSegment,
     context: RouteContext
   ): Promise<POIRecommendation[]> {
-    const searchRadius = this.calculateSearchRadius(segment);
+    const searchRadius = this.calculateSearchRadius([segment]);
+    const cacheKey = this.generatePOICacheKey(segment, context);
+
+    // Try to get from cache first
+    const cachedPOIs = this.poiCache.get(cacheKey);
+    if (cachedPOIs) {
+      return cachedPOIs;
+    }
+
+    // If not in cache, search and filter
     const searchResult = await this.poiService.searchPOIs({
       location: segment.points[0],
       radius: searchRadius,
@@ -407,17 +416,34 @@ export class MCPIntegrationService {
     });
 
     // Filter POIs based on safety and accessibility
-    return searchResult.results.filter(poi => 
+    const filteredPOIs = searchResult.results.filter((poi: POIRecommendation) => 
       this.isAccessiblePOI(poi, context.preferences)
     );
+
+    // Cache the filtered results
+    this.poiCache.set(cacheKey, filteredPOIs, context.preferences.maxCacheDuration || 3600);
+    return filteredPOIs;
+  }
+
+  private generatePOICacheKey(segment: RouteSegment, context: RouteContext): string {
+    return `poi:${segment.points[0].lat}:${segment.points[0].lng}:${context.preferences.activityType}`;
   }
 
   private isAccessiblePOI(poi: POIRecommendation, preferences: RoutePreferences): boolean {
+    if (!poi.details?.ratings?.aspects?.safety) {
+      return false;
+    }
+
     // Check if POI meets accessibility requirements based on preferences
     if (preferences.urbanPreferences?.safetyPriority === 'high') {
-      return poi.details?.ratings?.aspects?.safety > 0.8;
+      return poi.details.ratings.aspects.safety > 0.8;
     }
-    return true;
+
+    if (preferences.urbanPreferences?.safetyPriority === 'moderate') {
+      return poi.details.ratings.aspects.safety > 0.6;
+    }
+
+    return poi.details.ratings.aspects.safety > 0.4;
   }
 
   private async createTributaryRoute(

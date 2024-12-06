@@ -4,13 +4,14 @@ import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
 import { MapIntegrationLayer } from '../../services/maps/MapIntegrationLayer';
+import { UserInteractionContext, ChatMessage } from '@/mcp/types/mcp-integration.types';
 import ChatInput from './ChatInput';
+import { RouteSuggestion } from './RouteSuggestion';
+import { POISuggestion } from './POISuggestion';
+import logger from '@/utils/logger';
 
-interface Message {
+interface Message extends ChatMessage {
   id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  createdAt: Date;
 }
 
 interface ChatInterfaceProps {
@@ -25,8 +26,8 @@ interface ChatInterfaceProps {
 export function ChatInterface({ mapIntegration, routeContext }: ChatInterfaceProps) {
   const { data: session } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [context, setContext] = useState<UserInteractionContext | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -39,33 +40,39 @@ export function ChatInterface({ mapIntegration, routeContext }: ChatInterfacePro
 
   const handleMessage = async (message: string) => {
     try {
-      // First, try to parse intent from message
-      const intent = await parseIntent(message);
-      
-      // Handle map-related actions
-      if (intent.type === 'LOCATION_SEARCH' || intent.type === 'ROUTE_PLANNING') {
-        const result = await mapIntegration.handleChatAction({
-          type: intent.type === 'LOCATION_SEARCH' ? 'SEARCH_LOCATION' : 'PLAN_ROUTE',
-          payload: intent.payload
-        });
+      setIsLoading(true);
 
-        // Update chat with results
-        setMessages(prev => [...prev, {
-          id: uuidv4(),
-          content: formatResponseFromResult(result),
-          role: 'assistant',
-          createdAt: new Date()
-        }]);
-      }
+      // Add user message
+      const userMessage: Message = {
+        id: uuidv4(),
+        role: 'user',
+        content: message,
+        timestamp: Date.now(),
+        context: {
+          route: routeContext,
+          location: mapIntegration.getCurrentLocation(),
+          weather: context?.sessionContext.weather,
+          poi: context?.sessionContext.recentPOIs
+        }
+      };
 
-      // Continue with normal chat processing
+      setMessages(prev => [...prev, userMessage]);
+
+      // Prepare request context
+      const requestContext = {
+        route: routeContext,
+        location: mapIntegration.getCurrentLocation(),
+        preferences: context?.userPreferences || {}
+      };
+
+      // Send to API
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, { role: 'user', content: message }],
-          routeContext,
-          mapContext: mapIntegration.getState()
+          message,
+          context: requestContext,
+          messages: messages.map(({ id, ...msg }) => msg)
         })
       });
 
@@ -77,34 +84,69 @@ export function ChatInterface({ mapIntegration, routeContext }: ChatInterfacePro
       // Handle streaming response
       const decoder = new TextDecoder();
       let assistantMessage = '';
+      let currentMessageId = uuidv4();
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        assistantMessage += decoder.decode(value);
+        const chunk = decoder.decode(value);
+        try {
+          // Try to parse as JSON (complete message)
+          const data = JSON.parse(chunk);
+          assistantMessage = data.message;
+          
+          // Handle suggestions
+          if (data.suggestions?.routes) {
+            mapIntegration.showRouteSuggestions(data.suggestions.routes);
+          }
+          if (data.suggestions?.pois) {
+            mapIntegration.showPOISuggestions(data.suggestions.pois);
+          }
+
+          // Update context
+          setContext(data.context);
+
+          // Log metrics
+          logger.info('Chat message processed', {
+            metrics: data.metrics,
+            hasRouteSuggestions: !!data.suggestions?.routes,
+            hasPOISuggestions: !!data.suggestions?.pois
+          });
+        } catch {
+          // Not JSON, treat as streaming text
+          assistantMessage += chunk;
+        }
         
         // Update the UI with partial response
         setMessages(prev => {
           const lastMessage = prev[prev.length - 1];
-          if (lastMessage.role === 'assistant') {
+          if (lastMessage.role === 'assistant' && lastMessage.id === currentMessageId) {
             return [...prev.slice(0, -1), {
               ...lastMessage,
               content: assistantMessage,
+              context: context
             }];
           } else {
             return [...prev, {
-              id: uuidv4(),
-              content: assistantMessage,
+              id: currentMessageId,
               role: 'assistant',
-              createdAt: new Date(),
+              content: assistantMessage,
+              timestamp: Date.now(),
+              context: context
             }];
           }
         });
       }
+
     } catch (error) {
-      console.error('Chat error:', error);
-      // Handle error state
+      logger.error('Chat error:', { error });
+      setMessages(prev => [...prev, {
+        id: uuidv4(),
+        role: 'assistant',
+        content: 'Sorry, I encountered an error processing your request.',
+        timestamp: Date.now()
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -129,6 +171,12 @@ export function ChatInterface({ mapIntegration, routeContext }: ChatInterfacePro
               }`}
             >
               {message.content}
+              {message.role === 'assistant' && message.context?.route && (
+                <RouteSuggestion route={message.context.route} />
+              )}
+              {message.role === 'assistant' && message.context?.poi && (
+                <POISuggestion pois={message.context.poi} />
+              )}
             </div>
           </div>
         ))}
@@ -136,25 +184,9 @@ export function ChatInterface({ mapIntegration, routeContext }: ChatInterfacePro
       </div>
 
       {/* Input Form */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-stone-800">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Ask about route planning..."
-            disabled={isLoading}
-            className="flex-1 bg-stone-800 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? 'Sending...' : 'Send'}
-          </button>
-        </div>
-      </form>
+      <div className="p-4 border-t border-stone-800">
+        <ChatInput onSendMessage={handleMessage} isLoading={isLoading} />
+      </div>
     </div>
   );
 } 

@@ -1,36 +1,40 @@
-export type ActivityType = 'car' | 'bike' | 'walk' | 'ski';
+export enum ActivityType {
+  WALK = 'WALK',
+  RUN = 'RUN',
+  BIKE = 'BIKE',
+  CAR = 'CAR',
+  SKI = 'SKI'
+}
 
 export interface ActivityPreferences {
-  avoidTolls?: boolean;
-  avoidHighways?: boolean;
-  preferScenic?: boolean;
-  maxDistance?: number;
-  maxDuration?: number;
-  difficulty?: 'easy' | 'moderate' | 'hard';
+  difficulty: 'easy' | 'moderate' | 'hard';
+  terrain: string[];
+  timeOfDay: 'morning' | 'afternoon' | 'evening' | 'any';
+  weather: string[];
 }
 
 export interface ActivityConstraints {
-  timeConstraints?: {
-    startTime?: Date;
-    endTime?: Date;
-    maxDuration?: number;
-  };
-  locationConstraints?: {
-    startPoint?: [number, number];
-    endPoint?: [number, number];
-    waypoints?: [number, number][];
-  };
-  routeConstraints?: {
-    maxElevation?: number;
-    maxGradient?: number;
-    surfaceType?: string[];
-  };
+  maxDistance?: number;
+  maxDuration?: number;
+  maxElevation?: number;
+  requiredPOIs?: string[];
 }
 
-export interface Activity {
-  id: string;
+export interface ActivityMetrics {
+  distance: number;
+  duration: number;
+  elevation: number;
+  speed: number;
+}
+
+export interface ActivityStats {
   type: ActivityType;
-  preferences: ActivityPreferences;
-  constraints: ActivityConstraints;
-  timestamp: Date;
+  count: number;
+  totalDistance: number;
+  totalDuration: number;
+  averageSpeed: number;
+  lastActivity?: {
+    date: string;
+    metrics: ActivityMetrics;
+  };
 } 

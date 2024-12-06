@@ -7,7 +7,9 @@ import {
   ActivityType,
   POIRecommendation,
   WeatherConditions,
-  TrafficConditions
+  TrafficConditions,
+  POISearchRequest,
+  POISearchResult
 } from '../../../types/mcp.types';
 
 interface SkiRouteOptions {
@@ -15,6 +17,11 @@ interface SkiRouteOptions {
   preferGroomed?: boolean;
   avoidCrowds?: boolean;
   maxWaitTime?: number;
+}
+
+interface RoutePoint {
+  lat: number;
+  lng: number;
 }
 
 export class RouteService {
@@ -289,5 +296,39 @@ export class RouteService {
     // Implement route optimization logic
     // For now, just combine the routes
     return [...mainRoute, ...tributaries];
+  }
+
+  private async getSkiResortPOIs(request: POISearchRequest): Promise<POIRecommendation[]> {
+    const searchResult = await this.poiService.searchPOIs(request);
+    return searchResult.results.filter((poi: POIRecommendation) => {
+      if (poi.category === 'ski_lift') {
+        return this.isValidSkiLift(poi);
+      }
+      if (poi.category === 'ski_run') {
+        return this.isValidSkiRun(poi);
+      }
+      return ['lodge', 'restaurant', 'service'].includes(poi.category);
+    });
+  }
+
+  private isValidSkiLift(poi: POIRecommendation): boolean {
+    return (
+      poi.details?.amenities?.includes('lift') &&
+      poi.details?.openingHours !== undefined
+    );
+  }
+
+  private isValidSkiRun(poi: POIRecommendation): boolean {
+    return (
+      poi.details?.amenities?.includes('ski_run') &&
+      poi.details?.ratings?.overall !== undefined
+    );
+  }
+
+  private calculateDifficulty(poi: POIRecommendation): 'easy' | 'moderate' | 'hard' {
+    const rating = poi.details?.ratings?.overall || 0;
+    if (rating > 4) return 'hard';
+    if (rating > 3) return 'moderate';
+    return 'easy';
   }
 } 

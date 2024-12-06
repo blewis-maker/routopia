@@ -1,0 +1,48 @@
+graph TB
+    subgraph Shell["AppShell (Layout)"]
+        Nav["NavigationBar (Persistent)"]
+        CommandP["CommandPalette (Global)"]
+        
+        subgraph Pages["Page Layouts"]
+            Dashboard["DashboardLayout"]
+            RoutePlanner["RoutePlannerLayout"]
+            ActivityHub["ActivityHubLayout"]
+            POIExplorer["POIExplorerLayout"]
+        end
+
+        subgraph Shared["Shared Components"]
+            Map["MapView"]
+            Chat["AIChat"]
+            Weather["WeatherWidget"]
+            Activity["ActivityTracker"]
+        end
+    end
+
+    Nav --> Dashboard
+    Nav --> RoutePlanner
+    Nav --> ActivityHub
+    Nav --> POIExplorer
+
+    Dashboard --> Map
+    Dashboard --> Weather
+    Dashboard --> Activity
+
+    RoutePlanner --> Map
+    RoutePlanner --> Chat
+    RoutePlanner --> Weather
+
+    ActivityHub --> Activity
+    ActivityHub --> Weather
+    ActivityHub --> Chat
+
+    POIExplorer --> Map
+    POIExplorer --> Weather
+    POIExplorer --> Chat
+
+    classDef layout fill:#4f46e5,stroke:#3730a3,color:#fff
+    classDef component fill:#10b981,stroke:#047857,color:#fff
+    classDef shared fill:#f59e0b,stroke:#b45309,color:#fff
+
+    class Shell,Pages layout
+    class Nav,CommandP,Dashboard,RoutePlanner,ActivityHub,POIExplorer component
+    class Map,Chat,Weather,Activity shared

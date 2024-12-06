@@ -1,6 +1,9 @@
 import { Redis, RedisOptions } from 'ioredis';
 import { POISearchRequest, POIRecommendation, ActivityType } from '../../../types/mcp.types';
 import logger from '../utils/logger';
+import { RateLimiter } from '../utils/rateLimiter';
+import { MetricsCollector } from '../utils/metrics';
+import { Cache } from '../utils/cache';
 
 export interface POISearchResult {
   results: POIRecommendation[];
@@ -44,6 +47,10 @@ export class POIService {
   private redis: Redis;
   private readonly CACHE_TTL = 3600; // 1 hour in seconds
   private readonly CACHE_PREFIX = 'poi:';
+  private rateLimiter: RateLimiter;
+  private metrics: MetricsCollector;
+  private cache: Cache<POISearchResult>;
+  private fallbackProviders: POIProvider[] = [];
 
   constructor(
     private apiKey?: string,
@@ -57,48 +64,62 @@ export class POIService {
     this.redis.on('error', (err) => {
       logger.error('Redis connection error:', err);
     });
+    this.rateLimiter = new RateLimiter({
+      maxRequests: 100,
+      perSeconds: 60,
+      burstSize: 10
+    });
+    this.metrics = new MetricsCollector('poi_service');
+    this.cache = new Cache<POISearchResult>({ ttl: 3600 });
+    this.initializeFallbackProviders();
   }
 
   async searchPOIs(request: POISearchRequest): Promise<POISearchResult> {
     const cacheKey = this.generateCacheKey(request);
+    const cachedResult = this.cache.get(cacheKey);
     
-    try {
-      // Try to get from cache first
-      const cachedResult = await this.redis.get(cacheKey);
-      if (cachedResult) {
-        return JSON.parse(cachedResult);
-      }
+    if (cachedResult) {
+      this.metrics.increment('cache_hit');
+      return cachedResult;
+    }
 
-      // If not in cache, fetch and store
-      const pois = await this.fetchPOIs(request);
-      const result: POISearchResult = {
-        results: pois,
-        metadata: {
-          total: pois.length,
-          radius: request.radius,
-          categories: request.categories || [],
-          searchTime: Date.now()
-        }
-      };
-      await this.redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(result));
+    this.metrics.increment('cache_miss');
+    const startTime = Date.now();
+
+    try {
+      await this.rateLimiter.acquire();
+      const result = await this.performSearch(request);
+      
+      this.metrics.timing('search_duration', Date.now() - startTime);
+      this.cache.set(cacheKey, result);
+      
       return result;
     } catch (error) {
-      logger.error('Error in POI search:', error);
-      // Fallback to direct fetch if cache fails
-      const pois = await this.fetchPOIs(request);
-      return {
-        results: pois,
-        metadata: {
-          total: pois.length,
-          radius: request.radius,
-          categories: request.categories || [],
-          searchTime: Date.now()
-        }
-      };
+      this.metrics.increment('search_error');
+      return this.handleSearchError(error, request);
     }
   }
 
-  private async fetchPOIs(request: POISearchRequest): Promise<POIRecommendation[]> {
+  private async handleSearchError(error: Error, request: POISearchRequest): Promise<POISearchResult> {
+    for (const provider of this.fallbackProviders) {
+      try {
+        const result = await provider.searchPOIs(request);
+        this.metrics.increment('fallback_success');
+        return result;
+      } catch (fallbackError) {
+        this.metrics.increment('fallback_error');
+        continue;
+      }
+    }
+
+    throw new Error('All POI providers failed');
+  }
+
+  private generateCacheKey(request: POISearchRequest): string {
+    return `${this.CACHE_PREFIX}${request.activityType}:${request.location.lat}:${request.location.lng}:${request.radius}:${request.categories?.join(',')}`;
+  }
+
+  private async performSearch(request: POISearchRequest): Promise<POISearchResult> {
     if (request.activityType === 'SKI') {
       return this.getSkiResortPOIs(request);
     }
@@ -127,8 +148,14 @@ export class POIService {
     }];
   }
 
-  private generateCacheKey(request: POISearchRequest): string {
-    return `${this.CACHE_PREFIX}${request.activityType}:${request.location.lat}:${request.location.lng}:${request.radius}:${request.categories?.join(',')}`;
+  private initializeFallbackProviders(): void {
+    // Initialize fallback POI providers
+    // This could be different APIs or data sources
+    this.fallbackProviders = [
+      new OpenStreetMapProvider(),
+      new LocalCacheProvider(),
+      // Add more providers as needed
+    ];
   }
 
   async clearCache(): Promise<void> {
@@ -303,5 +330,23 @@ export class POIService {
     }
     
     return Math.min(score, 1);
+  }
+}
+
+interface POIProvider {
+  searchPOIs(request: POISearchRequest): Promise<POISearchResult>;
+}
+
+class OpenStreetMapProvider implements POIProvider {
+  async searchPOIs(request: POISearchRequest): Promise<POISearchResult> {
+    // Implement OpenStreetMap API calls
+    throw new Error('Not implemented');
+  }
+}
+
+class LocalCacheProvider implements POIProvider {
+  async searchPOIs(request: POISearchRequest): Promise<POISearchResult> {
+    // Implement local cache fallback
+    throw new Error('Not implemented');
   }
 } 

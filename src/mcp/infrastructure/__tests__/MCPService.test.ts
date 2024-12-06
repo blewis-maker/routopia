@@ -10,6 +10,7 @@ import type {
   TrafficConditions,
   POIRecommendation
 } from '../../types/mcp.types';
+import { ActivityType } from '../../../types/activities';
 
 // Mock services
 vi.mock('../../../services/ai/AIService', () => ({
@@ -45,7 +46,7 @@ describe('MCPService', () => {
   let service: MCPService;
   let mockWeather: WeatherConditions;
   let mockTraffic: TrafficConditions;
-  let mockPOIs: POIRecommendation[];
+  let mockPOIs: POISearchResult;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -66,24 +67,36 @@ describe('MCPService', () => {
       predictedDelays: 0
     };
 
-    mockPOIs = [{
-      id: 'poi1',
-      name: 'Test POI',
-      location: { lat: 40.0150, lng: -105.2705 },
-      category: 'park',
-      recommendedActivities: ['WALK', 'RUN'],
-      confidence: 0.9,
-      details: {
-        ratings: {
-          overall: 4.5,
-          aspects: {
-            safety: 0.9
+    mockPOIs = {
+      results: [{
+        id: 'test-poi',
+        name: 'Test POI',
+        category: 'restaurant',
+        location: { lat: 37.7749, lng: -122.4194 },
+        recommendedActivities: [ActivityType.WALK],
+        confidence: 0.9,
+        details: {
+          description: 'Test restaurant',
+          openingHours: '9:00-17:00',
+          amenities: ['parking', 'wifi', 'outdoor_seating'],
+          ratings: {
+            overall: 4.5,
+            aspects: {
+              safety: 0.9,
+              accessibility: 0.85,
+              familyFriendly: 0.95
+            }
           }
         }
+      }],
+      metadata: {
+        total: 1,
+        radius: 1000,
+        categories: ['restaurant'],
+        searchTime: Date.now()
       }
-    }];
+    };
 
-    // Setup mocks
     vi.mocked(POIService.prototype.searchPOIs).mockResolvedValue(mockPOIs);
     vi.mocked(WeatherService.prototype.getWeatherForRoute).mockResolvedValue(mockWeather);
 

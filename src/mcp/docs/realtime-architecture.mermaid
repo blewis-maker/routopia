@@ -1,0 +1,161 @@
+```mermaid
+%% System Architecture
+graph TB
+    subgraph Client Layer
+        Web[Web Application]
+        Mobile[Mobile Apps]
+        Desktop[Desktop Apps]
+    end
+
+    subgraph WebSocket Gateway
+        LB[Load Balancer]
+        WS1[WebSocket Server 1]
+        WS2[WebSocket Server 2]
+        WSN[WebSocket Server N]
+    end
+
+    subgraph Message Broker
+        Redis[Redis PubSub]
+        Queue[Message Queue]
+    end
+
+    subgraph Services
+        POI[POI Service]
+        Weather[Weather Service]
+        Traffic[Traffic Service]
+        Route[Route Service]
+    end
+
+    subgraph Monitoring
+        Prometheus[Prometheus]
+        Grafana[Grafana]
+        AlertManager[Alert Manager]
+    end
+
+    subgraph Storage
+        Cache[Redis Cache]
+        TimeSeries[Time Series DB]
+        Metrics[Metrics Store]
+    end
+
+    %% Client Connections
+    Web --> LB
+    Mobile --> LB
+    Desktop --> LB
+
+    %% Load Balancer to WebSocket Servers
+    LB --> WS1
+    LB --> WS2
+    LB --> WSN
+
+    %% WebSocket Servers to Message Broker
+    WS1 --> Redis
+    WS2 --> Redis
+    WSN --> Redis
+
+    %% Services to Message Broker
+    POI --> Queue
+    Weather --> Queue
+    Traffic --> Queue
+    Route --> Queue
+
+    %% Message Broker to WebSocket Servers
+    Redis --> WS1
+    Redis --> WS2
+    Redis --> WSN
+
+    %% Monitoring
+    WS1 --> Prometheus
+    WS2 --> Prometheus
+    WSN --> Prometheus
+    Prometheus --> Grafana
+    Prometheus --> AlertManager
+
+    %% Storage
+    WS1 --> Cache
+    WS2 --> Cache
+    WSN --> Cache
+    Prometheus --> TimeSeries
+    Metrics --> TimeSeries
+
+%% Message Flow
+sequenceDiagram
+    participant C as Client
+    participant WS as WebSocket Server
+    participant R as Redis PubSub
+    participant S as Service
+    participant M as Monitoring
+
+    C->>WS: Connect
+    WS->>M: Log Connection
+    C->>WS: Subscribe(types)
+    WS->>R: Register Subscription
+    S->>R: Publish Update
+    R->>WS: Broadcast Update
+    WS->>C: Send Update
+    WS->>M: Log Metrics
+
+%% Component Relationships
+classDiagram
+    class RealTimeService {
+        +handleConnection(ws)
+        +broadcast(update)
+        -handleSubscription(client, types)
+        -handleHeartbeat(client)
+    }
+
+    class WebSocketClient {
+        +connect()
+        +subscribe(types)
+        +unsubscribe(types)
+        -handleReconnect()
+        -startHeartbeat()
+    }
+
+    class MessageBroker {
+        +publish(channel, message)
+        +subscribe(channel)
+        -handleDelivery()
+    }
+
+    class MetricsCollector {
+        +increment(metric)
+        +gauge(metric, value)
+        +timing(metric, value)
+    }
+
+    RealTimeService --> MessageBroker
+    RealTimeService --> MetricsCollector
+    WebSocketClient --> RealTimeService
+    MessageBroker --> RealTimeService
+
+%% State Transitions
+stateDiagram-v2
+    [*] --> Disconnected
+    Disconnected --> Connecting
+    Connecting --> Connected
+    Connected --> Subscribed
+    Subscribed --> Receiving
+    Receiving --> Subscribed
+    Connected --> Disconnected
+    Subscribed --> Disconnected
+    Disconnected --> [*]
+
+    state Connecting {
+        [*] --> Authenticating
+        Authenticating --> Handshaking
+        Handshaking --> [*]
+    }
+
+    state Connected {
+        [*] --> Idle
+        Idle --> Active: Subscribe
+        Active --> Idle: Unsubscribe
+    }
+
+    state Receiving {
+        [*] --> Processing
+        Processing --> Filtering
+        Filtering --> Delivering
+        Delivering --> [*]
+    }

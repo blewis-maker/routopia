@@ -1,0 +1,201 @@
+%% POI Update Flow
+sequenceDiagram
+    participant User
+    participant Client
+    participant WS as WebSocket
+    participant Cache
+    participant POI as POI Service
+    participant Queue
+    participant Metrics
+
+    User->>Client: Open Map View
+    Client->>WS: Connect()
+    WS->>Metrics: Log Connection
+    Client->>WS: Subscribe(['POI'])
+    WS->>Queue: Register POI Interest
+    
+    Note over POI: POI Update Detected
+    POI->>Cache: Check Cache
+    alt Cache Hit
+        Cache-->>POI: Return Cached Data
+    else Cache Miss
+        POI->>POI: Generate Update
+        POI->>Cache: Store Update
+    end
+    
+    POI->>Queue: Publish Update
+    Queue->>WS: Broadcast to Subscribers
+    WS->>Client: Send Update
+    Client->>User: Update Map
+    WS->>Metrics: Log Latency
+
+%% Error Recovery Flow
+sequenceDiagram
+    participant Client
+    participant WS as WebSocket
+    participant Recovery
+    participant Metrics
+
+    Client->>WS: Connect()
+    Note over WS: Connection Lost
+    WS--xClient: Connection Error
+    Client->>Recovery: Start Recovery
+    
+    loop Retry with Backoff
+        Recovery->>Client: Wait(backoff)
+        Client->>WS: Reconnect()
+        alt Success
+            WS->>Client: Connected
+            Client->>WS: Resubscribe
+            Note over Client: Resume Normal Operation
+        else Failure
+            WS--xClient: Connection Error
+            Recovery->>Recovery: Increase Backoff
+        end
+    end
+    
+    Recovery->>Metrics: Log Recovery Attempt
+
+%% Rate Limiting Flow
+sequenceDiagram
+    participant Client
+    participant Gateway
+    participant RateLimit
+    participant WS as WebSocket
+    participant Metrics
+
+    Client->>Gateway: Request
+    Gateway->>RateLimit: Check Limits
+    
+    alt Within Limits
+        RateLimit->>WS: Allow Request
+        WS->>Client: Process Normally
+        RateLimit->>RateLimit: Update Counters
+    else Exceeded Limits
+        RateLimit->>Gateway: Reject
+        Gateway->>Client: 429 Too Many Requests
+        RateLimit->>Metrics: Log Rate Limit Event
+    end
+
+%% Load Balancing Flow
+graph TB
+    subgraph Client Layer
+        C1[Client 1]
+        C2[Client 2]
+        C3[Client 3]
+    end
+
+    subgraph Load Balancer
+        LB[HAProxy]
+        HC[Health Check]
+    end
+
+    subgraph WebSocket Cluster
+        WS1[Server 1]
+        WS2[Server 2]
+        WS3[Server 3]
+    end
+
+    subgraph State Management
+        Redis[Redis Cluster]
+        Sync[State Sync]
+    end
+
+    C1 --> LB
+    C2 --> LB
+    C3 --> LB
+
+    LB --> WS1
+    LB --> WS2
+    LB --> WS3
+
+    HC --> WS1
+    HC --> WS2
+    HC --> WS3
+
+    WS1 --> Redis
+    WS2 --> Redis
+    WS3 --> Redis
+
+    Redis --> Sync
+    Sync --> WS1
+    Sync --> WS2
+    Sync --> WS3
+
+%% Cache Management Flow
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Checking: Update Request
+    Checking --> CacheHit: Found
+    Checking --> CacheMiss: Not Found
+    CacheHit --> Validating
+    CacheMiss --> Fetching
+    
+    state Validating {
+        [*] --> Fresh
+        [*] --> Stale
+        Fresh --> Serving
+        Stale --> Refreshing
+    }
+    
+    state Fetching {
+        [*] --> RequestingData
+        RequestingData --> ProcessingResponse
+        ProcessingResponse --> StoringCache
+    }
+    
+    Serving --> Idle
+    Refreshing --> Idle
+    StoringCache --> Idle
+
+%% Monitoring Flow
+graph TB
+    subgraph Real-time Metrics
+        Connections[Connection Count]
+        MessageRate[Message Rate]
+        Latency[Message Latency]
+        Errors[Error Rate]
+    end
+
+    subgraph Aggregation
+        Prometheus[Prometheus]
+        TS[Time Series DB]
+    end
+
+    subgraph Visualization
+        Grafana[Grafana Dashboard]
+        Alerts[Alert Manager]
+    end
+
+    subgraph Actions
+        AutoScale[Auto Scaling]
+        Notification[Notifications]
+        Recovery[Recovery Actions]
+    end
+
+    Connections --> Prometheus
+    MessageRate --> Prometheus
+    Latency --> Prometheus
+    Errors --> Prometheus
+
+    Prometheus --> TS
+    TS --> Grafana
+    TS --> Alerts
+
+    Alerts --> AutoScale
+    Alerts --> Notification
+    Alerts --> Recovery
+
+%% Subscription Management
+stateDiagram-v2
+    [*] --> NoSubscription
+    NoSubscription --> Subscribing: Subscribe Request
+    Subscribing --> Active: Success
+    Subscribing --> Failed: Error
+    Active --> Updating: Change Request
+    Active --> Unsubscribing: Unsubscribe
+    Updating --> Active: Success
+    Updating --> Failed: Error
+    Failed --> Subscribing: Retry
+    Unsubscribing --> NoSubscription: Success
+    Unsubscribing --> Failed: Error 
