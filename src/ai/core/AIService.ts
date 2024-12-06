@@ -1,4 +1,4 @@
-import { RouteGenerationRequest } from '../../mcp/server/src/types';
+import { RouteGenerationRequest } from '@/types/mcp';
 
 // ... existing code ...
 

@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { AIService } from '@/services/ai/AIService';
-import { MCPIntegrationService } from '@/services/mcp/MCPIntegrationService';
-import { WeatherService } from '@/services/mcp/WeatherService';
-import { POIService } from '@/services/mcp/POIService';
-import { ChatMessage, UserInteractionContext } from '@/mcp/types/mcp-integration.types';
+import { MCPIntegrationService } from '@/services/integration/MCPIntegrationService';
+import { WeatherService } from '@/services/weather/WeatherService';
+import { POIService } from '@/services/poi/POIService';
+import { ChatMessage, UserInteractionContext } from '@/types/mcp';
 import logger from '@/utils/logger';
 
 export async function POST(request: Request) {

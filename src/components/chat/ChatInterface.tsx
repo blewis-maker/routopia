@@ -1,160 +1,88 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { v4 as uuidv4 } from 'uuid';
-import { MapIntegrationLayer } from '../../services/maps/MapIntegrationLayer';
-import { UserInteractionContext, ChatMessage } from '@/mcp/types/mcp-integration.types';
-import ChatInput from './ChatInput';
-import { RouteSuggestion } from './RouteSuggestion';
+import React, { useState, useCallback } from 'react';
+import { useChat } from '@/hooks/useChat';
 import { POISuggestion } from './POISuggestion';
 import logger from '@/utils/logger';
-
-interface Message extends ChatMessage {
-  id: string;
-}
+import { RouteContext } from '@/types/route';
+import { GeoPoint } from '@/types/geo';
+import { ActivityType } from '@/types/activity';
+import { ChatMessage, ChatResponse } from '@/types/chat';
 
 interface ChatInterfaceProps {
-  mapIntegration: MapIntegrationLayer;
-  routeContext?: {
-    startLocation?: string;
-    endLocation?: string;
-    routeType?: 'CAR' | 'BIKE' | 'SKI';
-  };
+  onRouteUpdate?: (route: RouteContext) => void;
+  onLocationSelect?: (location: GeoPoint) => void;
+  onActivitySelect?: (activity: ActivityType) => void;
 }
 
-export function ChatInterface({ mapIntegration, routeContext }: ChatInterfaceProps) {
-  const { data: session } = useSession();
-  const [messages, setMessages] = useState<Message[]>([]);
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({
+  onRouteUpdate,
+  onLocationSelect,
+  onActivitySelect,
+}) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [context, setContext] = useState<UserInteractionContext | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { sendMessage } = useChat();
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    setIsLoading(true);
+    const userMessage: ChatMessage = {
+      id: `msg_${Date.now()}`,
+      role: 'user',
+      content: input,
+      timestamp: new Date().toISOString(),
+    };
 
-  const handleMessage = async (message: string) => {
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+
     try {
-      setIsLoading(true);
+      logger.info('Sending message to chat service', { content: input });
+      const response: ChatResponse = await sendMessage(input);
 
-      // Add user message
-      const userMessage: Message = {
-        id: uuidv4(),
-        role: 'user',
-        content: message,
-        timestamp: Date.now(),
-        context: {
-          route: routeContext,
-          location: mapIntegration.getCurrentLocation(),
-          weather: context?.sessionContext.weather,
-          poi: context?.sessionContext.recentPOIs
-        }
-      };
-
-      setMessages(prev => [...prev, userMessage]);
-
-      // Prepare request context
-      const requestContext = {
-        route: routeContext,
-        location: mapIntegration.getCurrentLocation(),
-        preferences: context?.userPreferences || {}
-      };
-
-      // Send to API
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          context: requestContext,
-          messages: messages.map(({ id, ...msg }) => msg)
-        })
-      });
-
-      if (!response.ok) throw new Error('Failed to send message');
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No response reader');
-
-      // Handle streaming response
-      const decoder = new TextDecoder();
-      let assistantMessage = '';
-      let currentMessageId = uuidv4();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        try {
-          // Try to parse as JSON (complete message)
-          const data = JSON.parse(chunk);
-          assistantMessage = data.message;
-          
-          // Handle suggestions
-          if (data.suggestions?.routes) {
-            mapIntegration.showRouteSuggestions(data.suggestions.routes);
-          }
-          if (data.suggestions?.pois) {
-            mapIntegration.showPOISuggestions(data.suggestions.pois);
-          }
-
-          // Update context
-          setContext(data.context);
-
-          // Log metrics
-          logger.info('Chat message processed', {
-            metrics: data.metrics,
-            hasRouteSuggestions: !!data.suggestions?.routes,
-            hasPOISuggestions: !!data.suggestions?.pois
-          });
-        } catch {
-          // Not JSON, treat as streaming text
-          assistantMessage += chunk;
-        }
-        
-        // Update the UI with partial response
-        setMessages(prev => {
-          const lastMessage = prev[prev.length - 1];
-          if (lastMessage.role === 'assistant' && lastMessage.id === currentMessageId) {
-            return [...prev.slice(0, -1), {
-              ...lastMessage,
-              content: assistantMessage,
-              context: context
-            }];
-          } else {
-            return [...prev, {
-              id: currentMessageId,
-              role: 'assistant',
-              content: assistantMessage,
-              timestamp: Date.now(),
-              context: context
-            }];
-          }
-        });
+      // Handle route updates
+      if (response.context?.route && onRouteUpdate) {
+        onRouteUpdate(response.context.route);
       }
 
-    } catch (error) {
-      logger.error('Chat error:', { error });
-      setMessages(prev => [...prev, {
-        id: uuidv4(),
+      // Handle location selection
+      if (response.context?.location && onLocationSelect) {
+        onLocationSelect(response.context.location);
+      }
+
+      const assistantMessage: ChatMessage = {
+        id: `msg_${Date.now()}_response`,
         role: 'assistant',
-        content: 'Sorry, I encountered an error processing your request.',
-        timestamp: Date.now()
-      }]);
+        content: response.content,
+        timestamp: new Date().toISOString(),
+        context: {
+          route: response.context?.route,
+          location: response.context?.location,
+          suggestions: response.context?.suggestions,
+        },
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      logger.error('Error in chat interaction', error);
+      const errorMessage: ChatMessage = {
+        id: `msg_${Date.now()}_error`,
+        role: 'assistant',
+        content: 'Sorry, I encountered an error. Please try again.',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [input, isLoading, onRouteUpdate, onLocationSelect, sendMessage]);
 
   return (
-    <div className="flex flex-col h-full bg-stone-900 rounded-lg shadow-lg">
-      {/* Chat Messages */}
+    <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
           <div
@@ -164,29 +92,44 @@ export function ChatInterface({ mapIntegration, routeContext }: ChatInterfacePro
             }`}
           >
             <div
-              className={`max-w-[80%] rounded-lg p-3 ${
+              className={`max-w-3/4 p-3 rounded-lg ${
                 message.role === 'user'
-                  ? 'bg-teal-600 text-white'
-                  : 'bg-stone-800 text-stone-100'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 text-gray-800'
               }`}
             >
-              {message.content}
-              {message.role === 'assistant' && message.context?.route && (
-                <RouteSuggestion route={message.context.route} />
-              )}
-              {message.role === 'assistant' && message.context?.poi && (
-                <POISuggestion pois={message.context.poi} />
+              <p>{message.content}</p>
+              {message.context?.suggestions && (
+                <POISuggestion suggestions={message.context.suggestions} />
               )}
             </div>
           </div>
         ))}
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Form */}
-      <div className="p-4 border-t border-stone-800">
-        <ChatInput onSendMessage={handleMessage} isLoading={isLoading} />
-      </div>
+      <form onSubmit={handleSubmit} className="p-4 border-t">
+        <div className="flex space-x-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type your message..."
+            className="flex-1 p-2 border rounded-lg"
+            disabled={isLoading}
+          />
+          <button
+            type="submit"
+            disabled={isLoading}
+            className={`px-4 py-2 rounded-lg ${
+              isLoading
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-blue-500 hover:bg-blue-600'
+            } text-white`}
+          >
+            {isLoading ? 'Sending...' : 'Send'}
+          </button>
+        </div>
+      </form>
     </div>
   );
-} 
+}; 

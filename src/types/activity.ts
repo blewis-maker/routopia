@@ -1,33 +1,14 @@
 export enum ActivityType {
-  WALK = 'WALK',
-  RUN = 'RUN',
   BIKE = 'BIKE',
+  RUN = 'RUN',
+  WALK = 'WALK',
+  HIKE = 'HIKE',
+  SKI = 'SKI',
+  SWIM = 'SWIM',
   CAR = 'CAR',
-  SKI = 'SKI'
 }
 
-export interface ActivityPreferences {
-  difficulty: 'easy' | 'moderate' | 'hard';
-  terrain: string[];
-  timeOfDay: 'morning' | 'afternoon' | 'evening' | 'any';
-  weather: string[];
-}
-
-export interface ActivityConstraints {
-  maxDistance?: number;
-  maxDuration?: number;
-  maxElevation?: number;
-  requiredPOIs?: string[];
-}
-
-export interface ActivityMetrics {
-  distance: number;
-  duration: number;
-  elevation: number;
-  speed: number;
-}
-
-export interface ActivityStats {
+export type ActivityStats = {
   type: ActivityType;
   count: number;
   totalDistance: number;
@@ -37,4 +18,48 @@ export interface ActivityStats {
     date: string;
     metrics: ActivityMetrics;
   };
-} 
+};
+
+export type ActivityMetrics = {
+  distance: number;
+  duration: number;
+  speed: number;
+  calories: number;
+  elevation?: number;
+  heartRate?: {
+    average: number;
+    max: number;
+  };
+  cadence?: number;
+  power?: number;
+};
+
+export type ActivityPreferences = {
+  preferredUnits: 'metric' | 'imperial';
+  defaultActivityType: ActivityType;
+  showHeartRate: boolean;
+  showPower: boolean;
+  showCadence: boolean;
+  showElevation: boolean;
+  showWeather: boolean;
+  autoStart: boolean;
+  autoPause: boolean;
+};
+
+export type ActivityFilters = {
+  type?: ActivityType;
+  startDate?: Date;
+  endDate?: Date;
+  minDistance?: number;
+  maxDistance?: number;
+  minDuration?: number;
+  maxDuration?: number;
+};
+
+export type ActivitySortField = 'date' | 'distance' | 'duration' | 'speed' | 'calories';
+export type SortOrder = 'asc' | 'desc';
+
+export type ActivitySort = {
+  field: ActivitySortField;
+  order: SortOrder;
+}; 

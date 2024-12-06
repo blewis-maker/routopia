@@ -1,4 +1,4 @@
-import { RouteContext } from '@/mcp/types/mcp.types';
+import { RouteContext } from '@/types/mcp';
 
 interface RouteSuggestionProps {
   route: RouteContext;

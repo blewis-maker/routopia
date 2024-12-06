@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,280 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Enums
-enum RouteType {
-  CAR
-  BIKE
-  SKI
-}
-
-enum RouteStatus {
-  DRAFT
-  PLANNED
-  ACTIVE
-  COMPLETED
-  CANCELLED
-}
-
-// Base models
-model User {
-  id              String            @id @default(uuid())
-  email           String            @unique
-  name            String?
-  emailVerified   DateTime?
-  image           String?
-  createdAt       DateTime          @default(now())
-  preferences     Json? // Stores user preferences as JSON
-  skillLevels     Json? // Different activity skill levels
-  routes          Route[]
-  activities      ActivityHistory[]
-  devices         Device[]
-  trainingPlans   TrainingPlan[]
-  chatHistory     ChatInteraction[]
-  chats           Chat[]
-  accounts        Account[]
-  sessions        Session[]
-  recentLocations RecentLocation[]
-
-  @@map("users")
-}
-
-model Route {
-  id               String                 @id @default(uuid())
-  userId           String
-  name             String
-  routeType        RouteType
-  status           RouteStatus
-  plannedFor       DateTime?
-  completedAt      DateTime?
-  budgetConstraint Float?
-  isActive         Boolean                @default(true)
-  weatherReqs      Json?
-  user             User                   @relation(fields: [userId], references: [id])
-  nodes            RouteNode[]
-  activityRoute    ActivityRoute?
-  alerts           RouteAlert[]
-  weatherAlerts    WeatherAlert[]
-  chatInteractions ChatInteraction[]
-  generationParams RouteGenerationParams?
-
-  @@map("routes")
-}
-
-model RouteNode {
-  id            String        @id @default(uuid())
-  routeId       String
-  nodeType      String // coffee, gas, food, destination
-  sequence      Int
-  latitude      Float
-  longitude     Float
-  targetArrival DateTime?
-  status        String?
-  providerData  Json?
-  costEstimate  Float?
-  route         Route         @relation(fields: [routeId], references: [id])
-  metadata      NodeMetadata?
-
-  @@map("route_nodes")
-}
-
-model NodeMetadata {
-  id           String    @id @default(uuid())
-  routeNodeId  String    @unique
-  weatherData  Json?
-  trafficData  Json?
-  openingHours Json?
-  reviews      Json?
-  routeNode    RouteNode @relation(fields: [routeNodeId], references: [id])
-
-  @@map("node_metadata")
-}
-
-model ActivityRoute {
-  id               String          @id @default(uuid())
-  routeId          String          @unique
-  activityType     String
-  elevationData    Json?
-  difficultyRating Json?
-  trailConditions  Json?
-  lastUpdated      DateTime
-  route            Route           @relation(fields: [routeId], references: [id])
-  points           ActivityPoint[]
-
-  @@map("activity_routes")
-}
-
-model ActivityPoint {
-  id              String        @id @default(uuid())
-  activityRouteId String
-  sequence        Int
-  latitude        Float
-  longitude       Float
-  elevation       Float?
-  timestamp       DateTime?
-  heartRate       Int?
-  power           Int?
-  activityRoute   ActivityRoute @relation(fields: [activityRouteId], references: [id])
-
-  @@map("activity_points")
-}
-
-model TrainingPlan {
-  id             String        @id @default(uuid())
-  userId         String
-  sourcePlatform String
-  planType       String
-  startDate      DateTime
-  endDate        DateTime
-  trainingZones  Json?
-  weeklyTargets  Json?
-  user           User          @relation(fields: [userId], references: [id])
-  workouts       WorkoutType[]
-
-  @@map("training_plans")
-}
-
-model WorkoutType {
-  id             String       @id @default(uuid())
-  trainingPlanId String
-  name           String
-  description    String?
-  duration       Float
-  intensity      String
-  trainingPlan   TrainingPlan @relation(fields: [trainingPlanId], references: [id])
-
-  @@map("workout_types")
-}
-
-model Device {
-  id                String    @id @default(uuid())
-  userId            String
-  deviceType        String
-  makeModel         String?
-  connectionDetails Json?
-  lastSync          DateTime?
-  user              User      @relation(fields: [userId], references: [id])
-
-  @@map("devices")
-}
-
-model ActivityHistory {
-  id                 String              @id @default(uuid())
-  userId             String
-  activityType       String
-  date               DateTime
-  location           Json?
-  duration           Float?
-  satisfactionRating Float?
-  user               User                @relation(fields: [userId], references: [id])
-  metrics            PerformanceMetrics?
-  externalSync       ExternalSync[]
-
-  @@map("activity_history")
-}
-
-model PerformanceMetrics {
-  id                String          @id @default(uuid())
-  activityHistoryId String          @unique
-  distance          Float?
-  avgSpeed          Float?
-  maxSpeed          Float?
-  avgPower          Float?
-  maxPower          Float?
-  avgHeartRate      Int?
-  maxHeartRate      Int?
-  calories          Int?
-  activityHistory   ActivityHistory @relation(fields: [activityHistoryId], references: [id])
-
-  @@map("performance_metrics")
-}
-
-model ExternalSync {
-  id                String          @id @default(uuid())
-  activityHistoryId String
-  platform          String
-  externalId        String
-  lastSynced        DateTime
-  syncData          Json?
-  activityHistory   ActivityHistory @relation(fields: [activityHistoryId], references: [id])
-
-  @@map("external_syncs")
-}
-
-model ChatInteraction {
-  id          String   @id @default(uuid())
-  userId      String
-  routeId     String?
-  timestamp   DateTime @default(now())
-  userInput   String
-  aiResponse  String
-  contextData Json?
-  user        User     @relation(fields: [userId], references: [id])
-  route       Route?   @relation(fields: [routeId], references: [id])
-
-  @@map("chat_interactions")
-}
-
-model RouteAlert {
-  id         String   @id @default(uuid())
-  routeId    String
-  alertType  String
-  message    String
-  severity   String
-  timestamp  DateTime @default(now())
-  isResolved Boolean  @default(false)
-  route      Route    @relation(fields: [routeId], references: [id])
-
-  @@map("route_alerts")
-}
-
-model WeatherAlert {
-  id         String   @id @default(uuid())
-  routeId    String
-  alertType  String
-  conditions Json
-  severity   String
-  timestamp  DateTime @default(now())
-  route      Route    @relation(fields: [routeId], references: [id])
-
-  @@map("weather_alerts")
-}
-
-model RouteGenerationParams {
-  id              String   @id @default(uuid())
-  routeId         String   @unique
-  activityType    String
-  constraints     Json?
-  priorityFactors Json?
-  generatedAt     DateTime @default(now())
-  route           Route    @relation(fields: [routeId], references: [id])
-
-  @@map("route_generation_params")
-}
-
-model Chat {
-  id        String    @id @default(uuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  messages  Message[]
-  context   Json? // For storing route preferences, location, etc.
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@map("chats")
-}
-
-model Message {
-  id        String   @id @default(uuid())
-  chatId    String
-  chat      Chat     @relation(fields: [chatId], references: [id])
-  content   String
-  role      String // 'user' or 'assistant'
-  createdAt DateTime @default(now())
-
-  @@map("messages")
-}
-
+// Existing auth models
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -297,8 +21,7 @@ model Account {
   scope             String?
   id_token          String? @db.Text
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -309,6 +32,24 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id              String            @id @default(cuid())
+  name            String?
+  email           String           @unique
+  emailVerified   DateTime?
+  image           String?
+  accounts        Account[]
+  sessions        Session[]
+  activities      Activity[]
+  devices         Device[]
+  trainingPlans   TrainingPlan[]
+  recentLocations RecentLocation[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@map("users")
 }
 
 model VerificationToken {
@@ -330,4 +71,107 @@ model RecentLocation {
   user         User     @relation(fields: [userId], references: [id])
 
   @@index([userId, locationType])
+}
+
+// Activity tracking models
+model Activity {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // Maps to ActivityType enum
+  date      DateTime @default(now())
+  metrics   ActivityMetrics @relation(fields: [metricsId], references: [id])
+  metricsId String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ActivityMetrics {
+  id        String   @id @default(cuid())
+  distance  Float
+  duration  Int      // In seconds
+  speed     Float
+  calories  Int
+  heartRate Json?    // { average: number, max: number }
+  cadence   Int?
+  power     Int?
+  activity  Activity?
+  workout   Workout? @relation("WorkoutTargetMetrics")
+  workoutActual Workout? @relation("WorkoutActualMetrics")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Training models
+model TrainingPlan {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  type      String   // Maps to ActivityType enum
+  startDate DateTime
+  endDate   DateTime
+  goal      String
+  workouts  Workout[]
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Workout {
+  id            String   @id @default(cuid())
+  type          String   // Maps to ActivityType enum
+  scheduledDate DateTime
+  notes         String?
+  targetMetrics ActivityMetrics @relation("WorkoutTargetMetrics", fields: [targetMetricsId], references: [id])
+  targetMetricsId String @unique
+  actualMetrics ActivityMetrics? @relation("WorkoutActualMetrics", fields: [actualMetricsId], references: [id])
+  actualMetricsId String? @unique
+  trainingPlan  TrainingPlan @relation(fields: [planId], references: [id])
+  planId        String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Device models
+model Device {
+  id             String   @id @default(cuid())
+  userId         String
+  name           String
+  type           String   // Maps to device type enum
+  status         String   // connected, disconnected, syncing
+  batteryLevel   Int?
+  manufacturer   String
+  model          String
+  firmwareVersion String?
+  settings       DeviceSettings?
+  syncs          DeviceSync[]
+  lastSync       DeviceSync? @relation("LastSync", fields: [lastSyncId], references: [id])
+  lastSyncId     String?    @unique
+  user           User     @relation(fields: [userId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model DeviceSettings {
+  id            String   @id @default(cuid())
+  device        Device   @relation(fields: [deviceId], references: [id])
+  deviceId      String   @unique
+  syncFrequency String   // realtime, hourly, daily
+  autoSync      Boolean  @default(true)
+  dataTypes     String[] // activity, heart_rate, power, cadence, location
+  notifications Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model DeviceSync {
+  id           String   @id @default(cuid())
+  device       Device   @relation(fields: [deviceId], references: [id])
+  deviceId     String
+  success      Boolean
+  dataTypes    String[]
+  recordsCount Int
+  error        String?
+  deviceLastSync Device? @relation("LastSync")
+  createdAt    DateTime @default(now())
 }
