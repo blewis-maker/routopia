@@ -23,20 +23,27 @@ import {
   isClaudeResponse,
   isServerError
 } from "./types.js";
+import logger from './utils/logger';
 
 dotenv.config();
 
-const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
-if (!CLAUDE_API_KEY) {
-  throw createServerError(ErrorCode.INTERNAL_ERROR, "CLAUDE_API_KEY environment variable is required");
+interface MCPServerConfig {
+  port?: number;
+  redisUrl?: string;
+  anthropicApiKey?: string;
 }
 
-class RoutopiaServer {
+export class MCPServer {
   private server: Server;
   private claude: Anthropic;
   private activeRoutes: Map<string, RouteResource>;
 
-  constructor() {
+  constructor(config?: MCPServerConfig) {
+    const apiKey = config?.anthropicApiKey || process.env.CLAUDE_API_KEY;
+    if (!apiKey) {
+      throw createServerError(ErrorCode.INTERNAL_ERROR, "CLAUDE_API_KEY is required");
+    }
+
     this.server = new Server({
       name: "routopia-mcp-server",
       version: "0.1.0"
@@ -48,7 +55,7 @@ class RoutopiaServer {
     });
 
     this.claude = new Anthropic({
-      apiKey: CLAUDE_API_KEY
+      apiKey
     });
 
     this.activeRoutes = new Map();
@@ -238,18 +245,17 @@ class RoutopiaServer {
     );
   }
 
-  private async handleRouteGeneration(args: unknown): Promise<ToolResponse> {
+  public async handleRouteGeneration(args: unknown): Promise<ToolResponse> {
     if (!isValidRouteRequest(args)) {
-      return {
-        content: [{
-          type: "text",
-          text: "Invalid route request parameters"
-        }],
-        isError: true
-      };
+      logger.error('Invalid route request parameters');
+      throw createServerError(
+        ErrorCode.VALIDATION_ERROR,
+        `${ErrorCode.VALIDATION_ERROR}: Invalid route request parameters`
+      );
     }
 
     try {
+      logger.info('Generating route with Claude', { args });
       const response = await this.claude.messages.create({
         model: "claude-3-opus-20240229",
         max_tokens: 2048,
@@ -259,53 +265,43 @@ class RoutopiaServer {
         }]
       });
 
-      if (!isClaudeResponse(response)) {
-        throw createServerError(
-          ErrorCode.CLAUDE_API_ERROR,
-          'Invalid response from Claude API'
-        );
-      }
-
-      const content = response.content[0];
-      if (!content || typeof content.text !== 'string') {
-        throw createServerError(
-          ErrorCode.CLAUDE_API_ERROR,
-          'Invalid content in Claude response'
-        );
-      }
-
+      logger.info('Successfully generated route');
       return {
         content: [{
-          type: "text",
-          text: content.text
+          type: 'text',
+          text: response.content[0].text
         }]
       };
     } catch (error) {
       if (error instanceof Anthropic.APIError) {
-        return {
-          content: [{
-            type: "text",
-            text: `Route generation failed: ${error.message}`
-          }],
-          isError: true
-        };
+        logger.error('Claude API error', { error });
+        throw createServerError(
+          ErrorCode.CLAUDE_API_ERROR,
+          `${ErrorCode.CLAUDE_API_ERROR}: ${error.message}`,
+          error.status === 429
+        );
       }
-      throw error;
+      logger.error('Internal server error', { error });
+      throw createServerError(
+        ErrorCode.INTERNAL_ERROR,
+        `${ErrorCode.INTERNAL_ERROR}: Internal server error`,
+        false,
+        error
+      );
     }
   }
 
-  private async handlePOISearch(args: unknown): Promise<ToolResponse> {
+  public async handlePOISearch(args: unknown): Promise<ToolResponse> {
     if (!isValidPOIRequest(args)) {
-      return {
-        content: [{
-          type: "text",
-          text: "Invalid POI request parameters"
-        }],
-        isError: true
-      };
+      logger.error('Invalid POI request parameters');
+      throw createServerError(
+        ErrorCode.VALIDATION_ERROR,
+        `${ErrorCode.VALIDATION_ERROR}: Invalid POI request parameters`
+      );
     }
 
     try {
+      logger.info('Searching POIs with Claude', { args });
       const response = await this.claude.messages.create({
         model: "claude-3-opus-20240229",
         max_tokens: 2048,
@@ -315,80 +311,49 @@ class RoutopiaServer {
         }]
       });
 
-      if (!isClaudeResponse(response)) {
-        throw createServerError(
-          ErrorCode.CLAUDE_API_ERROR,
-          'Invalid response from Claude API'
-        );
-      }
-
-      const content = response.content[0];
-      if (!content || typeof content.text !== 'string') {
-        throw createServerError(
-          ErrorCode.CLAUDE_API_ERROR,
-          'Invalid content in Claude response'
-        );
-      }
-
+      logger.info('Successfully found POIs');
       return {
         content: [{
-          type: "text",
-          text: content.text
+          type: 'text',
+          text: response.content[0].text
         }]
       };
     } catch (error) {
       if (error instanceof Anthropic.APIError) {
-        return {
-          content: [{
-            type: "text",
-            text: `POI search failed: ${error.message}`
-          }],
-          isError: true
-        };
+        logger.error('Claude API error', { error });
+        throw createServerError(
+          ErrorCode.CLAUDE_API_ERROR,
+          `${ErrorCode.CLAUDE_API_ERROR}: ${error.message}`,
+          error.status === 429
+        );
       }
-      throw error;
+      logger.error('Internal server error', { error });
+      throw createServerError(
+        ErrorCode.INTERNAL_ERROR,
+        `${ErrorCode.INTERNAL_ERROR}: Internal server error`,
+        false,
+        error
+      );
     }
   }
 
   private buildRoutePrompt(context: RouteGenerationRequest): string {
-    return `Generate a ${context.preferences.activityType.toLowerCase()} route from 
-      (${context.startPoint.lat}, ${context.startPoint.lng}) to 
-      (${context.endPoint.lat}, ${context.endPoint.lng})
-      ${this.getPreferencesString(context)}
-      ${this.getConstraintsString(context)}`;
+    const { preferences, startPoint, endPoint } = context;
+    return `Generate a ${preferences.activityType} route from 
+      (${startPoint.lat}, ${startPoint.lng}) to 
+      (${endPoint.lat}, ${endPoint.lng})
+      ${preferences.avoidHills ? 'avoiding hills' : ''}
+      ${preferences.preferScenic ? 'preferring scenic routes' : ''}
+      ${preferences.maxDistance ? `with maximum distance of ${preferences.maxDistance}m` : ''}`;
   }
 
   private buildPOIPrompt(context: POIRequest): string {
-    return `Find points of interest near (${context.location.lat}, ${context.location.lng})
-      within ${context.radius} meters
-      ${context.categories ? `in categories: ${context.categories.join(', ')}` : ''}
+    const { location, radius, categories } = context;
+    return `Find points of interest
+      near (${location.lat}, ${location.lng})
+      within ${radius}m radius
+      ${categories?.length ? `in categories: ${categories.join(', ')}` : ''}
       ${context.limit ? `limit to ${context.limit} results` : ''}`;
-  }
-
-  private getPreferencesString(context: RouteGenerationRequest): string {
-    const prefs = [];
-    if (context.preferences.avoidHills) prefs.push('avoiding hills');
-    if (context.preferences.preferScenic) prefs.push('preferring scenic routes');
-    if (context.preferences.maxDistance) {
-      prefs.push(`with maximum distance of ${context.preferences.maxDistance}m`);
-    }
-    return prefs.length ? 'with preferences: ' + prefs.join(', ') : '';
-  }
-
-  private getConstraintsString(context: RouteGenerationRequest): string {
-    if (!context.constraints) return '';
-    
-    const constraints = [];
-    if (context.constraints.maxElevationGain) {
-      constraints.push(`maximum elevation gain of ${context.constraints.maxElevationGain}m`);
-    }
-    if (context.constraints.maxDuration) {
-      constraints.push(`maximum duration of ${context.constraints.maxDuration} minutes`);
-    }
-    if (context.constraints.requiredPOIs?.length) {
-      constraints.push(`including these POIs: ${context.constraints.requiredPOIs.join(', ')}`);
-    }
-    return constraints.length ? 'with constraints: ' + constraints.join(', ') : '';
   }
 
   async run(): Promise<void> {
@@ -398,8 +363,10 @@ class RoutopiaServer {
   }
 }
 
-const server = new RoutopiaServer();
-server.run().catch(error => {
-  console.error("Server failed to start:", error);
-  process.exit(1);
-}); 
+if (require.main === module) {
+  const server = new MCPServer();
+  server.run().catch(error => {
+    console.error("Server failed to start:", error);
+    process.exit(1);
+  });
+} 

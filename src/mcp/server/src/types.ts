@@ -1,5 +1,12 @@
-import { GeoPoint, RoutePreferences, RouteConstraints } from '../../types/mcp.types';
-import { Message, ContentBlock } from '@anthropic-ai/sdk';
+import { GeoPoint, RouteConstraints } from '../../types/mcp.types';
+import type { Message } from '@anthropic-ai/sdk';
+
+export interface RoutePreferences {
+  activityType: 'WALK' | 'RUN' | 'BIKE';
+  avoidHills?: boolean;
+  preferScenic?: boolean;
+  maxDistance?: number;
+}
 
 export interface RouteGenerationRequest {
   startPoint: GeoPoint;
@@ -29,6 +36,11 @@ export interface ToolResponse {
     text: string;
   }>;
   isError?: boolean;
+}
+
+export interface ContentBlock {
+  type: 'text';
+  text: string;
 }
 
 export interface ClaudeResponse {
