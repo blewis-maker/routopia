@@ -1,19 +1,28 @@
 export interface GeoPoint {
-  lat: number;
-  lng: number;
+  latitude: number;
+  longitude: number;
+  elevation?: number;
+  accuracy?: number;
 }
 
-export interface GeoBox {
+export interface GeoArea {
+  center: GeoPoint;
+  radius: number;
+  type?: 'circle' | 'polygon';
+}
+
+export interface GeoBounds {
   northeast: GeoPoint;
   southwest: GeoPoint;
 }
 
-export interface GeoDistance {
-  value: number; // meters
-  text: string;
+export type GeoDistance = {
+  value: number;
+  unit: 'meters' | 'kilometers' | 'miles';
 }
 
-export interface GeoDuration {
-  value: number; // seconds
-  text: string;
+export interface GeoRoute {
+  points: GeoPoint[];
+  distance: GeoDistance;
+  bounds: GeoBounds;
 } 

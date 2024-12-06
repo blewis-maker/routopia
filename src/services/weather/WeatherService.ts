@@ -1,315 +1,330 @@
-import { WeatherConditions, GeoPoint, RouteContext, SeasonalConditions } from '@/types/mcp';
+import { MCPIntegrationService } from '@/services/integration/MCPIntegrationService';
+import { WeatherConditions, WeatherPattern, MicroClimate } from '@/types/weather';
+import { GeoPoint } from '@/types/geo';
 import logger from '@/utils/logger';
 
-export interface WeatherData {
-  temperature: number;
-  feelsLike: number;
-  humidity: number;
-  windSpeed: number;
-  condition: string;
-  precipitation: number;
-  visibility: number;
-  pressure: number;
-  uvIndex: number;
-  dewPoint: number;
-  cloudCover: number;
-}
-
 export class WeatherService {
-  constructor(private apiKey?: string) {}
+  constructor(private readonly mcpService: MCPIntegrationService) {}
 
-  async getCurrentWeather(location: GeoPoint): Promise<WeatherConditions> {
+  async getForecast(startPoint: GeoPoint, endPoint: GeoPoint): Promise<WeatherConditions> {
     try {
-      // TODO: Implement actual weather API integration
-      const mockData: WeatherData = {
-        temperature: 20,
-        feelsLike: 22,
-        humidity: 65,
-        windSpeed: 5,
-        condition: "Clear",
-        precipitation: 0,
-        visibility: 10000,
-        pressure: 1015,
-        uvIndex: 5,
-        dewPoint: 15,
-        cloudCover: 10
-      };
-
-      return this.convertToWeatherConditions(mockData);
+      const forecast = await this.mcpService.getWeatherForecast(startPoint, endPoint);
+      return this.enrichForecastWithMicroClimate(forecast);
     } catch (error) {
-      logger.error('Error fetching current weather:', { error, location });
+      logger.error('Failed to get weather forecast:', error);
       throw error;
     }
   }
 
-  async getWeatherForecast(location: GeoPoint, hours: number = 24): Promise<WeatherConditions[]> {
-    // TODO: Implement forecast fetching
-    return Array(hours).fill(null).map(() => ({
-      temperature: 20,
-      conditions: "Clear",
-      windSpeed: 5,
-      precipitation: 0,
-      visibility: 10000,
-      details: {
-        humidity: 65,
-        pressure: 1013,
-        dewPoint: 12,
-        uvIndex: 5,
-        cloudCover: 10
-      }
-    }));
-  }
-
-  async getSeasonalConditions(location: GeoPoint): Promise<SeasonalConditions> {
-    // TODO: Implement seasonal conditions fetching
-    return {
-      snowDepth: 0,
-      avalancheRisk: 'low',
-      trailCondition: 'dry',
-      visibility: 10000,
-      temperature: 20,
-      windSpeed: 5
-    };
-  }
-
-  private convertToWeatherConditions(data: WeatherData): WeatherConditions {
-    return {
-      temperature: data.temperature,
-      conditions: this.normalizeCondition(data.condition),
-      windSpeed: data.windSpeed,
-      precipitation: data.precipitation,
-      visibility: data.visibility,
-      details: {
-        feelsLike: data.feelsLike,
-        humidity: data.humidity,
-        pressure: data.pressure,
-        uvIndex: data.uvIndex,
-        dewPoint: data.dewPoint,
-        cloudCover: data.cloudCover
-      }
-    };
-  }
-
-  private normalizeCondition(condition: string): string {
-    // Normalize weather condition strings
-    const conditionMap: { [key: string]: string } = {
-      'partly cloudy': 'Partly Cloudy',
-      'mostly cloudy': 'Mostly Cloudy',
-      'clear': 'Clear',
-      'rain': 'Rain',
-      'light rain': 'Light Rain',
-      'heavy rain': 'Heavy Rain',
-      'snow': 'Snow',
-      'light snow': 'Light Snow',
-      'heavy snow': 'Heavy Snow',
-      'thunderstorm': 'Thunderstorm',
-      'fog': 'Fog',
-      'mist': 'Mist'
-    };
-
-    const normalized = condition.toLowerCase();
-    return conditionMap[normalized] || condition;
-  }
-
-  async getWeatherAlongRoute(route: RouteContext): Promise<Map<string, WeatherConditions>> {
-    const weatherMap = new Map<string, WeatherConditions>();
-    
-    // Sample weather at key points along the route
-    const keyPoints = this.getKeyRoutePoints(route);
-    
-    await Promise.all(
-      keyPoints.map(async ([pointId, point]) => {
-        const weather = await this.getCurrentWeather(point);
-        weatherMap.set(pointId, weather);
-      })
-    );
-
-    return weatherMap;
-  }
-
-  private getKeyRoutePoints(route: RouteContext): [string, GeoPoint][] {
-    const points: [string, GeoPoint][] = [
-      ['start', route.startPoint],
-      ['end', route.endPoint]
-    ];
-
-    // Add midpoints for long routes
-    if (route.distance > 10000) { // 10km
-      const midPoint: GeoPoint = {
-        lat: (route.startPoint.lat + route.endPoint.lat) / 2,
-        lng: (route.startPoint.lng + route.endPoint.lng) / 2
-      };
-      points.push(['mid', midPoint]);
-    }
-
-    return points;
-  }
-
-  async getHazardousConditions(route: RouteContext): Promise<Map<string, string[]>> {
-    const hazards = new Map<string, string[]>();
-    const weatherMap = await this.getWeatherAlongRoute(route);
-
-    weatherMap.forEach((weather, pointId) => {
-      const conditions = this.identifyHazards(weather, route);
-      if (conditions.length > 0) {
-        hazards.set(pointId, conditions);
-      }
-    });
-
-    return hazards;
-  }
-
-  private identifyHazards(weather: WeatherConditions, route: RouteContext): string[] {
-    const hazards: string[] = [];
-    const activityType = route.preferences.activityType;
-
-    // Check temperature extremes
-    if (weather.temperature > 35) hazards.push('extreme_heat');
-    if (weather.temperature < 0) hazards.push('freezing_conditions');
-
-    // Check visibility
-    if (weather.visibility < 1000) hazards.push('low_visibility');
-
-    // Check wind conditions
-    if (weather.windSpeed > 30) hazards.push('high_winds');
-
-    // Activity-specific hazards
-    if (activityType === 'BIKE' && weather.conditions.toLowerCase().includes('rain')) {
-      hazards.push('slippery_conditions');
-    }
-
-    if (activityType === 'SKI' && weather.conditions.toLowerCase().includes('storm')) {
-      hazards.push('dangerous_conditions');
-    }
-
-    return hazards;
-  }
-
-  async getPointWeather(point: GeoPoint): Promise<WeatherConditions> {
+  async getPointWeather(location: GeoPoint): Promise<WeatherConditions> {
     try {
-      const response = await fetch(
-        `https://api.weatherapi.com/v1/current.json?key=${this.apiKey}&q=${point.lat},${point.lng}`
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch weather data');
-      }
-
-      const data = await response.json();
-      return this.transformWeatherData(data);
+      return await this.mcpService.getWeatherForecast(location, location);
     } catch (error) {
-      logger.error('Error fetching point weather:', error);
-      return this.getDefaultWeather();
+      logger.error('Failed to get point weather:', error);
+      throw error;
     }
-  }
-
-  async getWeatherForRoute(request: RouteRequest): Promise<WeatherConditions> {
-    try {
-      // Get weather for start and end points
-      const [startWeather, endWeather] = await Promise.all([
-        this.getPointWeather(request.startPoint),
-        this.getPointWeather(request.endPoint)
-      ]);
-
-      // Combine weather conditions
-      return this.combineWeatherConditions(startWeather, endWeather);
-    } catch (error) {
-      logger.error('Error fetching route weather:', error);
-      return this.getDefaultWeather();
-    }
-  }
-
-  private transformWeatherData(data: any): WeatherConditions {
-    return {
-      temperature: data.current.temp_c,
-      conditions: data.current.condition.text,
-      windSpeed: data.current.wind_kph,
-      precipitation: data.current.precip_mm,
-      visibility: data.current.vis_km * 1000, // convert to meters
-      details: {
-        humidity: data.current.humidity,
-        pressure: data.current.pressure_mb,
-        dewPoint: data.current.dewpoint_c,
-        uvIndex: data.current.uv,
-        cloudCover: data.current.cloud
-      }
-    };
-  }
-
-  private combineWeatherConditions(
-    start: WeatherConditions,
-    end: WeatherConditions
-  ): WeatherConditions {
-    return {
-      temperature: (start.temperature + end.temperature) / 2,
-      conditions: this.combineWeatherDescriptions(start.conditions, end.conditions),
-      windSpeed: Math.max(start.windSpeed, end.windSpeed),
-      precipitation: Math.max(start.precipitation, end.precipitation),
-      visibility: Math.min(start.visibility, end.visibility),
-      details: {
-        humidity: (start.details.humidity + end.details.humidity) / 2,
-        pressure: (start.details.pressure + end.details.pressure) / 2,
-        dewPoint: (start.details.dewPoint + end.details.dewPoint) / 2,
-        uvIndex: Math.max(start.details.uvIndex, end.details.uvIndex),
-        cloudCover: Math.max(start.details.cloudCover, end.details.cloudCover)
-      }
-    };
-  }
-
-  private combineWeatherDescriptions(desc1: string, desc2: string): string {
-    if (desc1 === desc2) return desc1;
-    return `${desc1} to ${desc2}`;
-  }
-
-  private getDefaultWeather(): WeatherConditions {
-    return {
-      temperature: 20,
-      conditions: 'Unknown',
-      windSpeed: 0,
-      precipitation: 0,
-      visibility: 10000,
-      details: {
-        humidity: 50,
-        pressure: 1013,
-        dewPoint: 10,
-        uvIndex: 5,
-        cloudCover: 0
-      }
-    };
   }
 
   async getWeatherForLocation(location: GeoPoint): Promise<WeatherConditions> {
     try {
-      const forecasts = await this.getWeatherForecast(location);
-      return forecasts[0] || {
-        temperature: 20,
-        conditions: 'clear',
-        windSpeed: 0,
-        precipitation: 0,
-        humidity: 50,
-        visibility: 10000,
-        pressure: 1013,
-        uvIndex: 5,
-        cloudCover: 0
-      };
+      return await this.getPointWeather(location);
     } catch (error) {
       logger.error('Failed to get weather for location:', error);
       throw error;
     }
   }
 
-  async getHistoricalWeather(location: GeoPoint, date: Date): Promise<WeatherConditions> {
-    // Implementation for getting historical weather
+  async analyzeMicroClimate(location: GeoPoint): Promise<MicroClimate> {
+    try {
+      const terrain = await this.mcpService.getTerrainData(location);
+      const localWeather = await this.mcpService.getLocalWeather(location);
+      const historicalData = await this.mcpService.getHistoricalWeather(location);
+
+      return {
+        temperature: {
+          current: localWeather.temperature,
+          variation: this.calculateTemperatureVariation(historicalData),
+          microEffects: this.analyzeMicroTemperatureEffects(terrain, localWeather)
+        },
+        wind: {
+          speed: localWeather.windSpeed,
+          direction: localWeather.windDirection || 0,
+          patterns: this.analyzeWindPatterns(terrain, historicalData),
+          tunnelEffects: this.calculateWindTunnelEffects(terrain)
+        },
+        precipitation: {
+          intensity: localWeather.precipitation,
+          localized: this.analyzeLocalizedPrecipitation(terrain, historicalData),
+          accumulation: this.calculatePrecipitationAccumulation(terrain)
+        },
+        sunExposure: this.calculateSunExposure(terrain, location),
+        terrainEffects: this.analyzeTerrainWeatherEffects(terrain)
+      };
+    } catch (error) {
+      logger.error('Failed to analyze micro-climate:', error);
+      throw error;
+    }
+  }
+
+  async predictWeatherPatterns(location: GeoPoint): Promise<WeatherPattern[]> {
+    try {
+      const historicalData = await this.mcpService.getHistoricalWeather(location);
+      const forecast = await this.mcpService.getWeatherForecast(location, location);
+      const terrain = await this.mcpService.getTerrainData(location);
+
+      return this.analyzeWeatherPatterns(historicalData, forecast, terrain);
+    } catch (error) {
+      logger.error('Failed to predict weather patterns:', error);
+      throw error;
+    }
+  }
+
+  private enrichForecastWithMicroClimate(forecast: WeatherConditions): WeatherConditions {
     return {
-      temperature: 20,
-      conditions: 'clear',
-      windSpeed: 0,
-      precipitation: 0,
-      humidity: 50,
-      visibility: 10000,
-      pressure: 1013,
-      uvIndex: 5,
-      cloudCover: 0
+      ...forecast,
+      microClimates: forecast.locations?.map(location => ({
+        point: location.point,
+        localEffects: this.calculateLocalEffects(location, forecast)
+      }))
     };
+  }
+
+  private calculateTemperatureVariation(historicalData: any): number {
+    const temperatures = historicalData.temperatures || [];
+    if (temperatures.length === 0) return 0;
+
+    const mean = temperatures.reduce((sum, temp) => sum + temp, 0) / temperatures.length;
+    const variance = temperatures.reduce((sum, temp) => sum + Math.pow(temp - mean, 2), 0) / temperatures.length;
+    return Math.sqrt(variance);
+  }
+
+  private analyzeMicroTemperatureEffects(terrain: any, weather: any): any[] {
+    const effects = [];
+
+    if (terrain.type === 'urban') {
+      effects.push({
+        type: 'urban_heat',
+        impact: 2.0,
+        confidence: 0.8
+      });
+    }
+
+    if (terrain.features?.includes('water')) {
+      effects.push({
+        type: 'water_cooling',
+        impact: -1.0,
+        confidence: 0.7
+      });
+    }
+
+    return effects;
+  }
+
+  private analyzeWindPatterns(terrain: any, historicalData: any): any[] {
+    const patterns = [];
+
+    if (terrain.elevation > 500) {
+      patterns.push({
+        type: 'mountain_valley_breeze',
+        probability: 0.7,
+        timing: {
+          start: 'sunrise',
+          peak: 'midday',
+          end: 'sunset'
+        }
+      });
+    }
+
+    if (terrain.type === 'urban') {
+      patterns.push({
+        type: 'urban_corridor',
+        direction: this.calculatePredominantWindDirection(historicalData),
+        intensity: this.calculateWindIntensification(terrain)
+      });
+    }
+
+    return patterns;
+  }
+
+  private calculateWindTunnelEffects(terrain: any): any[] {
+    const effects = [];
+
+    if (terrain.type === 'urban' && terrain.buildings) {
+      effects.push(...this.analyzeUrbanWindTunnels(terrain.buildings));
+    }
+
+    if (terrain.features?.includes('valley')) {
+      effects.push({
+        type: 'valley_tunnel',
+        intensification: 1.5,
+        direction: terrain.valleyOrientation || 0
+      });
+    }
+
+    return effects;
+  }
+
+  private analyzeUrbanWindTunnels(buildings: any[]): any[] {
+    return buildings
+      .filter(building => building.height > 50)
+      .map(building => ({
+        type: 'building_tunnel',
+        location: building.location,
+        intensification: this.calculateBuildingWindEffect(building),
+        direction: building.orientation || 0
+      }));
+  }
+
+  private calculateBuildingWindEffect(building: any): number {
+    const baseEffect = 1.2;
+    const heightFactor = Math.log10(building.height / 50);
+    return baseEffect * heightFactor;
+  }
+
+  private analyzeLocalizedPrecipitation(terrain: any, historicalData: any): any {
+    return {
+      orographicEffect: this.calculateOrographicEffect(terrain),
+      urbanEffect: this.calculateUrbanPrecipitationEffect(terrain),
+      patterns: this.analyzePrecipitationPatterns(historicalData)
+    };
+  }
+
+  private calculateOrographicEffect(terrain: any): number {
+    if (!terrain.elevation) return 1.0;
+    
+    const baseEffect = 1.0;
+    const elevationFactor = terrain.elevation / 1000;
+    return baseEffect + (elevationFactor * 0.2);
+  }
+
+  private calculatePrecipitationAccumulation(terrain: any): any {
+    return {
+      rate: this.calculateAccumulationRate(terrain),
+      drainage: this.analyzeDrainagePatterns(terrain),
+      retention: this.calculateWaterRetention(terrain)
+    };
+  }
+
+  private calculateSunExposure(terrain: any, location: GeoPoint): any {
+    return {
+      dailyPattern: this.calculateDailySunPattern(terrain, location),
+      shadingEffects: this.analyzeShadingEffects(terrain),
+      seasonalVariation: this.calculateSeasonalSunExposure(location)
+    };
+  }
+
+  private analyzeTerrainWeatherEffects(terrain: any): any {
+    return {
+      elevation: this.analyzeElevationEffects(terrain),
+      slope: this.analyzeSlopeEffects(terrain),
+      vegetation: this.analyzeVegetationEffects(terrain),
+      urbanization: this.analyzeUrbanEffects(terrain)
+    };
+  }
+
+  private calculateLocalEffects(location: any, forecast: WeatherConditions): any {
+    return {
+      temperature: this.adjustTemperatureForLocal(location, forecast),
+      wind: this.adjustWindForLocal(location, forecast),
+      precipitation: this.adjustPrecipitationForLocal(location, forecast)
+    };
+  }
+
+  private analyzeWeatherPatterns(historicalData: any, forecast: any, terrain: any): WeatherPattern[] {
+    const patterns: WeatherPattern[] = [];
+
+    patterns.push(...this.analyzeSeasonalPatterns(historicalData));
+    patterns.push(...this.analyzeDailyPatterns(historicalData, terrain));
+    patterns.push(...this.analyzeTerrainPatterns(terrain, historicalData));
+    patterns.push(...this.predictUpcomingPatterns(forecast, historicalData));
+
+    return patterns;
+  }
+
+  private analyzeSeasonalPatterns(historicalData: any): WeatherPattern[] {
+    return [];
+  }
+
+  private analyzeDailyPatterns(historicalData: any, terrain: any): WeatherPattern[] {
+    return [];
+  }
+
+  private analyzeTerrainPatterns(terrain: any, historicalData: any): WeatherPattern[] {
+    return [];
+  }
+
+  private predictUpcomingPatterns(forecast: any, historicalData: any): WeatherPattern[] {
+    return [];
+  }
+
+  private calculatePredominantWindDirection(historicalData: any): number {
+    return 0;
+  }
+
+  private calculateWindIntensification(terrain: any): number {
+    return 1.0;
+  }
+
+  private calculateAccumulationRate(terrain: any): number {
+    return 0;
+  }
+
+  private analyzeDrainagePatterns(terrain: any): any {
+    return {};
+  }
+
+  private calculateWaterRetention(terrain: any): number {
+    return 0;
+  }
+
+  private calculateDailySunPattern(terrain: any, location: GeoPoint): any {
+    return {};
+  }
+
+  private analyzeShadingEffects(terrain: any): any {
+    return {};
+  }
+
+  private calculateSeasonalSunExposure(location: GeoPoint): any {
+    return {};
+  }
+
+  private analyzeElevationEffects(terrain: any): any {
+    return {};
+  }
+
+  private analyzeSlopeEffects(terrain: any): any {
+    return {};
+  }
+
+  private analyzeVegetationEffects(terrain: any): any {
+    return {};
+  }
+
+  private analyzeUrbanEffects(terrain: any): any {
+    return {};
+  }
+
+  private adjustTemperatureForLocal(location: any, forecast: WeatherConditions): number {
+    return forecast.temperature;
+  }
+
+  private adjustWindForLocal(location: any, forecast: WeatherConditions): any {
+    return {
+      speed: forecast.windSpeed,
+      direction: 0
+    };
+  }
+
+  private adjustPrecipitationForLocal(location: any, forecast: WeatherConditions): number {
+    return forecast.precipitation;
+  }
+
+  private analyzePrecipitationPatterns(historicalData: any): any[] {
+    return [];
+  }
+
+  private calculateUrbanPrecipitationEffect(terrain: any): number {
+    return 1.0;
   }
 } 

@@ -1,48 +1,32 @@
 import { GeoPoint } from '../geo';
-import { ActivityType } from '../activity';
+import { WeatherConditions } from '../weather';
+import { TerrainConditions } from '../terrain';
 
-export type RouteType = 'WALK' | 'RUN' | 'BIKE' | 'SKI';
+export type ActivityType = 'WALK' | 'RUN' | 'BIKE' | 'SKI' | 'CAR' | 'PUBLIC_TRANSPORT';
 
-export type OptimizationPreference = 
+export type OptimizationType = 
   | 'TIME' 
   | 'DISTANCE' 
   | 'SAFETY' 
   | 'TERRAIN' 
   | 'SNOW_CONDITIONS'
-  | 'POINTS_OF_INTEREST'
-  | 'SCENIC'
-  | 'SPEED'
+  | 'POINTS_OF_INTEREST' 
+  | 'SCENIC' 
+  | 'SPEED' 
   | 'RECOVERY';
 
-export enum TerrainDifficulty {
-  EASY = 'easy',
-  MODERATE = 'moderate',
-  HARD = 'hard',
-  EXPERT = 'expert',
-  INTERMEDIATE = 'intermediate',
-  UNKNOWN = 'unknown'
-}
-
-export type SurfaceType = 'paved' | 'unpaved' | 'trail' | 'snow' | 'mixed';
-
-export enum TerrainFeature {
-  FLAT = 'flat',
-  HILLS = 'hills',
-  URBAN = 'urban',
-  TRAIL = 'trail',
-  MOUNTAIN = 'mountain',
-  SLOPES = 'slopes',
-  GROOMED = 'groomed',
-  UNGROOMED = 'ungroomed',
-  WINTER_MAINTAINED = 'winter_maintained',
-  PARK = 'park'
-}
-
-export interface TerrainConditions {
-  elevation: number;
-  surface: SurfaceType;
-  difficulty: TerrainDifficulty;
-  features: TerrainFeature[];
+export interface RoutePreferences {
+  activityType: ActivityType;
+  avoidHighways?: boolean;
+  avoidTraffic?: boolean;
+  preferScenic?: boolean;
+  optimize?: OptimizationType;
+  maxDistance?: number;
+  maxDuration?: number;
+  maxElevationGain?: number;
+  safetyThreshold?: number;
+  weatherSensitivity?: number;
+  terrainSensitivity?: number;
 }
 
 export interface RouteMetrics {
@@ -55,98 +39,101 @@ export interface RouteMetrics {
   };
   safety: number;
   weatherImpact: number | null;
-  terrainDifficulty: TerrainDifficulty;
-  surfaceType: SurfaceType;
-  trafficLevel?: number;
-  shadePercentage?: number;
-  snowQuality?: number;
-  icyConditions?: number;
-  bikeLaneCoverage?: number;
-  pointsOfInterest?: Array<{
-    type: string;
-    location: GeoPoint;
-  }>;
-  weatherConditions?: string;
-  recommendedPace?: number;
-  winterMaintained?: boolean;
-}
-
-export interface RoutePreferences {
-  optimize: OptimizationPreference;
-  avoidHills?: boolean;
-  preferScenic?: boolean;
-  preferBikeLanes?: boolean;
-  avoidTraffic?: boolean;
-  weatherSensitivity?: 'low' | 'medium' | 'high';
-  safetyPriority?: 'normal' | 'maximum';
-  preferGroomed?: boolean;
-  difficultyLevel?: TerrainDifficulty;
-  timeOfDay?: 'flexible' | 'fixed';
-  shadePreference?: 'minimum' | 'moderate' | 'maximum';
-  winterMaintenance?: 'optional' | 'required';
-  weatherAdaptive?: boolean;
-  allowIndoorAlternatives?: boolean;
-  timeFlexible?: boolean;
-  timeWindow?: {
-    start: string;
-    end: string;
-  };
-  targetPace?: number;
-  preferSoftSurface?: boolean;
-  maxDetour?: number;
-  poiTypes?: string[];
-  bikeType?: 'road' | 'mountain' | 'hybrid';
+  terrainDifficulty: string;
+  surfaceType: string;
+  trafficImpact?: number;
+  scenicScore?: number;
+  pointsOfInterest?: number;
+  energyEfficiency?: number;
 }
 
 export interface RouteSegment {
+  id: string;
   startPoint: GeoPoint;
   endPoint: GeoPoint;
   activityType: ActivityType;
+  distance: number;
+  duration: number;
+  metrics: RouteMetrics;
+  waypoints?: GeoPoint[];
+  alternatives?: RouteSegment[];
+}
+
+export interface Route {
+  id: string;
+  name: string;
+  segments: RouteSegment[];
   preferences: RoutePreferences;
-  path?: GeoPoint[];
-  metrics?: RouteMetrics;
+  totalMetrics?: RouteMetrics;
+  createdAt?: Date;
+  updatedAt?: Date;
+  userId?: string;
 }
 
 export interface OptimizationResult {
   path: GeoPoint[];
   metrics: RouteMetrics;
-  alternativeRoutes?: Array<{
-    path: GeoPoint[];
-    metrics: RouteMetrics;
-  }>;
-  weatherWarnings?: string[];
-  indoorAlternatives?: Array<{
-    type: string;
-    location: GeoPoint;
-  }>;
-  recommendedStartTime?: string;
-  alternativeStartTimes?: string[];
-  weatherTransitions?: Array<{
-    point: GeoPoint;
-    conditions: string;
-  }>;
+  warnings?: string[];
+  alternatives?: GeoPoint[][];
+}
+
+export interface DynamicRoutingResult {
+  shouldReroute: boolean;
+  severity: number;
+  reason?: string;
+  alternatives?: Route[];
+}
+
+export interface RouteValidationResult {
+  isValid: boolean;
+  errors?: string[];
   warnings?: string[];
 }
 
-export interface Route {
-  segments: Array<{
-    path: GeoPoint[];
-    metrics: RouteMetrics;
-    type: ActivityType;
-  }>;
-  totalDistance: number;
-  estimatedDuration: number;
-  alternativeRoutes?: OptimizationResult[];
-  weatherWarnings?: string[];
-  indoorAlternatives?: Array<{
-    type: string;
-    location: GeoPoint;
-  }>;
-  recommendedStartTime?: string;
-  alternativeStartTimes?: string[];
-  weatherTransitions?: Array<{
-    point: GeoPoint;
-    conditions: string;
-  }>;
-  warnings?: string[];
+export interface RoutingContext {
+  weather?: WeatherConditions;
+  terrain?: TerrainConditions;
+  traffic?: {
+    level: number;
+    timestamp: Date;
+    confidence: number;
+  };
+  time?: {
+    start: Date;
+    end?: Date;
+  };
+  user?: {
+    preferences: RoutePreferences;
+    history?: {
+      routes: Route[];
+      activities: ActivityType[];
+    };
+  };
+}
+
+export interface OptimizationOptions {
+  considerWeather?: boolean;
+  considerTerrain?: boolean;
+  considerTraffic?: boolean;
+  considerTime?: boolean;
+  considerUserHistory?: boolean;
+  maxAlternatives?: number;
+  optimizationPriority?: OptimizationType[];
+}
+
+export interface RouteUpdateEvent {
+  type: 'weather' | 'traffic' | 'terrain' | 'emergency' | 'maintenance';
+  severity: number;
+  affectedSegments: string[];
+  alternatives?: Route[];
+  timestamp: Date;
+}
+
+export interface PerformanceMetrics {
+  calculationTime: number;
+  optimizationTime: number;
+  weatherAnalysisTime?: number;
+  terrainAnalysisTime?: number;
+  trafficAnalysisTime?: number;
+  totalTime: number;
 }

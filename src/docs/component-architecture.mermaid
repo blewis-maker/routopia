@@ -1,0 +1,55 @@
+graph TB
+    subgraph Core Navigation
+        Shell[Shell Layout]
+        Nav[Navigation System]
+        Cmd[Command Palette]
+    end
+
+    subgraph Feature Modules
+        RouteP[Route Planner]
+        ActH[Activity Hub]
+        POIE[POI Explorer]
+        Prof[Profile Dashboard]
+    end
+
+    subgraph Shared Components
+        Map[MapView System]
+        Chat[AI Chat Interface]
+        Weather[Weather Widget]
+        Activity[Activity Tracker]
+    end
+
+    subgraph State Management
+        Global[Global State]
+        Route[Route State]
+        User[User Context]
+        AI[AI Context]
+    end
+
+    Shell --> Nav
+    Shell --> Cmd
+    Shell --> Global
+
+    RouteP --> Map
+    RouteP --> Weather
+    RouteP --> Chat
+
+    ActH --> Activity
+    ActH --> Weather
+    ActH --> Chat
+
+    POIE --> Map
+    POIE --> Weather
+    POIE --> Chat
+
+    Map --> Route
+    Chat --> AI
+    Nav --> User
+
+    classDef complete fill:#4ade80,stroke:#16a34a,color:#fff
+    classDef progress fill:#fbbf24,stroke:#d97706,color:#fff
+    classDef pending fill:#9ca3af,stroke:#4b5563,color:#fff
+
+    class Shell,Nav,Map,Chat complete
+    class RouteP,ActH,Weather,AI progress
+    class POIE,Prof,Activity pending

@@ -1,177 +1,387 @@
-import { WeatherService } from '@/services/weather/WeatherService';
-import { MCPIntegrationService } from '@/services/mcp/MCPIntegrationService';
 import { RealTimeOptimizer } from '@/services/route/RealTimeOptimizer';
-import { 
-  ActivityType, 
-  GeoPoint, 
-  WeatherConditions,
-  TerrainConditions,
-  TerrainDifficulty,
-  TerrainFeature
-} from '@/types';
+import { WeatherService } from '@/services/weather/WeatherService';
+import { MCPIntegrationService } from '@/services/integration/MCPIntegrationService';
+import { ActivityType, ActivitySegment } from '@/types/activity/types';
+import { OptimizationPreference } from '@/types/route/types';
 
-describe('Route Optimization Performance Benchmarks', () => {
+jest.mock('@/services/weather/WeatherService');
+jest.mock('@/services/integration/MCPIntegrationService');
+
+describe('Route Optimization Performance', () => {
   let optimizer: RealTimeOptimizer;
-  let weatherService: jest.Mocked<WeatherService>;
-  let mcpService: jest.Mocked<MCPIntegrationService>;
+  let mockWeatherService: jest.Mocked<WeatherService>;
+  let mockMCPService: jest.Mocked<MCPIntegrationService>;
 
-  const mockStartPoint: GeoPoint = { lat: 45.5, lng: -122.6 };
-  const mockEndPoint: GeoPoint = { lat: 45.6, lng: -122.7 };
+  const generatePoints = (count: number) => {
+    const points = [];
+    const basePoint = { lat: 40.7128, lng: -74.0060 };
+    for (let i = 0; i < count; i++) {
+      points.push({
+        lat: basePoint.lat + (i * 0.01),
+        lng: basePoint.lng + (i * 0.01)
+      });
+    }
+    return points;
+  };
 
   beforeEach(() => {
-    weatherService = {
-      getWeatherForLocation: jest.fn(),
+    mockWeatherService = {
+      getWeatherForLocation: jest.fn().mockResolvedValue({
+        temperature: 20,
+        conditions: 'clear',
+        windSpeed: 10,
+        visibility: 10000
+      })
     } as any;
-    mcpService = {
-      getTerrainConditions: jest.fn(),
+
+    mockMCPService = {
+      getTrafficData: jest.fn().mockResolvedValue({
+        segments: [],
+        trafficLights: [],
+        stopSigns: [],
+        incidents: [],
+        majorIntersections: []
+      }),
+      getRoadConditions: jest.fn().mockResolvedValue({
+        overall: 'good',
+        segments: [],
+        warnings: []
+      }),
+      getTerrainConditions: jest.fn().mockResolvedValue({
+        type: 'urban',
+        difficulty: 'moderate',
+        surface: 'paved'
+      }),
+      getElevationProfile: jest.fn().mockResolvedValue([0, 10, 20, 10, 0]),
+      getBaseRoute: jest.fn().mockImplementation((start, end) => [start, end])
     } as any;
-    optimizer = new RealTimeOptimizer(weatherService, mcpService);
+
+    optimizer = new RealTimeOptimizer(mockWeatherService, mockMCPService);
   });
 
-  describe('Single Route Optimization', () => {
-    it('should optimize simple route within 100ms', async () => {
-      const startTime = performance.now();
-
-      await optimizer.optimizeRoute(
-        mockStartPoint,
-        mockEndPoint,
-        ActivityType.WALK,
+  describe('Single Segment Performance', () => {
+    it('should optimize simple routes within 100ms', async () => {
+      const points = generatePoints(2);
+      const segments: ActivitySegment[] = [
         {
-          optimize: 'TIME',
-          avoidHills: true
+          type: ActivityType.WALK,
+          startPoint: points[0],
+          endPoint: points[1],
+          metrics: null,
+          waypoints: []
         }
-      );
+      ];
 
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-      
+      const startTime = Date.now();
+      await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.WALK
+      });
+      const duration = Date.now() - startTime;
+
       expect(duration).toBeLessThan(100);
     });
 
-    it('should optimize complex route with weather within 200ms', async () => {
-      const weather: WeatherConditions = {
-        temperature: 20,
-        precipitation: 0,
-        windSpeed: 5,
-        conditions: 'clear',
-        visibility: 10000
-      };
+    it('should handle complex routes within 200ms', async () => {
+      mockMCPService.getTrafficData.mockResolvedValue({
+        segments: Array(100).fill({
+          congestionLevel: 0.5,
+          length: 100
+        }),
+        trafficLights: Array(20).fill({}),
+        stopSigns: Array(10).fill({}),
+        incidents: Array(5).fill({}),
+        majorIntersections: Array(10).fill({})
+      });
 
-      const terrain: TerrainConditions = {
-        elevation: 100,
-        surface: 'trail',
-        difficulty: TerrainDifficulty.MODERATE,
-        features: [TerrainFeature.HILLS, TerrainFeature.TRAIL]
-      };
-
-      const startTime = performance.now();
-
-      await optimizer.optimizeRoute(
-        mockStartPoint,
-        mockEndPoint,
-        ActivityType.RUN,
+      const points = generatePoints(2);
+      const segments: ActivitySegment[] = [
         {
-          optimize: 'TERRAIN',
-          weatherSensitivity: 'high',
-          preferScenic: true,
-          avoidTraffic: true
-        },
-        weather,
-        terrain
-      );
+          type: ActivityType.CAR,
+          startPoint: points[0],
+          endPoint: points[1],
+          metrics: null,
+          waypoints: []
+        }
+      ];
 
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-      
+      const startTime = Date.now();
+      await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.CAR,
+        avoidTraffic: true,
+        preferScenic: true
+      });
+      const duration = Date.now() - startTime;
+
       expect(duration).toBeLessThan(200);
     });
   });
 
-  describe('Multiple Route Alternatives', () => {
-    it('should generate 3 alternatives within 300ms', async () => {
-      const startTime = performance.now();
-
-      const result = await optimizer.optimizeRoute(
-        mockStartPoint,
-        mockEndPoint,
-        ActivityType.BIKE,
-        {
-          optimize: 'DISTANCE',
-          timeFlexible: true,
-          maxDetour: 1000
-        }
-      );
-
-      const endTime = performance.now();
-      const duration = endTime - startTime;
+  describe('Multi-Segment Performance', () => {
+    it('should handle 5-segment routes within 500ms', async () => {
+      const points = generatePoints(6);
+      const segments: ActivitySegment[] = [];
       
-      expect(duration).toBeLessThan(300);
-      expect(result.alternativeRoutes).toHaveLength(3);
-    });
-  });
+      for (let i = 0; i < 5; i++) {
+        segments.push({
+          type: ActivityType.WALK,
+          startPoint: points[i],
+          endPoint: points[i + 1],
+          metrics: null,
+          waypoints: []
+        });
+      }
 
-  describe('Weather Impact Analysis', () => {
-    it('should process weather transitions within 150ms', async () => {
-      const weatherTransitions: WeatherConditions[] = [
+      const startTime = Date.now();
+      await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.WALK
+      });
+      const duration = Date.now() - startTime;
+
+      expect(duration).toBeLessThan(500);
+    });
+
+    it('should optimize mixed activity routes within 1000ms', async () => {
+      const points = generatePoints(4);
+      const segments: ActivitySegment[] = [
         {
-          temperature: 18,
-          precipitation: 0,
-          windSpeed: 5,
-          conditions: 'clear',
-          visibility: 10000
+          type: ActivityType.CAR,
+          startPoint: points[0],
+          endPoint: points[1],
+          metrics: null,
+          waypoints: []
         },
         {
-          temperature: 16,
-          precipitation: 5,
-          windSpeed: 10,
-          conditions: 'rain',
-          visibility: 5000
+          type: ActivityType.WALK,
+          startPoint: points[1],
+          endPoint: points[2],
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.BIKE,
+          startPoint: points[2],
+          endPoint: points[3],
+          metrics: null,
+          waypoints: []
         }
       ];
 
-      const startTime = performance.now();
+      const startTime = Date.now();
+      await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.CAR
+      });
+      const duration = Date.now() - startTime;
 
-      const result = await optimizer.optimizeRoute(
-        mockStartPoint,
-        mockEndPoint,
-        ActivityType.RUN,
+      expect(duration).toBeLessThan(1000);
+    });
+  });
+
+  describe('Concurrent Optimization Performance', () => {
+    it('should handle 10 concurrent optimizations within 2000ms', async () => {
+      const points = generatePoints(2);
+      const segments: ActivitySegment[] = [
         {
-          optimize: 'SAFETY',
-          weatherAdaptive: true
-        },
-        weatherTransitions[0]
+          type: ActivityType.WALK,
+          startPoint: points[0],
+          endPoint: points[1],
+          metrics: null,
+          waypoints: []
+        }
+      ];
+
+      const startTime = Date.now();
+      const promises = Array(10).fill(null).map(() =>
+        optimizer.optimizeMultiSegmentRoute(segments, {
+          optimize: OptimizationPreference.TIME,
+          activityType: ActivityType.WALK
+        })
       );
 
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-      
-      expect(duration).toBeLessThan(150);
-      expect(result.weatherTransitions).toBeDefined();
+      await Promise.all(promises);
+      const duration = Date.now() - startTime;
+
+      expect(duration).toBeLessThan(2000);
+    });
+
+    it('should maintain performance under load', async () => {
+      const points = generatePoints(3);
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.CAR,
+          startPoint: points[0],
+          endPoint: points[1],
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.WALK,
+          startPoint: points[1],
+          endPoint: points[2],
+          metrics: null,
+          waypoints: []
+        }
+      ];
+
+      const durations: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        const startTime = Date.now();
+        await optimizer.optimizeMultiSegmentRoute(segments, {
+          optimize: OptimizationPreference.TIME,
+          activityType: ActivityType.CAR
+        });
+        durations.push(Date.now() - startTime);
+      }
+
+      const averageDuration = durations.reduce((a, b) => a + b) / durations.length;
+      const maxDuration = Math.max(...durations);
+      const variance = Math.sqrt(
+        durations.reduce((acc, val) => acc + Math.pow(val - averageDuration, 2), 0) / durations.length
+      );
+
+      expect(averageDuration).toBeLessThan(300);
+      expect(maxDuration).toBeLessThan(500);
+      expect(variance).toBeLessThan(100);
     });
   });
 
   describe('Memory Usage', () => {
-    it('should maintain reasonable memory usage for large routes', async () => {
+    it('should handle large route data efficiently', async () => {
+      const points = generatePoints(100);
+      const segments: ActivitySegment[] = [];
+      
+      for (let i = 0; i < 99; i++) {
+        segments.push({
+          type: ActivityType.WALK,
+          startPoint: points[i],
+          endPoint: points[i + 1],
+          metrics: null,
+          waypoints: []
+        });
+      }
+
+      const initialMemory = process.memoryUsage().heapUsed;
+      await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.WALK
+      });
+      const finalMemory = process.memoryUsage().heapUsed;
+
+      const memoryIncrease = (finalMemory - initialMemory) / 1024 / 1024; // MB
+      expect(memoryIncrease).toBeLessThan(50);
+    });
+
+    it('should clean up resources after optimization', async () => {
+      const points = generatePoints(10);
+      const segments: ActivitySegment[] = [];
+      
+      for (let i = 0; i < 9; i++) {
+        segments.push({
+          type: ActivityType.WALK,
+          startPoint: points[i],
+          endPoint: points[i + 1],
+          metrics: null,
+          waypoints: []
+        });
+      }
+
       const initialMemory = process.memoryUsage().heapUsed;
       
-      // Generate a long route with many points
-      const longRoute = await optimizer.optimizeRoute(
-        mockStartPoint,
-        { lat: mockEndPoint.lat + 1, lng: mockEndPoint.lng + 1 },
-        ActivityType.BIKE,
-        {
-          optimize: 'DISTANCE',
-          preferScenic: true,
-          maxDetour: 5000
-        }
-      );
+      // Run multiple optimizations
+      for (let i = 0; i < 10; i++) {
+        await optimizer.optimizeMultiSegmentRoute(segments, {
+          optimize: OptimizationPreference.TIME,
+          activityType: ActivityType.WALK
+        });
+      }
+
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc();
+      }
 
       const finalMemory = process.memoryUsage().heapUsed;
-      const memoryIncrease = finalMemory - initialMemory;
+      const memoryIncrease = (finalMemory - initialMemory) / 1024 / 1024; // MB
       
-      // Memory increase should be less than 50MB
-      expect(memoryIncrease).toBeLessThan(50 * 1024 * 1024);
-      expect(longRoute.path.length).toBeGreaterThan(100);
+      expect(memoryIncrease).toBeLessThan(10);
     });
   });
+
+  describe('Service Response Times', () => {
+    it('should handle slow weather service gracefully', async () => {
+      mockWeatherService.getWeatherForLocation.mockImplementation(
+        () => new Promise(resolve => setTimeout(resolve, 1000))
+      );
+
+      const points = generatePoints(2);
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.WALK,
+          startPoint: points[0],
+          endPoint: points[1],
+          metrics: null,
+          waypoints: []
+        }
+      ];
+
+      const startTime = Date.now();
+      await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.WALK
+      });
+      const duration = Date.now() - startTime;
+
+      expect(duration).toBeLessThan(1500); // Allow some overhead
+    });
+
+    it('should optimize service calls for multi-segment routes', async () => {
+      let weatherCalls = 0;
+      let terrainCalls = 0;
+
+      mockWeatherService.getWeatherForLocation.mockImplementation(async () => {
+        weatherCalls++;
+        return {
+          temperature: 20,
+          conditions: 'clear',
+          windSpeed: 10,
+          visibility: 10000
+        };
+      });
+
+      mockMCPService.getTerrainConditions.mockImplementation(async () => {
+        terrainCalls++;
+        return {
+          type: 'urban',
+          difficulty: 'moderate',
+          surface: 'paved'
+        };
+      });
+
+      const points = generatePoints(5);
+      const segments: ActivitySegment[] = [];
+      
+      for (let i = 0; i < 4; i++) {
+        segments.push({
+          type: ActivityType.WALK,
+          startPoint: points[i],
+          endPoint: points[i + 1],
+          metrics: null,
+          waypoints: []
+        });
+      }
+
+      await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.WALK
+      });
+
+      // Should batch or cache similar requests
+      expect(weatherCalls).toBeLessThan(segments.length * 2);
+      expect(terrainCalls).toBeLessThan(segments.length * 2);
+    });
+  });
+}); 
 }); 

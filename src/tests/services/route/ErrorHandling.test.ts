@@ -1,240 +1,403 @@
-import { WeatherService } from '@/services/weather/WeatherService';
-import { MCPIntegrationService } from '@/services/mcp/MCPIntegrationService';
 import { RealTimeOptimizer } from '@/services/route/RealTimeOptimizer';
-import { 
-  ActivityType, 
-  GeoPoint, 
-  WeatherConditions,
-  TerrainConditions,
-  TerrainDifficulty,
-  TerrainFeature
-} from '@/types';
+import { WeatherService } from '@/services/weather/WeatherService';
+import { MCPIntegrationService } from '@/services/integration/MCPIntegrationService';
+import { ActivityType, ActivitySegment } from '@/types/activity/types';
+import { OptimizationPreference } from '@/types/route/types';
+
+jest.mock('@/services/weather/WeatherService');
+jest.mock('@/services/integration/MCPIntegrationService');
 
 describe('Route Optimization Error Handling', () => {
   let optimizer: RealTimeOptimizer;
-  let weatherService: jest.Mocked<WeatherService>;
-  let mcpService: jest.Mocked<MCPIntegrationService>;
+  let mockWeatherService: jest.Mocked<WeatherService>;
+  let mockMCPService: jest.Mocked<MCPIntegrationService>;
 
-  const mockStartPoint: GeoPoint = { lat: 45.5, lng: -122.6 };
-  const mockEndPoint: GeoPoint = { lat: 45.6, lng: -122.7 };
+  const mockPoints = {
+    start: { lat: 40.7128, lng: -74.0060 },
+    middle: { lat: 40.7589, lng: -73.9851 },
+    end: { lat: 40.7931, lng: -73.9712 }
+  };
 
   beforeEach(() => {
-    weatherService = {
-      getWeatherForLocation: jest.fn(),
+    mockWeatherService = {
+      getWeatherForLocation: jest.fn().mockResolvedValue({
+        temperature: 20,
+        conditions: 'clear',
+        windSpeed: 10,
+        visibility: 10000
+      })
     } as any;
-    mcpService = {
-      getTerrainConditions: jest.fn(),
+
+    mockMCPService = {
+      getTrafficData: jest.fn().mockResolvedValue({
+        segments: [],
+        trafficLights: [],
+        stopSigns: [],
+        incidents: [],
+        majorIntersections: []
+      }),
+      getRoadConditions: jest.fn().mockResolvedValue({
+        overall: 'good',
+        segments: [],
+        warnings: []
+      }),
+      getTerrainConditions: jest.fn().mockResolvedValue({
+        type: 'urban',
+        difficulty: 'moderate',
+        surface: 'paved'
+      }),
+      getElevationProfile: jest.fn().mockResolvedValue([0, 10, 20, 10, 0]),
+      getBaseRoute: jest.fn().mockImplementation((start, end) => [start, end])
     } as any;
-    optimizer = new RealTimeOptimizer(weatherService, mcpService);
-  });
 
-  describe('Invalid Input Handling', () => {
-    it('should handle invalid coordinates gracefully', async () => {
-      const invalidStartPoint: GeoPoint = { lat: 91, lng: -122.6 }; // Invalid latitude
-
-      await expect(
-        optimizer.optimizeRoute(
-          invalidStartPoint,
-          mockEndPoint,
-          ActivityType.WALK,
-          { optimize: 'TIME' }
-        )
-      ).rejects.toThrow('Invalid coordinates');
-    });
-
-    it('should handle missing required preferences', async () => {
-      await expect(
-        optimizer.optimizeRoute(
-          mockStartPoint,
-          mockEndPoint,
-          ActivityType.BIKE,
-          {} as any
-        )
-      ).rejects.toThrow('Missing required optimization preference');
-    });
-
-    it('should validate activity type compatibility', async () => {
-      const snowTerrain: TerrainConditions = {
-        elevation: 1800,
-        surface: 'snow',
-        difficulty: TerrainDifficulty.HARD,
-        features: [TerrainFeature.SLOPES]
-      };
-
-      await expect(
-        optimizer.optimizeRoute(
-          mockStartPoint,
-          mockEndPoint,
-          ActivityType.BIKE,
-          { optimize: 'SNOW_CONDITIONS' },
-          undefined,
-          snowTerrain
-        )
-      ).rejects.toThrow('Incompatible activity type for snow conditions');
-    });
+    optimizer = new RealTimeOptimizer(mockWeatherService, mockMCPService);
   });
 
   describe('Service Failures', () => {
-    it('should handle weather service failures', async () => {
-      weatherService.getWeatherForLocation.mockRejectedValue(new Error('Weather service unavailable'));
-
-      const result = await optimizer.optimizeRoute(
-        mockStartPoint,
-        mockEndPoint,
-        ActivityType.WALK,
-        { optimize: 'SAFETY' }
+    it('should handle weather service failures gracefully', async () => {
+      mockWeatherService.getWeatherForLocation.mockRejectedValue(
+        new Error('Weather service unavailable')
       );
 
-      expect(result.warnings).toContain('Weather data unavailable');
-      expect(result.path).toBeDefined(); // Should still provide a basic route
-    });
-
-    it('should handle terrain service failures', async () => {
-      mcpService.getTerrainConditions.mockRejectedValue(new Error('Terrain service unavailable'));
-
-      const result = await optimizer.optimizeRoute(
-        mockStartPoint,
-        mockEndPoint,
-        ActivityType.HIKE,
-        { optimize: 'TERRAIN' }
-      );
-
-      expect(result.warnings).toContain('Terrain data unavailable');
-      expect(result.path).toBeDefined();
-    });
-
-    it('should handle multiple service failures gracefully', async () => {
-      weatherService.getWeatherForLocation.mockRejectedValue(new Error('Weather service error'));
-      mcpService.getTerrainConditions.mockRejectedValue(new Error('Terrain service error'));
-
-      const result = await optimizer.optimizeRoute(
-        mockStartPoint,
-        mockEndPoint,
-        ActivityType.RUN,
+      const segments: ActivitySegment[] = [
         {
-          optimize: 'SAFETY',
-          weatherSensitivity: 'high'
+          type: ActivityType.WALK,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
         }
+      ];
+
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.WALK
+      });
+
+      expect(result).toBeDefined();
+      expect(result.segments[0].metrics).toBeDefined();
+      expect(result.segments[0].metrics.weather).toBeNull();
+    });
+
+    it('should handle MCP service failures gracefully', async () => {
+      mockMCPService.getTrafficData.mockRejectedValue(
+        new Error('Traffic data unavailable')
       );
 
-      expect(result.warnings).toContain('Limited optimization available');
-      expect(result.path).toBeDefined();
-      expect(result.alternativeRoutes).toHaveLength(0);
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.CAR,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
+        }
+      ];
+
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.CAR
+      });
+
+      expect(result).toBeDefined();
+      expect(result.segments[0].metrics.trafficDelay).toBe(0);
+      expect(result.warnings).toContain('Traffic data unavailable');
+    });
+
+    it('should handle terrain service failures gracefully', async () => {
+      mockMCPService.getTerrainConditions.mockRejectedValue(
+        new Error('Terrain data unavailable')
+      );
+
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.BIKE,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
+        }
+      ];
+
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.BIKE
+      });
+
+      expect(result).toBeDefined();
+      expect(result.segments[0].metrics.terrain).toBeNull();
+      expect(result.warnings).toContain('Terrain data unavailable');
+    });
+  });
+
+  describe('Invalid Input Handling', () => {
+    it('should handle invalid coordinates', async () => {
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.WALK,
+          startPoint: { lat: 91, lng: -74.0060 }, // Invalid latitude
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
+        }
+      ];
+
+      await expect(
+        optimizer.optimizeMultiSegmentRoute(segments, {
+          optimize: OptimizationPreference.TIME,
+          activityType: ActivityType.WALK
+        })
+      ).rejects.toThrow('Invalid coordinates');
+    });
+
+    it('should handle empty segment array', async () => {
+      await expect(
+        optimizer.optimizeMultiSegmentRoute([], {
+          optimize: OptimizationPreference.TIME,
+          activityType: ActivityType.WALK
+        })
+      ).rejects.toThrow('No segments provided');
+    });
+
+    it('should handle invalid activity types', async () => {
+      const segments: ActivitySegment[] = [
+        {
+          type: 'INVALID' as ActivityType,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
+        }
+      ];
+
+      await expect(
+        optimizer.optimizeMultiSegmentRoute(segments, {
+          optimize: OptimizationPreference.TIME,
+          activityType: ActivityType.WALK
+        })
+      ).rejects.toThrow('Invalid activity type');
+    });
+  });
+
+  describe('Partial Data Handling', () => {
+    it('should handle missing weather data for some segments', async () => {
+      mockWeatherService.getWeatherForLocation
+        .mockResolvedValueOnce({
+          temperature: 20,
+          conditions: 'clear',
+          windSpeed: 10,
+          visibility: 10000
+        })
+        .mockRejectedValueOnce(new Error('Weather data unavailable'))
+        .mockResolvedValueOnce({
+          temperature: 18,
+          conditions: 'rain',
+          windSpeed: 15,
+          visibility: 5000
+        });
+
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.WALK,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.middle,
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.WALK,
+          startPoint: mockPoints.middle,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
+        }
+      ];
+
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.WALK
+      });
+
+      expect(result.segments[0].metrics.weather).toBeDefined();
+      expect(result.segments[1].metrics.weather).toBeNull();
+      expect(result.warnings).toContain('Weather data partially unavailable');
+    });
+
+    it('should handle missing terrain data for some segments', async () => {
+      mockMCPService.getTerrainConditions
+        .mockResolvedValueOnce({
+          type: 'urban',
+          difficulty: 'moderate',
+          surface: 'paved'
+        })
+        .mockRejectedValueOnce(new Error('Terrain data unavailable'));
+
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.BIKE,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.middle,
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.BIKE,
+          startPoint: mockPoints.middle,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
+        }
+      ];
+
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.BIKE
+      });
+
+      expect(result.segments[0].metrics.terrain).toBeDefined();
+      expect(result.segments[1].metrics.terrain).toBeNull();
+      expect(result.warnings).toContain('Terrain data partially unavailable');
+    });
+  });
+
+  describe('Recovery Strategies', () => {
+    it('should use fallback values when services fail', async () => {
+      mockMCPService.getTrafficData.mockRejectedValue(
+        new Error('Traffic data unavailable')
+      );
+      mockMCPService.getRoadConditions.mockRejectedValue(
+        new Error('Road conditions unavailable')
+      );
+
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.CAR,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
+        }
+      ];
+
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.CAR
+      });
+
+      expect(result.segments[0].metrics.trafficDelay).toBe(0);
+      expect(result.segments[0].metrics.stopCount).toBe(0);
+      expect(result.warnings).toContain('Using default traffic conditions');
+    });
+
+    it('should handle concurrent service failures', async () => {
+      mockWeatherService.getWeatherForLocation.mockRejectedValue(
+        new Error('Weather service unavailable')
+      );
+      mockMCPService.getTrafficData.mockRejectedValue(
+        new Error('Traffic data unavailable')
+      );
+      mockMCPService.getTerrainConditions.mockRejectedValue(
+        new Error('Terrain data unavailable')
+      );
+
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.CAR,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.middle,
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.WALK,
+          startPoint: mockPoints.middle,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
+        }
+      ];
+
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.CAR
+      });
+
+      expect(result).toBeDefined();
+      expect(result.segments).toHaveLength(2);
+      expect(result.warnings).toContain('Multiple services unavailable');
+      expect(result.warnings).toContain('Using fallback optimization strategy');
     });
   });
 
   describe('Edge Cases', () => {
     it('should handle zero-distance routes', async () => {
-      const result = await optimizer.optimizeRoute(
-        mockStartPoint,
-        mockStartPoint,
-        ActivityType.WALK,
-        { optimize: 'TIME' }
-      );
+      const samePoint = mockPoints.start;
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.WALK,
+          startPoint: samePoint,
+          endPoint: samePoint,
+          metrics: null,
+          waypoints: []
+        }
+      ];
 
-      expect(result.path).toEqual([mockStartPoint]);
-      expect(result.metrics.distance).toBe(0);
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.WALK
+      });
+
+      expect(result.segments[0].metrics.distance).toBe(0);
+      expect(result.segments[0].metrics.duration).toBe(0);
+      expect(result.warnings).toContain('Zero-distance route segment detected');
     });
 
     it('should handle extremely long routes', async () => {
-      const farEndPoint: GeoPoint = { lat: mockEndPoint.lat + 10, lng: mockEndPoint.lng + 10 };
-
-      const result = await optimizer.optimizeRoute(
-        mockStartPoint,
-        farEndPoint,
-        ActivityType.BIKE,
-        { optimize: 'DISTANCE' }
-      );
-
-      expect(result.warnings).toContain('Route exceeds recommended distance');
-      expect(result.alternativeRoutes).toBeDefined();
-    });
-
-    it('should handle routes crossing date line', async () => {
-      const dateLineCrossing: GeoPoint = { lat: 45.5, lng: 179.9 };
-      const dateLineCrossing2: GeoPoint = { lat: 45.5, lng: -179.9 };
-
-      const result = await optimizer.optimizeRoute(
-        dateLineCrossing,
-        dateLineCrossing2,
-        ActivityType.BIKE,
-        { optimize: 'DISTANCE' }
-      );
-
-      expect(result.path.length).toBeGreaterThan(0);
-      expect(result.warnings).not.toContain('Invalid route calculation');
-    });
-  });
-
-  describe('Recovery Strategies', () => {
-    it('should fallback to simplified optimization when services fail', async () => {
-      weatherService.getWeatherForLocation.mockRejectedValue(new Error('Service unavailable'));
-
-      const result = await optimizer.optimizeRoute(
-        mockStartPoint,
-        mockEndPoint,
-        ActivityType.WALK,
+      const veryFarPoint = { lat: 40.7128, lng: 0 }; // Across the ocean
+      const segments: ActivitySegment[] = [
         {
-          optimize: 'SAFETY',
-          weatherSensitivity: 'high'
+          type: ActivityType.CAR,
+          startPoint: mockPoints.start,
+          endPoint: veryFarPoint,
+          metrics: null,
+          waypoints: []
         }
-      );
+      ];
 
-      expect(result.path).toBeDefined();
-      expect(result.warnings).toContain('Using simplified optimization');
-    });
-
-    it('should retry failed service calls', async () => {
-      let attempts = 0;
-      weatherService.getWeatherForLocation.mockImplementation(() => {
-        attempts++;
-        if (attempts < 3) {
-          return Promise.reject(new Error('Temporary failure'));
-        }
-        return Promise.resolve({
-          temperature: 20,
-          precipitation: 0,
-          windSpeed: 5,
-          conditions: 'clear',
-          visibility: 10000
-        });
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.CAR
       });
 
-      const result = await optimizer.optimizeRoute(
-        mockStartPoint,
-        mockEndPoint,
-        ActivityType.RUN,
-        { optimize: 'SAFETY' }
-      );
-
-      expect(attempts).toBe(3);
-      expect(result.warnings).not.toContain('Weather data unavailable');
+      expect(result.warnings).toContain('Route distance exceeds recommended limit');
+      expect(result.warnings).toContain('Optimization may be less accurate');
     });
 
-    it('should maintain data consistency during partial failures', async () => {
-      const weather: WeatherConditions = {
-        temperature: 20,
-        precipitation: 0,
-        windSpeed: 5,
-        conditions: 'clear',
-        visibility: 10000
-      };
-
-      weatherService.getWeatherForLocation.mockResolvedValue(weather);
-      mcpService.getTerrainConditions.mockRejectedValue(new Error('Service unavailable'));
-
-      const result = await optimizer.optimizeRoute(
-        mockStartPoint,
-        mockEndPoint,
-        ActivityType.HIKE,
+    it('should handle invalid segment transitions', async () => {
+      const segments: ActivitySegment[] = [
         {
-          optimize: 'TERRAIN',
-          weatherSensitivity: 'high'
+          type: ActivityType.CAR,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.middle,
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.SKI,
+          startPoint: mockPoints.middle,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
         }
-      );
+      ];
 
-      expect(result.metrics.weatherImpact).toBeDefined();
-      expect(result.metrics.terrainDifficulty).toBe(TerrainDifficulty.UNKNOWN);
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.CAR
+      });
+
+      expect(result.warnings).toContain('Unusual activity type transition detected');
+      expect(result.transitions[0].duration).toBeGreaterThan(600); // Extra transition time
     });
   });
 }); 

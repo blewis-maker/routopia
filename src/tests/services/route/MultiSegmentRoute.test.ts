@@ -1,362 +1,326 @@
-import {
-  MockWeatherService,
-  MockPOIService,
-  MockMCPService,
-  MockRealTimeOptimizer,
-  createMockRouteResult
-} from '../../mocks/services/route/MockRouteServices';
-import { RouteService } from '@/services/route/RouteService';
-import { 
-  RouteSegment, 
-  RouteType, 
-  OptimizationPreference,
-  RouteMetrics,
-  TerrainConditions,
-  OptimizationResult
-} from '@/types/route/types';
-import { WeatherConditions } from '@/types/weather';
-import { GeoPoint } from '@/types/geo';
+import { RealTimeOptimizer } from '@/services/route/RealTimeOptimizer';
+import { WeatherService } from '@/services/weather/WeatherService';
+import { MCPIntegrationService } from '@/services/integration/MCPIntegrationService';
+import { ActivityType, ActivitySegment } from '@/types/activity/types';
+import { OptimizationPreference } from '@/types/route/types';
 
-describe('Multi-Segment Route System', () => {
-  let routeService: RouteService;
-  let mockOptimizer: MockRealTimeOptimizer;
-  let mockWeatherService: MockWeatherService;
-  let mockPOIService: MockPOIService;
-  let mockMCPService: MockMCPService;
+jest.mock('@/services/weather/WeatherService');
+jest.mock('@/services/integration/MCPIntegrationService');
 
-  const mockStartPoint: GeoPoint = { lat: 40.7128, lng: -74.0060 }; // NYC
-  const mockEndPoint: GeoPoint = { lat: 40.7614, lng: -73.9776 }; // Central Park
-  const mockWaypoint: GeoPoint = { lat: 40.7505, lng: -73.9934 }; // Empire State
+describe('MultiSegmentRoute', () => {
+  let optimizer: RealTimeOptimizer;
+  let mockWeatherService: jest.Mocked<WeatherService>;
+  let mockMCPService: jest.Mocked<MCPIntegrationService>;
+
+  const mockPoints = {
+    start: { lat: 40.7128, lng: -74.0060 },
+    middle1: { lat: 40.7589, lng: -73.9851 },
+    middle2: { lat: 40.7829, lng: -73.9654 },
+    end: { lat: 40.7931, lng: -73.9712 }
+  };
 
   beforeEach(() => {
-    mockWeatherService = new MockWeatherService();
-    mockPOIService = new MockPOIService();
-    mockMCPService = new MockMCPService();
-    mockOptimizer = new MockRealTimeOptimizer(mockWeatherService, mockMCPService);
-    routeService = new RouteService(mockOptimizer, mockPOIService, mockMCPService);
+    mockWeatherService = {
+      getWeatherForLocation: jest.fn().mockResolvedValue({
+        temperature: 20,
+        conditions: 'clear',
+        windSpeed: 10,
+        visibility: 10000
+      })
+    } as any;
+
+    mockMCPService = {
+      getTrafficData: jest.fn().mockResolvedValue({
+        segments: [
+          {
+            start: mockPoints.start,
+            end: mockPoints.middle1,
+            congestionLevel: 0.3,
+            length: 1000
+          }
+        ],
+        trafficLights: [],
+        stopSigns: [],
+        incidents: [],
+        majorIntersections: []
+      }),
+      getRoadConditions: jest.fn().mockResolvedValue({
+        overall: 'good',
+        segments: [],
+        warnings: []
+      }),
+      getTerrainConditions: jest.fn().mockResolvedValue({
+        type: 'urban',
+        difficulty: 'moderate',
+        surface: 'paved'
+      }),
+      getElevationProfile: jest.fn().mockResolvedValue([0, 10, 20, 10, 0]),
+      getBaseRoute: jest.fn().mockImplementation((start, end) => [start, end]),
+      getBikeLanes: jest.fn().mockResolvedValue({
+        lanes: [],
+        transitions: []
+      }),
+      getSidewalks: jest.fn().mockResolvedValue({
+        paths: [],
+        crossings: []
+      })
+    } as any;
+
+    optimizer = new RealTimeOptimizer(mockWeatherService, mockMCPService);
   });
 
-  describe('Route Segment Creation', () => {
-    it('should create valid multi-segment routes with different activity types', async () => {
-      const mockResult = createMockRouteResult(2);
-      const mockOptResult: OptimizationResult = {
-        path: [mockStartPoint, mockWaypoint],
-        metrics: {
-          distance: 1000,
-          duration: 600,
-          elevation: {
-            gain: 10,
-            loss: 5,
-            profile: []
-          },
-          safety: 0.9,
-          weatherImpact: 0.1,
-          terrainDifficulty: 0.3
-        }
-      };
-
-      mockOptimizer.setMockOptimizationResult(mockOptResult);
-
-      const segments: RouteSegment[] = [
+  describe('optimizeMultiSegmentRoute', () => {
+    it('should optimize a car-walk-bike route correctly', async () => {
+      const segments: ActivitySegment[] = [
         {
-          start: mockStartPoint,
-          end: mockWaypoint,
-          type: 'WALK' as RouteType,
-          preferences: {
-            optimize: 'TIME' as OptimizationPreference,
-            avoidHills: true,
-            preferScenic: true
-          }
+          type: ActivityType.CAR,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.middle1,
+          metrics: null,
+          waypoints: []
         },
         {
-          start: mockWaypoint,
-          end: mockEndPoint,
-          type: 'BIKE' as RouteType,
-          preferences: {
-            optimize: 'DISTANCE' as OptimizationPreference,
-            preferBikeLanes: true
-          }
+          type: ActivityType.WALK,
+          startPoint: mockPoints.middle1,
+          endPoint: mockPoints.middle2,
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.BIKE,
+          startPoint: mockPoints.middle2,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
         }
       ];
 
-      const route = await routeService.createMultiSegmentRoute(segments);
-      
-      expect(route).toBeDefined();
-      expect(route.segments).toHaveLength(2);
-      expect(route.segments[0].type).toBe('WALK');
-      expect(route.segments[1].type).toBe('BIKE');
-      expect(route.totalDistance).toBeGreaterThan(0);
-      expect(route.estimatedDuration).toBeGreaterThan(0);
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.CAR
+      });
+
+      expect(result.segments).toHaveLength(3);
+      expect(result.transitions).toHaveLength(2);
+      expect(result.totalMetrics).toBeDefined();
+      expect(result.totalMetrics.distance).toBeGreaterThan(0);
+      expect(result.totalMetrics.duration).toBeGreaterThan(0);
     });
 
-    it('should handle complex routes with multiple waypoints', async () => {
-      const intermediatePoints = [
-        { lat: 40.7505, lng: -73.9934 }, // Empire State
-        { lat: 40.7527, lng: -73.9772 }, // Grand Central
-        { lat: 40.7587, lng: -73.9787 }, // Rockefeller Center
-      ];
-
-      const mockResult = createMockRouteResult(intermediatePoints.length);
-      const mockOptResult: OptimizationResult = {
-        path: [mockStartPoint, intermediatePoints[0]],
-        metrics: {
-          distance: 1000,
-          duration: 600,
-          elevation: {
-            gain: 10,
-            loss: 5,
-            profile: []
-          },
-          safety: 0.9,
-          weatherImpact: 0.1,
-          terrainDifficulty: 0.3
-        }
-      };
-
-      mockOptimizer.setMockOptimizationResult(mockOptResult);
-
-      const segments = intermediatePoints.map((point, index) => ({
-        start: index === 0 ? mockStartPoint : intermediatePoints[index - 1],
-        end: point,
-        type: 'WALK' as RouteType,
-        preferences: {
-          optimize: 'TIME' as OptimizationPreference,
-          preferScenic: true
-        }
-      }));
-
-      const route = await routeService.createMultiSegmentRoute(segments);
-      
-      expect(route.segments).toHaveLength(intermediatePoints.length);
-      expect(route.segments.every(s => s.path.length > 0)).toBe(true);
-    });
-  });
-
-  describe('Route Optimization', () => {
-    it('should optimize segments based on real-time conditions', async () => {
-      const mockWeather: WeatherConditions = {
-        temperature: 25,
+    it('should handle weather-affected transitions correctly', async () => {
+      mockWeatherService.getWeatherForLocation.mockResolvedValueOnce({
+        temperature: 20,
         conditions: 'rain',
         windSpeed: 15,
-        precipitation: 5,
-        humidity: 80,
-        visibility: 5000,
-        pressure: 1013,
-        uvIndex: 2,
-        cloudCover: 90
-      };
-
-      const mockTerrain: TerrainConditions = {
-        elevation: 50,
-        surface: 'paved',
-        difficulty: 'moderate',
-        features: ['urban', 'hills']
-      };
-
-      mockWeatherService.setMockWeather(mockWeather);
-      mockMCPService.setMockTerrain(mockTerrain);
-
-      const mockOptResult: OptimizationResult = {
-        path: [mockStartPoint, mockWaypoint],
-        metrics: {
-          distance: 1000,
-          duration: 600,
-          elevation: {
-            gain: 10,
-            loss: 5,
-            profile: []
-          },
-          safety: 0.8,
-          weatherImpact: 0.4,
-          terrainDifficulty: 0.5
-        }
-      };
-
-      mockOptimizer.setMockOptimizationResult(mockOptResult);
-
-      const segments: RouteSegment[] = [
-        {
-          start: mockStartPoint,
-          end: mockWaypoint,
-          type: 'WALK' as RouteType,
-          preferences: { optimize: 'SAFETY' as OptimizationPreference }
-        }
-      ];
-
-      const route = await routeService.createMultiSegmentRoute(segments);
-      const metrics = route.segments[0].metrics as RouteMetrics;
-
-      expect(metrics.safety).toBeGreaterThan(0.7);
-      expect(metrics.weatherImpact).toBeDefined();
-      expect(metrics.terrainDifficulty).toBeDefined();
-    });
-
-    it('should handle concurrent optimization requests', async () => {
-      const mockOptResult: OptimizationResult = {
-        path: [mockStartPoint, mockEndPoint],
-        metrics: {
-          distance: 1000,
-          duration: 600,
-          elevation: {
-            gain: 10,
-            loss: 5,
-            profile: []
-          },
-          safety: 0.9,
-          weatherImpact: 0.1,
-          terrainDifficulty: 0.3
-        }
-      };
-
-      mockOptimizer.setMockOptimizationResult(mockOptResult);
-
-      const requests = Array(5).fill(null).map(() => ({
-        segments: [{
-          start: mockStartPoint,
-          end: mockEndPoint,
-          type: 'WALK' as RouteType,
-          preferences: { optimize: 'TIME' as OptimizationPreference }
-        }]
-      }));
-
-      const results = await Promise.all(
-        requests.map(req => routeService.createMultiSegmentRoute(req.segments))
-      );
-
-      expect(results).toHaveLength(5);
-      results.forEach(route => {
-        expect(route.segments).toBeDefined();
-        expect(route.totalDistance).toBeGreaterThan(0);
+        visibility: 8000
       });
-    });
-  });
 
-  describe('Error Handling', () => {
-    it('should handle invalid segment combinations gracefully', async () => {
-      const invalidSegments: RouteSegment[] = [
+      const segments: ActivitySegment[] = [
         {
-          start: mockStartPoint,
-          end: { lat: 90.1, lng: -74.0060 }, // Invalid latitude
-          type: 'WALK' as RouteType,
-          preferences: { optimize: 'TIME' as OptimizationPreference }
+          type: ActivityType.CAR,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.middle1,
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.BIKE,
+          startPoint: mockPoints.middle1,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
         }
       ];
 
-      await expect(
-        routeService.createMultiSegmentRoute(invalidSegments)
-      ).rejects.toThrow('Invalid coordinates');
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.CAR
+      });
+
+      expect(result.transitions[0].duration).toBeGreaterThan(180); // Base bike transition time
     });
 
-    it('should handle service failures gracefully', async () => {
-      mockWeatherService.getWeatherForLocation = jest.fn().mockRejectedValue(
-        new Error('Weather service unavailable')
+    it('should calculate accurate total metrics', async () => {
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.WALK,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.middle1,
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.WALK,
+          startPoint: mockPoints.middle1,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
+        }
+      ];
+
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.WALK
+      });
+
+      const totalDistance = result.segments.reduce(
+        (sum, segment) => sum + segment.metrics.distance,
+        0
+      );
+      const totalDuration = result.segments.reduce(
+        (sum, segment) => sum + segment.metrics.duration,
+        0
       );
 
-      const mockOptResult: OptimizationResult = {
-        path: [mockStartPoint, mockEndPoint],
-        metrics: {
-          distance: 1000,
-          duration: 600,
-          elevation: {
-            gain: 10,
-            loss: 5,
-            profile: []
-          },
-          safety: 0.9,
-          weatherImpact: null,
-          terrainDifficulty: 0.3
-        }
-      };
-
-      mockOptimizer.setMockOptimizationResult(mockOptResult);
-
-      const segments: RouteSegment[] = [{
-        start: mockStartPoint,
-        end: mockEndPoint,
-        type: 'WALK' as RouteType,
-        preferences: { optimize: 'TIME' as OptimizationPreference }
-      }];
-
-      const route = await routeService.createMultiSegmentRoute(segments);
-      
-      expect(route).toBeDefined();
-      expect(route.segments[0].metrics.weatherImpact).toBeNull();
-      expect(route.segments[0].path).toBeDefined();
-    });
-  });
-
-  describe('Performance', () => {
-    it('should optimize routes within acceptable time limits', async () => {
-      const mockOptResult: OptimizationResult = {
-        path: [mockStartPoint, mockEndPoint],
-        metrics: {
-          distance: 1000,
-          duration: 600,
-          elevation: {
-            gain: 10,
-            loss: 5,
-            profile: []
-          },
-          safety: 0.9,
-          weatherImpact: 0.1,
-          terrainDifficulty: 0.3
-        }
-      };
-
-      mockOptimizer.setMockOptimizationResult(mockOptResult);
-
-      const startTime = Date.now();
-      
-      const segments: RouteSegment[] = [{
-        start: mockStartPoint,
-        end: mockEndPoint,
-        type: 'WALK' as RouteType,
-        preferences: { optimize: 'TIME' as OptimizationPreference }
-      }];
-
-      await routeService.createMultiSegmentRoute(segments);
-      
-      const duration = Date.now() - startTime;
-      expect(duration).toBeLessThan(100); // Should be much faster with mocks
+      expect(result.totalMetrics.distance).toBe(totalDistance);
+      expect(result.totalMetrics.duration).toBe(
+        totalDuration + result.transitions[0].duration
+      );
     });
 
-    it('should handle large multi-segment routes efficiently', async () => {
-      const points = Array(10).fill(null).map((_, i) => ({
-        lat: mockStartPoint.lat + (i * 0.01),
-        lng: mockStartPoint.lng + (i * 0.01)
-      }));
+    it('should handle terrain changes between segments', async () => {
+      mockMCPService.getTerrainConditions
+        .mockResolvedValueOnce({
+          type: 'urban',
+          difficulty: 'easy',
+          surface: 'paved'
+        })
+        .mockResolvedValueOnce({
+          type: 'trail',
+          difficulty: 'moderate',
+          surface: 'unpaved'
+        });
 
-      const mockOptResult: OptimizationResult = {
-        path: [points[0], points[1]],
-        metrics: {
-          distance: 1000,
-          duration: 600,
-          elevation: {
-            gain: 10,
-            loss: 5,
-            profile: []
-          },
-          safety: 0.9,
-          weatherImpact: 0.1,
-          terrainDifficulty: 0.3
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.BIKE,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.middle1,
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.WALK,
+          startPoint: mockPoints.middle1,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
         }
-      };
+      ];
 
-      mockOptimizer.setMockOptimizationResult(mockOptResult);
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.BIKE
+      });
 
-      const segments = points.slice(1).map((point, index) => ({
-        start: points[index],
-        end: point,
-        type: 'WALK' as RouteType,
-        preferences: { optimize: 'TIME' as OptimizationPreference }
-      }));
+      expect(result.segments[0].metrics.terrain.type).toBe('urban');
+      expect(result.segments[1].metrics.terrain.type).toBe('trail');
+    });
 
-      const startTime = Date.now();
-      const route = await routeService.createMultiSegmentRoute(segments);
-      const duration = Date.now() - startTime;
+    it('should optimize transitions for efficiency', async () => {
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.CAR,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.middle1,
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.WALK,
+          startPoint: mockPoints.middle1,
+          endPoint: mockPoints.middle2,
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.BIKE,
+          startPoint: mockPoints.middle2,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
+        }
+      ];
 
-      expect(duration).toBeLessThan(500); // Should be much faster with mocks
-      expect(route.segments).toHaveLength(points.length - 1);
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.CAR
+      });
+
+      // Verify that transitions are ordered correctly
+      expect(result.transitions[0].fromType).toBe(ActivityType.CAR);
+      expect(result.transitions[0].toType).toBe(ActivityType.WALK);
+      expect(result.transitions[1].fromType).toBe(ActivityType.WALK);
+      expect(result.transitions[1].toType).toBe(ActivityType.BIKE);
+
+      // Verify that transition points are optimized
+      expect(result.transitions[0].point).toEqual(mockPoints.middle1);
+      expect(result.transitions[1].point).toEqual(mockPoints.middle2);
+    });
+
+    it('should handle complex weather scenarios', async () => {
+      // Simulate changing weather conditions along the route
+      mockWeatherService.getWeatherForLocation
+        .mockResolvedValueOnce({
+          temperature: 20,
+          conditions: 'clear',
+          windSpeed: 10,
+          visibility: 10000
+        })
+        .mockResolvedValueOnce({
+          temperature: 18,
+          conditions: 'rain',
+          windSpeed: 15,
+          visibility: 5000
+        })
+        .mockResolvedValueOnce({
+          temperature: 17,
+          conditions: 'rain',
+          windSpeed: 20,
+          visibility: 3000
+        });
+
+      const segments: ActivitySegment[] = [
+        {
+          type: ActivityType.CAR,
+          startPoint: mockPoints.start,
+          endPoint: mockPoints.middle1,
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.WALK,
+          startPoint: mockPoints.middle1,
+          endPoint: mockPoints.middle2,
+          metrics: null,
+          waypoints: []
+        },
+        {
+          type: ActivityType.BIKE,
+          startPoint: mockPoints.middle2,
+          endPoint: mockPoints.end,
+          metrics: null,
+          waypoints: []
+        }
+      ];
+
+      const result = await optimizer.optimizeMultiSegmentRoute(segments, {
+        optimize: OptimizationPreference.TIME,
+        activityType: ActivityType.CAR
+      });
+
+      // Verify that each segment has appropriate weather adjustments
+      expect(result.segments[0].metrics.weather.conditions).toBe('clear');
+      expect(result.segments[1].metrics.weather.conditions).toBe('rain');
+      expect(result.segments[2].metrics.weather.conditions).toBe('rain');
+
+      // Later segments should have longer durations due to weather
+      const durationPerDistance1 = result.segments[0].metrics.duration / result.segments[0].metrics.distance;
+      const durationPerDistance2 = result.segments[1].metrics.duration / result.segments[1].metrics.distance;
+      const durationPerDistance3 = result.segments[2].metrics.duration / result.segments[2].metrics.distance;
+
+      expect(durationPerDistance2).toBeGreaterThan(durationPerDistance1);
+      expect(durationPerDistance3).toBeGreaterThan(durationPerDistance1);
     });
   });
 }); 
