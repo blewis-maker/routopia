@@ -1,16 +1,15 @@
 export interface WeatherConditions {
   temperature: number;
-  humidity: number;
   conditions: string[];
   windSpeed: number;
-  windDirection?: number;
   precipitation: number;
   visibility: number;
   pressure: number;
+  humidity: number;
+  severity: number;
   uvIndex: number;
   cloudCover: number;
-  feelsLike?: number;
-  dewPoint?: number;
+  timestamp?: Date;
 }
 
 export interface WeatherForecast {

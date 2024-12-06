@@ -2,6 +2,16 @@ import { GeoPoint } from '../geo';
 
 export type TerrainDifficulty = 'easy' | 'intermediate' | 'difficult' | 'expert' | 'extreme';
 
+export type TerrainType = 
+  | 'urban'
+  | 'suburban'
+  | 'rural'
+  | 'forest'
+  | 'mountain'
+  | 'desert'
+  | 'coastal'
+  | 'wetland';
+
 export type SurfaceType = 
   | 'paved' 
   | 'gravel' 
@@ -124,26 +134,14 @@ export interface TerrainUpdateEvent {
 }
 
 export interface TerrainAnalysisResult {
-  conditions: TerrainConditions;
-  risks: {
-    type: TerrainHazard;
-    probability: number;
-    impact: number;
-    mitigations?: string[];
-  }[];
-  recommendations: {
-    maintenance?: {
-      priority: number;
-      type: string;
-      deadline: Date;
-    };
-    routing?: {
-      avoid: boolean;
-      alternatives: GeoPoint[];
-    };
-  };
+  surface: 'dry' | 'wet' | 'icy' | 'snow' | 'unknown';
+  hazards: TerrainHazard[];
+  elevation: number;
+  slope: number;
+  roughness: number;
+  type: TerrainType;
+  features: TerrainFeature[];
   confidence: number;
-  validUntil: Date;
 }
 
 export interface TerrainPerformanceMetrics {

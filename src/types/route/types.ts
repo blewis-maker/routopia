@@ -15,6 +15,8 @@ export type OptimizationType =
   | 'SPEED' 
   | 'RECOVERY';
 
+export type OptimizationLevel = 'basic' | 'advanced' | 'premium';
+
 export interface RoutePreferences {
   activityType: ActivityType;
   avoidHighways?: boolean;
@@ -27,6 +29,15 @@ export interface RoutePreferences {
   safetyThreshold?: number;
   weatherSensitivity?: number;
   terrainSensitivity?: number;
+  avoidTolls?: boolean;
+  weights: {
+    distance: number;
+    duration: number;
+    effort: number;
+    safety: number;
+    comfort: number;
+  };
+  optimizationLevel?: OptimizationLevel;
 }
 
 export interface RouteMetrics {
@@ -49,14 +60,15 @@ export interface RouteMetrics {
 
 export interface RouteSegment {
   id: string;
+  start: GeoPoint;
+  end: GeoPoint;
   startPoint: GeoPoint;
   endPoint: GeoPoint;
-  activityType: ActivityType;
   distance: number;
   duration: number;
+  type: ActivityType;
   metrics: RouteMetrics;
-  waypoints?: GeoPoint[];
-  alternatives?: RouteSegment[];
+  conditions?: TerrainConditions;
 }
 
 export interface Route {

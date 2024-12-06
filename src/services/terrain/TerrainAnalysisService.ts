@@ -1,4 +1,5 @@
 import { WeatherService } from '../weather/WeatherService';
+import { SatelliteTerrainAnalyzer } from './SatelliteTerrainAnalyzer';
 import { 
   TerrainConditions,
   TerrainMesh,
@@ -15,12 +16,44 @@ export class TerrainAnalysisService {
   private qualityCache: Map<string, SurfaceQualityMetrics> = new Map();
   private readonly MESH_CACHE_DURATION = 1000 * 60 * 60; // 1 hour
   private readonly QUALITY_CACHE_DURATION = 1000 * 60 * 15; // 15 minutes
+  private satelliteAnalyzer: SatelliteTerrainAnalyzer;
 
   constructor(
     private weatherService: WeatherService
-  ) {}
+  ) {
+    this.satelliteAnalyzer = new SatelliteTerrainAnalyzer(weatherService, this);
+  }
 
-  async getTerrainConditions(location: GeoPoint): Promise<TerrainAnalysisResult> {
+  async getTerrainConditions(location: GeoPoint, useSatellite: boolean = true): Promise<TerrainAnalysisResult> {
+    try {
+      // Get base terrain analysis
+      const baseAnalysis = await this.performBaseAnalysis(location);
+
+      // Enhance with satellite data if requested and available
+      if (useSatellite) {
+        try {
+          const satelliteAnalysis = await this.satelliteAnalyzer.analyzeTerrain({
+            center: location,
+            radius: 1000, // Default radius
+            resolution: 'high'
+          });
+
+          // Merge base and satellite analysis
+          return this.mergeAnalyses(baseAnalysis, satelliteAnalysis);
+        } catch (error) {
+          console.warn('Satellite analysis failed, using base analysis:', error);
+          return baseAnalysis;
+        }
+      }
+
+      return baseAnalysis;
+    } catch (error) {
+      console.error('Error in terrain analysis:', error);
+      throw new Error('Failed to analyze terrain conditions');
+    }
+  }
+
+  private async performBaseAnalysis(location: GeoPoint): Promise<TerrainAnalysisResult> {
     const startTime = Date.now();
     const performanceMetrics: TerrainPerformanceMetrics = {
       meshGenerationTime: 0,
@@ -32,63 +65,122 @@ export class TerrainAnalysisService {
       lodLevel: 0
     };
 
-    try {
-      // Generate or retrieve terrain mesh
-      const meshStartTime = Date.now();
-      const mesh = await this.generateTerrainMesh(location);
-      performanceMetrics.meshGenerationTime = Date.now() - meshStartTime;
-      performanceMetrics.vertexCount = mesh.vertices.length;
-      performanceMetrics.faceCount = mesh.faces.length;
-      performanceMetrics.lodLevel = mesh.lodLevels;
+    // Generate or retrieve terrain mesh
+    const meshStartTime = Date.now();
+    const mesh = await this.generateTerrainMesh(location);
+    performanceMetrics.meshGenerationTime = Date.now() - meshStartTime;
+    performanceMetrics.vertexCount = mesh.vertices.length;
+    performanceMetrics.faceCount = mesh.faces.length;
+    performanceMetrics.lodLevel = mesh.lodLevels;
 
-      // Get current weather conditions
-      const weather = await this.weatherService.getWeatherForLocation(location);
+    // Get current weather conditions
+    const weather = await this.weatherService.getWeatherForLocation(location);
 
-      // Analyze surface quality
-      const qualityStartTime = Date.now();
-      const quality = await this.analyzeSurfaceQuality(location, weather);
-      performanceMetrics.analysisTime = Date.now() - qualityStartTime;
+    // Analyze surface quality
+    const qualityStartTime = Date.now();
+    const quality = await this.analyzeSurfaceQuality(location, weather);
+    performanceMetrics.analysisTime = Date.now() - qualityStartTime;
 
-      // Calculate terrain features and hazards
-      const features = this.extractTerrainFeatures(mesh);
-      const hazards = await this.identifyHazards(location, mesh, weather);
+    // Calculate terrain features and hazards
+    const features = this.extractTerrainFeatures(mesh);
+    const hazards = await this.identifyHazards(location, mesh, weather);
 
-      // Prepare comprehensive terrain conditions
-      const conditions: TerrainConditions = {
-        surface: this.determineSurfaceType(mesh.materials[0]),
-        difficulty: this.calculateDifficulty(mesh, hazards),
-        hazards,
-        features,
-        elevation: this.calculateElevation(mesh),
-        slope: this.calculateSlope(mesh),
-        aspect: this.calculateAspect(mesh),
-        roughness: this.calculateRoughness(mesh),
-        quality,
-        mesh,
-        weather: {
-          impact: this.calculateWeatherImpact(weather),
-          conditions: weather.conditions
+    // Prepare comprehensive terrain conditions
+    const conditions: TerrainConditions = {
+      surface: this.determineSurfaceType(mesh.materials[0]),
+      difficulty: this.calculateDifficulty(mesh, hazards),
+      hazards,
+      features,
+      elevation: this.calculateElevation(mesh),
+      slope: this.calculateSlope(mesh),
+      aspect: this.calculateAspect(mesh),
+      roughness: this.calculateRoughness(mesh),
+      quality,
+      mesh,
+      weather: {
+        impact: this.calculateWeatherImpact(weather),
+        conditions: weather.conditions
+      }
+    };
+
+    // Generate risk assessment and recommendations
+    const risks = this.assessRisks(conditions);
+    const recommendations = this.generateRecommendations(conditions, risks);
+
+    // Calculate confidence based on data quality and completeness
+    const confidence = this.calculateConfidence(conditions, performanceMetrics);
+
+    return {
+      conditions,
+      risks,
+      recommendations,
+      confidence,
+      validUntil: this.calculateValidityPeriod(conditions)
+    };
+  }
+
+  private mergeAnalyses(base: TerrainAnalysisResult, satellite: TerrainAnalysisResult): TerrainAnalysisResult {
+    return {
+      conditions: {
+        ...base.conditions,
+        features: [...base.conditions.features, ...satellite.conditions.features],
+        hazards: [...new Set([...base.conditions.hazards, ...satellite.conditions.hazards])],
+        quality: {
+          ...base.conditions.quality,
+          ...satellite.conditions.quality,
+          predictedDegradation: Math.max(
+            base.conditions.quality.predictedDegradation,
+            satellite.conditions.quality.predictedDegradation
+          )
         }
-      };
+      },
+      risks: this.mergeRisks(base.risks, satellite.risks),
+      recommendations: this.mergeRecommendations(base.recommendations, satellite.recommendations),
+      confidence: (base.confidence + satellite.confidence) / 2,
+      validUntil: new Date(Math.min(
+        base.validUntil.getTime(),
+        satellite.validUntil.getTime()
+      ))
+    };
+  }
 
-      // Generate risk assessment and recommendations
-      const risks = this.assessRisks(conditions);
-      const recommendations = this.generateRecommendations(conditions, risks);
+  private mergeRisks(baseRisks: any[], satelliteRisks: any[]): any[] {
+    const mergedRisks = new Map();
+    
+    [...baseRisks, ...satelliteRisks].forEach(risk => {
+      if (mergedRisks.has(risk.type)) {
+        const existing = mergedRisks.get(risk.type);
+        mergedRisks.set(risk.type, {
+          ...risk,
+          probability: Math.max(existing.probability, risk.probability),
+          impact: Math.max(existing.impact, risk.impact),
+          mitigations: [...new Set([...existing.mitigations, ...risk.mitigations])]
+        });
+      } else {
+        mergedRisks.set(risk.type, risk);
+      }
+    });
 
-      // Calculate confidence based on data quality and completeness
-      const confidence = this.calculateConfidence(conditions, performanceMetrics);
+    return Array.from(mergedRisks.values());
+  }
 
-      return {
-        conditions,
-        risks,
-        recommendations,
-        confidence,
-        validUntil: this.calculateValidityPeriod(conditions)
-      };
-    } catch (error) {
-      console.error('Error in terrain analysis:', error);
-      throw new Error('Failed to analyze terrain conditions');
-    }
+  private mergeRecommendations(base: any, satellite: any): any {
+    return {
+      maintenance: {
+        priority: Math.min(base.maintenance.priority, satellite.maintenance.priority),
+        type: base.maintenance.priority <= satellite.maintenance.priority 
+          ? base.maintenance.type 
+          : satellite.maintenance.type,
+        deadline: new Date(Math.min(
+          base.maintenance.deadline.getTime(),
+          satellite.maintenance.deadline.getTime()
+        ))
+      },
+      routing: {
+        avoid: base.routing.avoid || satellite.routing.avoid,
+        alternatives: [...base.routing.alternatives, ...satellite.routing.alternatives]
+      }
+    };
   }
 
   private async generateTerrainMesh(location: GeoPoint): Promise<TerrainMesh> {

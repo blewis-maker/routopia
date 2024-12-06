@@ -3,8 +3,9 @@ import { TerrainAnalysisService } from '@/services/terrain/TerrainAnalysisServic
 import { TrafficService } from '@/services/traffic/TrafficService';
 import { DynamicRoutingService } from '@/services/route/DynamicRoutingService';
 import { RealTimeOptimizer } from '@/services/route/RealTimeOptimizer';
-import { Route, RoutePreferences } from '@/types/route/types';
-import { GeoPoint } from '@/types/geo';
+import { MultiSegmentRouteOptimizer } from '@/services/route/MultiSegmentRouteOptimizer';
+import { Route, RoutePreferences, RouteSegment, OptimizationMetrics } from '@/types/route/types';
+import { GeoPoint, TerrainType, WeatherCondition } from '@/types/geo';
 
 describe('Route Optimization Integration', () => {
   let weatherService: WeatherService;
@@ -12,37 +13,49 @@ describe('Route Optimization Integration', () => {
   let trafficService: TrafficService;
   let dynamicRoutingService: DynamicRoutingService;
   let realTimeOptimizer: RealTimeOptimizer;
+  let multiSegmentOptimizer: MultiSegmentRouteOptimizer;
 
   const mockLocation: GeoPoint = {
     latitude: 40.7128,
-    longitude: -74.0060
+    longitude: -74.0060,
+    elevation: 10
+  };
+
+  const mockSegment: RouteSegment = {
+    id: 'segment-1',
+    startPoint: mockLocation,
+    endPoint: { latitude: 40.7589, longitude: -73.9851, elevation: 15 },
+    activityType: 'WALK',
+    distance: 1000,
+    duration: 1200,
+    metrics: {
+      elevation: { gain: 10, loss: 5, profile: [] },
+      safety: 0.9,
+      weatherImpact: 0.2,
+      terrainDifficulty: TerrainType.EASY,
+      surfaceQuality: 0.95,
+      congestionLevel: 0.1
+    }
   };
 
   const mockRoute: Route = {
     id: 'test-route-1',
     name: 'Test Route',
-    segments: [
-      {
-        id: 'segment-1',
-        startPoint: mockLocation,
-        endPoint: { latitude: 40.7589, longitude: -73.9851 },
-        activityType: 'WALK',
-        distance: 1000,
-        duration: 1200,
-        metrics: {
-          elevation: { gain: 10, loss: 5, profile: [] },
-          safety: 0.9,
-          weatherImpact: 0.2,
-          terrainDifficulty: 'easy',
-          surfaceType: 'paved'
-        }
-      }
-    ],
+    segments: [mockSegment],
     preferences: {
       activityType: 'WALK',
       avoidHighways: true,
       avoidTraffic: true,
-      preferScenic: false
+      preferScenic: false,
+      maxElevationGain: 100,
+      weatherPreference: WeatherCondition.CLEAR
+    },
+    optimizationMetrics: {
+      totalDistance: 1000,
+      totalDuration: 1200,
+      averageSafety: 0.9,
+      weatherCompatibility: 0.8,
+      terrainSuitability: 0.95
     }
   };
 
@@ -56,6 +69,11 @@ describe('Route Optimization Integration', () => {
       trafficService
     );
     realTimeOptimizer = new RealTimeOptimizer(
+      weatherService,
+      terrainService,
+      trafficService
+    );
+    multiSegmentOptimizer = new MultiSegmentRouteOptimizer(
       weatherService,
       terrainService,
       trafficService
@@ -260,6 +278,69 @@ describe('Route Optimization Integration', () => {
 
       const duration = Date.now() - start;
       expect(duration).toBeLessThan(5000); // Should complete within 5 seconds
+    });
+  });
+
+  describe('Multi-Segment Route Optimization', () => {
+    it('should optimize a multi-segment route with different activities', async () => {
+      const multiSegmentRoute: Route = {
+        ...mockRoute,
+        segments: [
+          mockSegment,
+          {
+            ...mockSegment,
+            id: 'segment-2',
+            activityType: 'BIKE',
+            startPoint: mockSegment.endPoint,
+            endPoint: { latitude: 40.7829, longitude: -73.9654, elevation: 20 }
+          }
+        ]
+      };
+
+      const optimizedRoute = await multiSegmentOptimizer.optimizeMultiSegmentRoute(
+        multiSegmentRoute,
+        {
+          conditions: [WeatherCondition.CLEAR],
+          temperature: 20,
+          windSpeed: 5,
+          visibility: 10000,
+          precipitation: 0
+        }
+      );
+
+      expect(optimizedRoute.segments.length).toBe(2);
+      expect(optimizedRoute.optimizationMetrics.totalDistance).toBeGreaterThan(0);
+      expect(optimizedRoute.optimizationMetrics.averageSafety).toBeGreaterThan(0.7);
+      
+      // Verify segment-specific optimizations
+      const [walkSegment, bikeSegment] = optimizedRoute.segments;
+      expect(walkSegment.activityType).toBe('WALK');
+      expect(bikeSegment.activityType).toBe('BIKE');
+      expect(walkSegment.metrics.terrainDifficulty).toBeDefined();
+      expect(bikeSegment.metrics.surfaceQuality).toBeGreaterThan(0.6);
+    });
+
+    it('should handle transition points between segments optimally', async () => {
+      const transitionPoint: GeoPoint = {
+        latitude: 40.7589,
+        longitude: -73.9851,
+        elevation: 15
+      };
+
+      const result = await multiSegmentOptimizer.optimizeTransitionPoint(
+        transitionPoint,
+        'WALK',
+        'BIKE',
+        {
+          maxDistance: 100,
+          safetyThreshold: 0.8,
+          terrainPreference: TerrainType.EASY
+        }
+      );
+
+      expect(result.optimizedPoint).toBeDefined();
+      expect(result.safetyScore).toBeGreaterThan(0.7);
+      expect(result.transitionFeasibility).toBeGreaterThan(0.8);
     });
   });
 }); 

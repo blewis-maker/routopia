@@ -1,155 +1,93 @@
-import { Route, RoutePreferences, RouteSegment } from '@/types/route/types';
-import { GeoPoint } from '@/types/geo';
-import { TerrainDifficultyLevel, TerrainFeatureType } from '@/types/terrain';
+import { Route, RouteSegment, RouteMetrics, RoutePreferences, GeoPoint } from '@/types/route/types';
 import { WeatherConditions } from '@/types/weather/types';
+import { TerrainConditions } from '@/types/terrain/types';
 
-export const mockLocation: GeoPoint = {
+export const mockPoint: GeoPoint = {
   latitude: 40.7128,
   longitude: -74.0060
+};
+
+export const mockMetrics: RouteMetrics = {
+  distance: 1000,
+  duration: 600,
+  elevation: {
+    gain: 10,
+    loss: 5,
+    profile: []
+  },
+  safety: 0.9,
+  weatherImpact: 0.1,
+  terrainDifficulty: 'easy',
+  surfaceType: 'paved',
+  trafficImpact: 0.2,
+  scenicScore: 0.8,
+  pointsOfInterest: 3,
+  energyEfficiency: 0.85
+};
+
+export const mockSegment: RouteSegment = {
+  id: 'segment-1',
+  start: mockPoint,
+  end: mockPoint,
+  startPoint: mockPoint,
+  endPoint: mockPoint,
+  distance: 1000,
+  duration: 600,
+  type: 'WALK',
+  metrics: mockMetrics
 };
 
 export const mockPreferences: RoutePreferences = {
   activityType: 'WALK',
   avoidHighways: true,
   avoidTraffic: true,
-  preferScenic: true,
-  maxDistance: 5000,
-  maxDuration: 3600,
+  preferScenic: false,
+  optimize: 'TIME',
   weights: {
-    distance: 0.3,
+    distance: 0.2,
     duration: 0.3,
     effort: 0.1,
     safety: 0.2,
-    scenery: 0.1
+    comfort: 0.2
   }
 };
 
-export const mockSegment: RouteSegment = {
-  id: 'segment-1',
-  start: mockLocation,
-  end: {
-    latitude: mockLocation.latitude + 0.01,
-    longitude: mockLocation.longitude + 0.01
-  },
-  distance: 1000,
-  duration: 600,
-  elevation: {
-    gain: 10,
-    loss: 5,
-    points: [0, 2, 5, 8, 10, 8, 5, 2, 0]
-  },
-  path: [
-    mockLocation,
-    {
-      latitude: mockLocation.latitude + 0.005,
-      longitude: mockLocation.longitude + 0.005
-    },
-    {
-      latitude: mockLocation.latitude + 0.01,
-      longitude: mockLocation.longitude + 0.01
-    }
-  ],
-  type: 'WALK',
-  conditions: {
-    weather: {
-      temperature: 20,
-      conditions: ['clear'],
-      windSpeed: 5,
-      precipitation: 0,
-      visibility: 10000,
-      pressure: 1015,
-      uvIndex: 5,
-      cloudCover: 10
-    },
-    terrain: {
-      surface: 'paved',
-      difficulty: TerrainDifficultyLevel.EASY,
-      features: [TerrainFeatureType.URBAN, TerrainFeatureType.FLAT],
-      elevation: 100,
-      slope: 5,
-      weather: ['clear'],
-      temperature: 20,
-      hazards: []
-    },
-    traffic: {
-      timestamp: new Date(),
-      level: 0.3,
-      speed: 40,
-      density: 30,
-      confidence: 0.9
-    }
+export const mockWeatherConditions: WeatherConditions = {
+  temperature: 20,
+  conditions: ['clear'],
+  windSpeed: 5,
+  precipitation: 0,
+  visibility: 10000,
+  pressure: 1013,
+  forecast: []
+};
+
+export const mockTerrainConditions: TerrainConditions = {
+  surface: 'paved',
+  difficulty: 'easy',
+  hazards: [],
+  features: [],
+  elevation: 100,
+  slope: 2,
+  aspect: 180,
+  roughness: 0.1,
+  quality: {
+    grip: 0.9,
+    stability: 0.9,
+    drainage: 0.8,
+    maintenance: 0.9,
+    wear: 0.1,
+    predictedDegradation: 0.01
   }
 };
 
 export const mockRoute: Route = {
   id: 'route-1',
   name: 'Test Route',
-  description: 'A test route through the city',
   segments: [mockSegment],
-  metrics: {
-    distance: 1000,
-    duration: 600,
-    elevation: {
-      totalGain: 10,
-      totalLoss: 5,
-      maxAltitude: 10,
-      minAltitude: 0
-    },
-    effort: 0.3,
-    safety: 0.8,
-    scenery: 0.7,
-    segments: {
-      count: 1,
-      types: {
-        WALK: 1,
-        RUN: 0,
-        BIKE: 0,
-        DRIVE: 0,
-        HIKE: 0,
-        MIXED: 0
-      }
-    },
-    conditions: {
-      weather: {
-        score: 0.9,
-        factors: ['clear_conditions', 'good_visibility']
-      },
-      terrain: {
-        score: 0.8,
-        factors: ['flat_terrain', 'paved_surface']
-      },
-      traffic: {
-        score: 0.7,
-        factors: ['low_congestion']
-      }
-    }
-  },
-  alternatives: [
-    {
-      id: 'alt-1',
-      reason: 'Less traffic',
-      score: 0.85
-    }
-  ],
-  optimization: {
-    score: 0.85,
-    factors: [
-      {
-        name: 'weather',
-        impact: 0.9,
-        confidence: 0.95
-      },
-      {
-        name: 'terrain',
-        impact: 0.8,
-        confidence: 0.9
-      },
-      {
-        name: 'traffic',
-        impact: 0.7,
-        confidence: 0.85
-      }
-    ],
-    lastUpdated: new Date()
-  }
+  preferences: mockPreferences,
+  totalMetrics: mockMetrics,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  userId: 'user-1'
 }; 

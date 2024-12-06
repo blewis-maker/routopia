@@ -7,23 +7,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Existing auth models
 model Account {
-  id                String  @id @default(cuid())
+  id                String   @id @default(cuid())
   userId            String
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?  @db.Text
   session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -31,147 +34,101 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model User {
-  id              String            @id @default(cuid())
-  name            String?
-  email           String           @unique
-  emailVerified   DateTime?
-  image           String?
-  accounts        Account[]
-  sessions        Session[]
-  activities      Activity[]
-  devices         Device[]
-  trainingPlans   TrainingPlan[]
-  recentLocations RecentLocation[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-
-  @@map("users")
+  id                    String    @id @default(cuid())
+  name                  String?
+  email                 String    @unique
+  password              String?
+  emailVerified         DateTime?
+  image                 String?
+  lastLogin             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  accounts              Account[]
+  sessions              Session[]
+  preferences           UserPreferences?
+  verificationTokens    VerificationToken[]
+  passwordResetTokens   PasswordResetToken[]
+  routePreferences      RoutePreferences?
+  activityPreferences   ActivityPreferences?
+  notificationSettings  NotificationSettings?
 }
 
 model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-model RecentLocation {
-  id           String   @id @default(cuid())
-  userId       String
-  place_name   String
-  center_lat   Float
-  center_lng   Float
-  locationType String // 'START' or 'DESTINATION'
-  timestamp    DateTime @default(now())
-  user         User     @relation(fields: [userId], references: [id])
-
-  @@index([userId, locationType])
-}
-
-// Activity tracking models
-model Activity {
   id        String   @id @default(cuid())
+  token     String   @unique
   userId    String
-  type      String   // Maps to ActivityType enum
-  date      DateTime @default(now())
-  metrics   ActivityMetrics @relation(fields: [metricsId], references: [id])
-  metricsId String   @unique
-  user      User     @relation(fields: [userId], references: [id])
+  expires   DateTime
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
 }
 
-model ActivityMetrics {
+model PasswordResetToken {
   id        String   @id @default(cuid())
-  distance  Float
-  duration  Int      // In seconds
-  speed     Float
-  calories  Int
-  heartRate Json?    // { average: number, max: number }
-  cadence   Int?
-  power     Int?
-  activity  Activity?
-  workout   Workout? @relation("WorkoutTargetMetrics")
-  workoutActual Workout? @relation("WorkoutActualMetrics")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// Training models
-model TrainingPlan {
-  id        String   @id @default(cuid())
+  token     String   @unique
   userId    String
-  name      String
-  type      String   // Maps to ActivityType enum
-  startDate DateTime
-  endDate   DateTime
-  goal      String
-  workouts  Workout[]
-  user      User     @relation(fields: [userId], references: [id])
+  expires   DateTime
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
 }
 
-model Workout {
-  id            String   @id @default(cuid())
-  type          String   // Maps to ActivityType enum
-  scheduledDate DateTime
-  notes         String?
-  targetMetrics ActivityMetrics @relation("WorkoutTargetMetrics", fields: [targetMetricsId], references: [id])
-  targetMetricsId String @unique
-  actualMetrics ActivityMetrics? @relation("WorkoutActualMetrics", fields: [actualMetricsId], references: [id])
-  actualMetricsId String? @unique
-  trainingPlan  TrainingPlan @relation(fields: [planId], references: [id])
-  planId        String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+model UserPreferences {
+  id                String  @id @default(cuid())
+  userId           String  @unique
+  theme            String  @default("light")
+  emailNotifications Boolean @default(true)
+  pushNotifications Boolean @default(true)
+  language         String  @default("en")
+  timezone         String  @default("UTC")
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// Device models
-model Device {
-  id             String   @id @default(cuid())
-  userId         String
-  name           String
-  type           String   // Maps to device type enum
-  status         String   // connected, disconnected, syncing
-  batteryLevel   Int?
-  manufacturer   String
-  model          String
-  firmwareVersion String?
-  settings       DeviceSettings?
-  syncs          DeviceSync[]
-  lastSync       DeviceSync? @relation("LastSync", fields: [lastSyncId], references: [id])
-  lastSyncId     String?    @unique
-  user           User     @relation(fields: [userId], references: [id])
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+model RoutePreferences {
+  id                String  @id @default(cuid())
+  userId           String  @unique
+  defaultTransportMode String  @default("WALK")
+  avoidHighways    Boolean @default(false)
+  avoidTolls       Boolean @default(false)
+  preferScenic     Boolean @default(false)
+  maxWalkingDistance Int     @default(5000) // meters
+  maxBikingDistance Int     @default(20000) // meters
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model DeviceSettings {
-  id            String   @id @default(cuid())
-  device        Device   @relation(fields: [deviceId], references: [id])
-  deviceId      String   @unique
-  syncFrequency String   // realtime, hourly, daily
-  autoSync      Boolean  @default(true)
-  dataTypes     String[] // activity, heart_rate, power, cadence, location
-  notifications Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+model ActivityPreferences {
+  id                String  @id @default(cuid())
+  userId           String  @unique
+  preferredActivities String[] @default(["WALK", "BIKE"])
+  weeklyGoals      Json?   // Stored as JSON with activity types and target durations
+  difficultyLevel  String  @default("MODERATE")
+  shareActivity    Boolean @default(false)
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model DeviceSync {
-  id           String   @id @default(cuid())
-  device       Device   @relation(fields: [deviceId], references: [id])
-  deviceId     String
-  success      Boolean
-  dataTypes    String[]
-  recordsCount Int
-  error        String?
-  deviceLastSync Device? @relation("LastSync")
-  createdAt    DateTime @default(now())
+model NotificationSettings {
+  id                String  @id @default(cuid())
+  userId           String  @unique
+  routeUpdates     Boolean @default(true)
+  weatherAlerts    Boolean @default(true)
+  achievementAlerts Boolean @default(true)
+  socialUpdates    Boolean @default(true)
+  dailyReminders   Boolean @default(true)
+  emailDigest      Boolean @default(true)
+  digestFrequency  String  @default("WEEKLY") // DAILY, WEEKLY, MONTHLY
+  quietHoursStart  Int     @default(22) // 24-hour format
+  quietHoursEnd    Int     @default(7)  // 24-hour format
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

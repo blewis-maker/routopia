@@ -730,7 +730,7 @@ export const RouteDrawing: React.FC<RouteDrawingProps> = ({
   }, [isDrawingProp]);
 
   return (
-    <div
+    <div 
       className={`route-drawing ${className || ''}`}
       ref={containerRef}
       role="application"
@@ -747,5 +747,3 @@ export const RouteDrawing: React.FC<RouteDrawingProps> = ({
     </div>
   );
 };
-
-export default RouteDrawing;

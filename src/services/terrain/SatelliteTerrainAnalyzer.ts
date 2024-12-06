@@ -25,67 +25,36 @@ export class SatelliteTerrainAnalyzer {
     private terrainService: TerrainAnalysisService
   ) {}
 
-  async analyzeTerrain(params: SatelliteImageryParams): Promise<TerrainAnalysisResult> {
+  async analyzeTerrain(location: GeoPoint, weather: WeatherConditions): Promise<TerrainAnalysisResult> {
     try {
-      // Fetch and analyze satellite data
-      const satelliteData = await this.fetchSatelliteData(params);
+      const baseAnalysis = await this.terrainService.getTerrainConditions(location);
+      const surfaceAnalysis = await this.analyzeSurfaceFromSatellite(location);
+      const spectralAnalysis = await this.performSpectralAnalysis(location);
+      const vegetationAnalysis = await this.analyzeVegetation(location);
+      const waterAnalysis = await this.analyzeWaterBodies(location);
       
-      // Perform parallel analysis
-      const [
-        spectralAnalysis,
-        vegetationAnalysis,
-        waterAnalysis,
-        surfaceAnalysis
-      ] = await Promise.all([
-        this.analyzeSpectralData(satelliteData),
-        this.analyzeVegetation(satelliteData),
-        this.analyzeWaterBodies(satelliteData),
-        this.analyzeSurfaceComposition(satelliteData)
-      ]);
+      const confidence = this.calculateConfidence(surfaceAnalysis, spectralAnalysis);
 
-      // Get weather data for correlation
-      const weather = await this.weatherService.getWeatherForLocation(params.center);
-
-      // Get base terrain analysis
-      const baseAnalysis = await this.terrainService.getTerrainConditions(params.center);
-
-      // Enhance terrain conditions with satellite data
-      const enhancedConditions: TerrainConditions = {
-        ...baseAnalysis.conditions,
+      // Create terrain analysis result
+      const result: TerrainAnalysisResult = {
         surface: this.determineSurfaceType(surfaceAnalysis),
-        features: [
-          ...baseAnalysis.conditions.features,
-          ...this.extractFeatures(spectralAnalysis, vegetationAnalysis)
-        ],
-        hazards: [
-          ...baseAnalysis.conditions.hazards,
-          ...this.identifyHazards(waterAnalysis, surfaceAnalysis)
-        ],
-        quality: {
-          ...baseAnalysis.conditions.quality,
-          ...this.assessSurfaceQuality(surfaceAnalysis, weather)
-        }
+        hazards: this.identifyHazards(waterAnalysis, surfaceAnalysis),
+        elevation: baseAnalysis.elevation,
+        slope: baseAnalysis.slope,
+        roughness: baseAnalysis.roughness,
+        type: this.determineTerrainType(spectralAnalysis, vegetationAnalysis),
+        features: this.extractFeatures(spectralAnalysis, vegetationAnalysis),
+        confidence
       };
-
-      // Calculate confidence based on data quality
-      const confidence = this.calculateConfidence({
-        satelliteQuality: satelliteData.quality,
-        cloudCover: spectralAnalysis.cloudCover,
-        baseConfidence: baseAnalysis.confidence,
-        resolution: params.resolution
-      });
 
       return {
-        conditions: enhancedConditions,
-        risks: this.assessRisks(enhancedConditions, waterAnalysis),
-        recommendations: this.generateRecommendations(enhancedConditions),
-        confidence,
-        validUntil: this.calculateValidityPeriod(enhancedConditions, weather)
+        ...result,
+        risks: this.assessRisks(result, waterAnalysis),
+        recommendations: this.generateRecommendations(result)
       };
     } catch (error) {
-      console.error('Satellite terrain analysis failed:', error);
-      // Fallback to base terrain analysis
-      return this.terrainService.getTerrainConditions(params.center);
+      console.error('Error in satellite terrain analysis:', error);
+      throw new Error('Failed to analyze terrain from satellite data');
     }
   }
 
@@ -271,17 +240,27 @@ export class SatelliteTerrainAnalyzer {
     }
   }
 
-  private generateRecommendations(conditions: TerrainConditions) {
+  private generateRecommendations(conditions: TerrainAnalysisResult) {
     return {
       maintenance: {
-        priority: conditions.quality.wear > 0.7 ? 1 : 3,
-        type: 'routine_maintenance',
-        deadline: conditions.quality.nextMaintenance
+        priority: this.calculateMaintenancePriority(conditions),
+        type: this.determineMaintenanceType(conditions),
+        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Default to 7 days from now
       },
       routing: {
-        avoid: conditions.hazards.length > 2,
-        alternatives: [] // Would generate alternative routes
+        avoid: conditions.hazards.length > 0,
+        alternatives: []
       }
     };
+  }
+
+  private calculateMaintenancePriority(conditions: TerrainAnalysisResult): number {
+    // Implement priority calculation logic based on conditions
+    return 1;
+  }
+
+  private determineMaintenanceType(conditions: TerrainAnalysisResult): string {
+    // Implement maintenance type determination logic based on conditions
+    return 'routine_maintenance';
   }
 } 

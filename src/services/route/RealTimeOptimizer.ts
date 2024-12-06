@@ -19,13 +19,19 @@ import {
   TerrainConditions
 } from '@/types/route/types';
 import { WeatherConditions } from '@/types/weather/types';
+import { GeoPoint } from '@/types/geo';
+import { RoutePreferences, RouteSegment, OptimizationType } from '@/types/route';
+import { TerrainAnalysisService } from '../terrain/TerrainAnalysisService';
+import { TrafficService } from '../traffic/TrafficService';
 
 export class RealTimeOptimizer {
   private carOptimizer: CarRouteOptimizer;
 
   constructor(
     private weatherService: WeatherService,
-    private mcpService: MCPIntegrationService
+    private mcpService: MCPIntegrationService,
+    private terrainService: TerrainAnalysisService,
+    private trafficService: TrafficService
   ) {
     this.carOptimizer = new CarRouteOptimizer(weatherService, mcpService);
   }
@@ -984,5 +990,231 @@ export class RealTimeOptimizer {
     
     // Convert to factor (1.0 = no delay, 2.0 = twice as long, etc.)
     return 1 + avgCongestion;
+  }
+
+  async optimizeRoute(
+    start: GeoPoint,
+    end: GeoPoint,
+    preferences: RoutePreferences,
+    currentConditions?: {
+      weather?: WeatherConditions;
+      terrain?: TerrainConditions;
+    }
+  ) {
+    const weather = currentConditions?.weather || await this.weatherService.getWeatherForLocation(start);
+    const terrain = currentConditions?.terrain || await this.terrainService.getTerrainConditions(start);
+    
+    // Get initial route from MCP
+    let route = await this.mcpService.getRoute(start, end, preferences);
+    
+    // Apply dynamic optimizations
+    route = await this.applyDynamicOptimizations(route, preferences, weather, terrain);
+    
+    // Predict and avoid congestion
+    route = await this.avoidPredictedCongestion(route, preferences);
+    
+    // Generate and rank alternatives
+    const alternatives = await this.generateAlternativeRoutes(route, preferences);
+    
+    return {
+      primary: route,
+      alternatives: this.rankAlternativeRoutes(alternatives, preferences)
+    };
+  }
+
+  private async applyDynamicOptimizations(
+    route: RouteSegment[],
+    preferences: RoutePreferences,
+    weather: WeatherConditions,
+    terrain: TerrainConditions
+  ): Promise<RouteSegment[]> {
+    // Apply weather-based optimizations
+    if (weather.severity > 0.5) {
+      route = await this.optimizeForWeather(route, weather, preferences);
+    }
+
+    // Apply terrain-based optimizations
+    if (terrain.difficulty !== 'easy') {
+      route = await this.optimizeForTerrain(route, terrain, preferences);
+    }
+
+    // Apply time-based optimizations
+    route = await this.optimizeForTimeOfDay(route, preferences);
+
+    return route;
+  }
+
+  private async avoidPredictedCongestion(
+    route: RouteSegment[],
+    preferences: RoutePreferences
+  ): Promise<RouteSegment[]> {
+    const congestionPredictions = await Promise.all(
+      route.map(segment => this.trafficService.predictCongestion(segment.start, segment.end))
+    );
+
+    // Reroute segments with high predicted congestion
+    const optimizedSegments = await Promise.all(
+      route.map(async (segment, index) => {
+        if (congestionPredictions[index] > 0.7) {
+          return this.findAlternativeSegment(segment, preferences);
+        }
+        return segment;
+      })
+    );
+
+    return optimizedSegments;
+  }
+
+  private async generateAlternativeRoutes(
+    primaryRoute: RouteSegment[],
+    preferences: RoutePreferences
+  ): Promise<RouteSegment[][]> {
+    const start = primaryRoute[0].start;
+    const end = primaryRoute[primaryRoute.length - 1].end;
+
+    // Generate alternatives with different optimization criteria
+    const alternatives = await Promise.all([
+      this.mcpService.getRoute(start, end, { ...preferences, optimize: 'TIME' }),
+      this.mcpService.getRoute(start, end, { ...preferences, optimize: 'DISTANCE' }),
+      this.mcpService.getRoute(start, end, { ...preferences, optimize: 'SAFETY' })
+    ]);
+
+    return alternatives;
+  }
+
+  private rankAlternativeRoutes(
+    alternatives: RouteSegment[][],
+    preferences: RoutePreferences
+  ): RouteSegment[][] {
+    return alternatives.sort((a, b) => {
+      const scoreA = this.calculateRouteScore(a, preferences);
+      const scoreB = this.calculateRouteScore(b, preferences);
+      return scoreB - scoreA;
+    });
+  }
+
+  private calculateRouteScore(route: RouteSegment[], preferences: RoutePreferences): number {
+    const weights = preferences.weights;
+    let score = 0;
+
+    // Calculate weighted score based on metrics
+    route.forEach(segment => {
+      score += segment.metrics.distance * weights.distance;
+      score += segment.metrics.duration * weights.duration;
+      score += segment.metrics.safety * weights.safety;
+      score += this.calculateComfortScore(segment) * weights.comfort;
+    });
+
+    return score;
+  }
+
+  private calculateComfortScore(segment: RouteSegment): number {
+    // Implement comfort scoring based on surface type, elevation changes, etc.
+    let score = 1.0;
+
+    if (segment.conditions) {
+      // Reduce score for difficult terrain
+      if (segment.conditions.difficulty !== 'easy') {
+        score *= 0.8;
+      }
+
+      // Reduce score for hazards
+      score *= Math.max(0.5, 1 - (segment.conditions.hazards.length * 0.1));
+
+      // Adjust for surface quality
+      if (segment.conditions.quality) {
+        score *= segment.conditions.quality.stability;
+      }
+    }
+
+    return score;
+  }
+
+  private async findAlternativeSegment(
+    segment: RouteSegment,
+    preferences: RoutePreferences
+  ): Promise<RouteSegment> {
+    // Get alternative segments avoiding congested areas
+    const alternatives = await this.mcpService.getAlternativeSegments(
+      segment.start,
+      segment.end,
+      {
+        ...preferences,
+        avoidTraffic: true
+      }
+    );
+
+    // Return the best alternative based on current conditions
+    return alternatives[0] || segment;
+  }
+
+  private async optimizeForWeather(
+    route: RouteSegment[],
+    weather: WeatherConditions,
+    preferences: RoutePreferences
+  ): Promise<RouteSegment[]> {
+    // Implement weather-based optimizations
+    return route.map(segment => ({
+      ...segment,
+      metrics: {
+        ...segment.metrics,
+        safety: this.adjustSafetyForWeather(segment.metrics.safety, weather)
+      }
+    }));
+  }
+
+  private async optimizeForTerrain(
+    route: RouteSegment[],
+    terrain: TerrainConditions,
+    preferences: RoutePreferences
+  ): Promise<RouteSegment[]> {
+    // Implement terrain-based optimizations
+    return route.map(segment => ({
+      ...segment,
+      metrics: {
+        ...segment.metrics,
+        safety: this.adjustSafetyForTerrain(segment.metrics.safety, terrain)
+      }
+    }));
+  }
+
+  private async optimizeForTimeOfDay(
+    route: RouteSegment[],
+    preferences: RoutePreferences
+  ): Promise<RouteSegment[]> {
+    const currentHour = new Date().getHours();
+    const isRushHour = (currentHour >= 7 && currentHour <= 9) || (currentHour >= 16 && currentHour <= 18);
+
+    if (isRushHour && preferences.avoidTraffic) {
+      return this.avoidPredictedCongestion(route, preferences);
+    }
+
+    return route;
+  }
+
+  private adjustSafetyForWeather(safety: number, weather: WeatherConditions): number {
+    let adjustment = 1.0;
+
+    // Reduce safety score based on weather conditions
+    if (weather.conditions.includes('rain')) adjustment *= 0.8;
+    if (weather.conditions.includes('snow')) adjustment *= 0.6;
+    if (weather.conditions.includes('ice')) adjustment *= 0.4;
+    if (weather.visibility < 5000) adjustment *= 0.7;
+
+    return safety * adjustment;
+  }
+
+  private adjustSafetyForTerrain(safety: number, terrain: TerrainConditions): number {
+    let adjustment = 1.0;
+
+    // Reduce safety score based on terrain conditions
+    if (terrain.difficulty === 'difficult') adjustment *= 0.7;
+    if (terrain.difficulty === 'expert') adjustment *= 0.5;
+    if (terrain.difficulty === 'extreme') adjustment *= 0.3;
+
+    // Further reduce for hazards
+    adjustment *= Math.max(0.3, 1 - (terrain.hazards.length * 0.15));
+
+    return safety * adjustment;
   }
 } 

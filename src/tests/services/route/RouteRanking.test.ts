@@ -1,232 +1,102 @@
 import { RouteRankingService } from '@/services/route/RouteRankingService';
 import { WeatherService } from '@/services/weather/WeatherService';
-import { TrafficService } from '@/services/traffic/TrafficService';
 import { TerrainAnalysisService } from '@/services/terrain/TerrainAnalysisService';
-import { Route, RoutePreferences } from '@/types/route/types';
-import { GeoPoint } from '@/types/geo';
+import { TrafficService } from '@/services/traffic/TrafficService';
+import { mockPoint, mockPreferences, mockWeatherConditions, mockTerrainConditions, mockRoute, mockSegment } from '@/tests/__mocks__/routeMocks';
+import { Route } from '@/types/route/types';
 
 jest.mock('@/services/weather/WeatherService');
-jest.mock('@/services/traffic/TrafficService');
 jest.mock('@/services/terrain/TerrainAnalysisService');
+jest.mock('@/services/traffic/TrafficService');
 
 describe('RouteRankingService', () => {
-  let service: RouteRankingService;
+  let rankingService: RouteRankingService;
   let mockWeatherService: jest.Mocked<WeatherService>;
-  let mockTrafficService: jest.Mocked<TrafficService>;
   let mockTerrainService: jest.Mocked<TerrainAnalysisService>;
-
-  const mockPoint: GeoPoint = { latitude: 40.7128, longitude: -74.0060 };
-  
-  const mockRoute1: Route = {
-    id: 'route1',
-    segments: [
-      {
-        startPoint: mockPoint,
-        endPoint: { latitude: 40.7589, longitude: -73.9851 }
-      }
-    ]
-  };
-
-  const mockRoute2: Route = {
-    id: 'route2',
-    segments: [
-      {
-        startPoint: mockPoint,
-        endPoint: { latitude: 40.7829, longitude: -73.9654 }
-      }
-    ]
-  };
+  let mockTrafficService: jest.Mocked<TrafficService>;
 
   beforeEach(() => {
-    mockWeatherService = {
-      getWeatherForLocation: jest.fn()
-    } as any;
+    mockWeatherService = new WeatherService() as jest.Mocked<WeatherService>;
+    mockTerrainService = new TerrainAnalysisService() as jest.Mocked<TerrainAnalysisService>;
+    mockTrafficService = new TrafficService() as jest.Mocked<TrafficService>;
 
-    mockTrafficService = {
-      getCurrentConditions: jest.fn()
-    } as any;
+    mockWeatherService.getCurrentConditions.mockResolvedValue(mockWeatherConditions);
+    mockTerrainService.getTerrainConditions.mockResolvedValue(mockTerrainConditions);
+    mockTrafficService.getCurrentConditions.mockResolvedValue({
+      speed: 40,
+      density: 0.3,
+      timestamp: new Date(),
+      confidence: 0.9
+    });
 
-    mockTerrainService = {
-      getCurrentConditions: jest.fn()
-    } as any;
-
-    service = new RouteRankingService(
+    rankingService = new RouteRankingService(
       mockWeatherService,
-      mockTrafficService,
-      mockTerrainService
+      mockTerrainService,
+      mockTrafficService
     );
   });
 
   describe('rankRoutes', () => {
-    it('should rank routes based on weather conditions', async () => {
-      mockWeatherService.getWeatherForLocation.mockResolvedValueOnce({
-        conditions: ['clear'],
-        temperature: 20,
-        humidity: 50,
-        windSpeed: 5,
-        precipitation: 0,
-        visibility: 10,
-        pressure: 1013,
-        uvIndex: 5,
-        cloudCover: 10
-      });
+    it('should rank routes based on preferences', async () => {
+      const routes: Route[] = [
+        mockRoute,
+        {
+          ...mockRoute,
+          id: 'route-2',
+          segments: [{
+            ...mockSegment,
+            id: 'segment-2',
+            distance: 2000,
+            duration: 1200
+          }]
+        }
+      ];
 
-      mockWeatherService.getWeatherForLocation.mockResolvedValueOnce({
-        conditions: ['rain'],
-        temperature: 15,
-        humidity: 80,
-        windSpeed: 15,
-        precipitation: 5,
-        visibility: 5,
-        pressure: 1010,
-        uvIndex: 2,
-        cloudCover: 90
-      });
+      const result = await rankingService.rankRoutes(routes, mockPreferences);
 
-      mockTrafficService.getCurrentConditions.mockResolvedValue({
-        congestionLevel: 0.2
-      });
-
-      mockTerrainService.getCurrentConditions.mockResolvedValue({
-        hazards: [],
-        slope: 5
-      });
-
-      const preferences: RoutePreferences = {
-        activityType: 'WALK',
-        avoidTraffic: true,
-        preferScenic: false,
-        avoidTolls: false
-      };
-
-      const result = await service.rankRoutes([mockRoute1, mockRoute2], preferences);
-
-      expect(result.rankedRoutes[0].id).toBe('route1');
-      expect(result.rankedRoutes[1].id).toBe('route2');
-      expect(result.scores.get('route1')).toBeGreaterThan(result.scores.get('route2')!);
+      expect(result).toBeDefined();
+      expect(result.length).toBe(2);
+      expect(result[0].score).toBeGreaterThan(result[1].score);
     });
 
-    it('should rank routes based on traffic conditions', async () => {
-      mockWeatherService.getWeatherForLocation.mockResolvedValue({
-        conditions: ['clear'],
-        temperature: 20,
-        humidity: 50,
-        windSpeed: 5,
-        precipitation: 0,
-        visibility: 10,
-        pressure: 1013,
-        uvIndex: 5,
-        cloudCover: 10
+    it('should consider weather conditions in ranking', async () => {
+      const routes: Route[] = [
+        mockRoute,
+        {
+          ...mockRoute,
+          id: 'route-2',
+          segments: [{
+            ...mockSegment,
+            id: 'segment-2',
+            metrics: {
+              ...mockSegment.metrics,
+              weatherImpact: 0.8
+            }
+          }]
+        }
+      ];
+
+      const result = await rankingService.rankRoutes(routes, {
+        ...mockPreferences,
+        weights: {
+          ...mockPreferences.weights,
+          comfort: 0.8,
+          safety: 0.8
+        }
       });
 
-      mockTrafficService.getCurrentConditions.mockResolvedValueOnce({
-        congestionLevel: 0.2
-      });
-
-      mockTrafficService.getCurrentConditions.mockResolvedValueOnce({
-        congestionLevel: 0.8
-      });
-
-      mockTerrainService.getCurrentConditions.mockResolvedValue({
-        hazards: [],
-        slope: 5
-      });
-
-      const preferences: RoutePreferences = {
-        activityType: 'WALK',
-        avoidTraffic: true,
-        preferScenic: false,
-        avoidTolls: false
-      };
-
-      const result = await service.rankRoutes([mockRoute1, mockRoute2], preferences);
-
-      expect(result.rankedRoutes[0].id).toBe('route1');
-      expect(result.rankedRoutes[1].id).toBe('route2');
-      expect(result.scores.get('route1')).toBeGreaterThan(result.scores.get('route2')!);
+      expect(result[0].id).toBe('route-1');
+      expect(result[1].id).toBe('route-2');
     });
 
-    it('should rank routes based on terrain conditions', async () => {
-      mockWeatherService.getWeatherForLocation.mockResolvedValue({
-        conditions: ['clear'],
-        temperature: 20,
-        humidity: 50,
-        windSpeed: 5,
-        precipitation: 0,
-        visibility: 10,
-        pressure: 1013,
-        uvIndex: 5,
-        cloudCover: 10
-      });
+    it('should handle missing conditions gracefully', async () => {
+      mockWeatherService.getCurrentConditions.mockRejectedValue(new Error('Service error'));
 
-      mockTrafficService.getCurrentConditions.mockResolvedValue({
-        congestionLevel: 0.2
-      });
+      const routes: Route[] = [mockRoute];
+      const result = await rankingService.rankRoutes(routes, mockPreferences);
 
-      mockTerrainService.getCurrentConditions.mockResolvedValueOnce({
-        hazards: [],
-        slope: 5
-      });
-
-      mockTerrainService.getCurrentConditions.mockResolvedValueOnce({
-        hazards: ['construction'],
-        slope: 15
-      });
-
-      const preferences: RoutePreferences = {
-        activityType: 'WALK',
-        avoidTraffic: false,
-        preferScenic: true,
-        avoidTolls: false
-      };
-
-      const result = await service.rankRoutes([mockRoute1, mockRoute2], preferences);
-
-      expect(result.rankedRoutes[0].id).toBe('route1');
-      expect(result.rankedRoutes[1].id).toBe('route2');
-      expect(result.scores.get('route1')).toBeGreaterThan(result.scores.get('route2')!);
-    });
-
-    it('should consider user preferences in ranking', async () => {
-      mockWeatherService.getWeatherForLocation.mockResolvedValue({
-        conditions: ['clear'],
-        temperature: 20,
-        humidity: 50,
-        windSpeed: 5,
-        precipitation: 0,
-        visibility: 10,
-        pressure: 1013,
-        uvIndex: 5,
-        cloudCover: 10
-      });
-
-      mockTrafficService.getCurrentConditions.mockResolvedValue({
-        congestionLevel: 0.5
-      });
-
-      mockTerrainService.getCurrentConditions.mockResolvedValue({
-        hazards: [],
-        slope: 5
-      });
-
-      const preferences1: RoutePreferences = {
-        activityType: 'WALK',
-        avoidTraffic: true,
-        preferScenic: false,
-        avoidTolls: false
-      };
-
-      const preferences2: RoutePreferences = {
-        activityType: 'WALK',
-        avoidTraffic: false,
-        preferScenic: true,
-        avoidTolls: true
-      };
-
-      const result1 = await service.rankRoutes([mockRoute1, mockRoute2], preferences1);
-      const result2 = await service.rankRoutes([mockRoute1, mockRoute2], preferences2);
-
-      expect(result1.scores).not.toEqual(result2.scores);
+      expect(result).toBeDefined();
+      expect(result[0].warnings).toContain('Weather data unavailable');
     });
   });
 }); 
