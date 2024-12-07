@@ -1,22 +1,33 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
-import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { combineClasses } from '@/utils/formatters';
+import { Text, Heading } from '@/components/common/Typography';
 
 interface SignUpModalProps {
   isOpen: boolean;
   onClose: () => void;
+  mode?: 'login' | 'signup';
 }
 
-export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
+export default function SignUpModal({ isOpen, onClose, mode = 'signup' }: SignUpModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLogoAnimated, setIsLogoAnimated] = useState(false);
+  const [email, setEmail] = useState('');
+  const [isValidEmail, setIsValidEmail] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+  }, [isOpen]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -24,7 +35,46 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
     }
   };
 
-  if (!isOpen) return null;
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value;
+    setEmail(newEmail);
+    if (newEmail) {
+      setIsValidEmail(validateEmail(newEmail));
+    } else {
+      setIsValidEmail(true);
+    }
+  };
+
+  const handleEmailSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!email || !isValidEmail) return;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const result = await signIn('email', {
+        email,
+        callbackUrl: '/routopia',
+        redirect: false
+      });
+
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        setError('Check your email for a login link!');
+      }
+    } catch (error) {
+      setError('An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     try {
@@ -43,108 +93,254 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
       }
     } catch (error) {
       setError('An error occurred during sign in');
-      console.error('Sign in error:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleButtonHover = (isHovered: boolean) => {
-    setIsLogoAnimated(isHovered);
+  const handleAppleSignIn = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const result = await signIn('apple', {
+        callbackUrl: '/routopia',
+        redirect: false
+      });
+
+      if (result?.error) {
+        setError(result.error);
+      } else if (result?.ok) {
+        router.push('/routopia');
+      }
+    } catch (error) {
+      setError('Apple sign in is not available yet');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div 
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center"
+      className={combineClasses(
+        "fixed inset-0 bg-black/90 backdrop-blur-sm z-50",
+        "flex items-center justify-center",
+        "transition-all duration-300"
+      )}
       onClick={handleBackdropClick}
     >
-      <div className="bg-stone-900 rounded-lg p-8 max-w-md w-full mx-4 border border-stone-800">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center flex-grow justify-center">
-            <div className="flex items-center">
-              <Image
-                src="/logo.png"
-                alt="Routopia"
-                className={`h-8 w-8 mr-2 ${isLogoAnimated ? 'animate-logo-active' : ''}`}
-                width={32}
-                height={32}
-                priority
-              />
-              <span className="text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">
-                Routopia
-              </span>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-300 absolute right-6 top-6">
-            <X className="h-6 w-6" />
+      <div className={combineClasses(
+        "bg-black rounded-2xl p-8 max-w-md w-full mx-4",
+        "shadow-xl shadow-black/20",
+        "transform transition-all duration-300",
+        "animate-fade-in-up"
+      )}>
+        {/* Close button */}
+        <div className="flex justify-end mb-2">
+          <button 
+            onClick={onClose}
+            className="text-stone-400 hover:text-stone-200 transition-colors"
+          >
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <p className="text-stone-300 text-center mb-8">
-          Plan your next adventure with AI-powered inspiration. Join our community of explorers.
-        </p>
+        {/* Centered Logo and Title */}
+        <div className="flex flex-col items-center mb-6">
+          <div className="relative w-full flex justify-center">
+            <div className="flex items-center">
+              <Image
+                src="/routopia-logo.png"
+                alt="Routopia"
+                width={32}
+                height={32}
+                className="w-8 h-8 absolute -translate-x-[calc(100%+8px)]"
+              />
+              <Text 
+                as="span"
+                variant="2xl"
+                className="font-montserrat font-semibold text-white"
+              >
+                Routopia
+              </Text>
+            </div>
+          </div>
+
+          {/* Description */}
+          <Text 
+            className="text-stone-300 text-center mt-4 max-w-[80%]"
+            variant="base"
+          >
+            Plan your next adventure with AI-powered inspiration. Join our community of explorers.
+          </Text>
+        </div>
 
         {error && (
-          <div className="p-3 mb-4 text-sm text-red-500 bg-red-100/10 rounded-md">
-            {error}
+          <div className={combineClasses(
+            "mb-6 p-4 rounded-lg",
+            error.includes('Check your email')
+              ? "bg-teal-500/10 border border-teal-500/20"
+              : "bg-red-500/10 border border-red-500/20",
+            "animate-fade-in"
+          )}>
+            <Text 
+              variant="sm" 
+              className={error.includes('Check your email')
+                ? "text-teal-400"
+                : "text-red-400"
+              }
+            >
+              {error}
+            </Text>
           </div>
         )}
 
-        <div className="space-y-4">
-          <Button 
+        {/* Auth Buttons */}
+        <div className="space-y-3">
+          <button 
             onClick={handleGoogleSignIn}
-            onMouseEnter={() => handleButtonHover(true)}
-            onMouseLeave={() => handleButtonHover(false)}
-            className="w-full bg-white hover:bg-gray-100 text-stone-900 font-semibold flex items-center justify-center gap-2"
-            variant="outline"
             disabled={isLoading}
+            className={combineClasses(
+              "w-full h-12 rounded-lg",
+              "flex items-center justify-center gap-3",
+              "bg-white hover:bg-gray-50",
+              "transition-all duration-200",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              "font-inter"
+            )}
           >
-            <img src="/google-icon.svg" alt="Google" className="w-5 h-5" />
-            {isLoading ? 'Signing in...' : 'Continue with Google'}
-          </Button>
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+                <Text as="span" variant="sm" className="text-black font-medium">
+                  Signing in...
+                </Text>
+              </div>
+            ) : (
+              <>
+                <Image 
+                  src="/google-icon.svg" 
+                  alt="Google" 
+                  width={20} 
+                  height={20} 
+                  className="w-5 h-5"
+                />
+                <Text as="span" variant="sm" className="text-black font-medium">
+                  Continue with Google
+                </Text>
+              </>
+            )}
+          </button>
 
-          <Button 
-            onMouseEnter={() => handleButtonHover(true)}
-            onMouseLeave={() => handleButtonHover(false)}
-            className="w-full bg-black hover:bg-stone-800 text-white font-semibold flex items-center justify-center gap-2"
-            variant="outline"
-            disabled
+          <button 
+            onClick={handleAppleSignIn}
+            disabled={true}
+            title="Apple sign in coming soon"
+            className={combineClasses(
+              "w-full h-12 rounded-lg",
+              "flex items-center justify-center gap-3",
+              "bg-black/80",
+              "border border-stone-800",
+              "transition-all duration-200",
+              "hover:bg-stone-900 cursor-not-allowed",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              "font-inter"
+            )}
           >
-            <img src="/apple-icon.svg" alt="Apple" className="w-5 h-5 text-white fill-white" />
-            <span className="text-white">Continue with Apple</span>
-          </Button>
+            <Image 
+              src="/apple-icon.svg" 
+              alt="Apple" 
+              width={20} 
+              height={20} 
+              className="w-5 h-5 invert"
+            />
+            <Text as="span" variant="sm" className="text-white font-medium">
+              Continue with Apple
+            </Text>
+          </button>
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-stone-700"></div>
+              <div className="w-full border-t border-stone-800/50"></div>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-stone-900 text-stone-400">or</span>
+            <div className="relative flex justify-center">
+              <Text as="span" variant="sm" className="px-2 bg-black text-stone-600">
+                or
+              </Text>
             </div>
           </div>
 
-          <Button 
-            onMouseEnter={() => handleButtonHover(true)}
-            onMouseLeave={() => handleButtonHover(false)}
-            className="w-full bg-teal-600 hover:bg-teal-500 text-white font-semibold"
-            disabled
-          >
-            Continue with Email
-          </Button>
+          <form onSubmit={handleEmailSubmit} className="space-y-3">
+            <input
+              type="email"
+              value={email}
+              onChange={handleEmailChange}
+              placeholder="Enter your email"
+              className={combineClasses(
+                "w-full h-12 px-4 rounded-lg",
+                "bg-stone-900",
+                "text-white placeholder-stone-500",
+                "focus:outline-none focus:ring-1",
+                !isValidEmail && email 
+                  ? "ring-1 ring-red-500/50 focus:ring-red-500/50"
+                  : "focus:ring-teal-500/50",
+                "transition-all duration-200",
+                "font-inter text-sm"
+              )}
+            />
+            {!isValidEmail && email && (
+              <Text variant="xs" className="text-red-400 mt-1">
+                Please enter a valid email address
+              </Text>
+            )}
+            <button 
+              type="submit"
+              disabled={isLoading || !email}
+              className={combineClasses(
+                "w-full h-12 rounded-lg",
+                "bg-teal-600 hover:bg-teal-500",
+                "text-white font-medium",
+                "transition-all duration-200",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+                "font-inter text-sm"
+              )}
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  <span>Processing...</span>
+                </div>
+              ) : (
+                'Continue with Email'
+              )}
+            </button>
+          </form>
 
-          <div className="text-center text-stone-400 text-sm mt-6">
-            <p>Already have an account? {' '}
-              <button className="text-teal-400 hover:text-teal-300" onClick={onClose}>
+          <div className="text-center mt-6">
+            <Text variant="sm" className="text-stone-400">
+              Already have an account?{' '}
+              <button 
+                onClick={() => router.push('/login')}
+                className="text-teal-500 hover:text-teal-400 transition-colors font-medium"
+              >
                 Log In
               </button>
-            </p>
+            </Text>
           </div>
 
-          <div className="text-center text-stone-400 text-xs mt-4">
-            By continuing, you agree to our{' '}
-            <a href="#" className="text-teal-400 hover:text-teal-300">Terms of Service</a>
-            {' '}and{' '}
-            <a href="#" className="text-teal-400 hover:text-teal-300">Privacy Policy</a>
+          <div className="text-center mt-4">
+            <Text variant="xs" className="text-stone-600">
+              By continuing, you agree to our{' '}
+              <a href="/terms" className="text-teal-500 hover:text-teal-400 transition-colors">
+                Terms of Service
+              </a>
+              {' '}and{' '}
+              <a href="/privacy" className="text-teal-500 hover:text-teal-400 transition-colors">
+                Privacy Policy
+              </a>
+            </Text>
           </div>
         </div>
       </div>

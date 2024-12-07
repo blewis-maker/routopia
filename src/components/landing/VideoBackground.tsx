@@ -10,50 +10,116 @@ interface VideoBackgroundProps {
 export default function VideoBackground({ videoUrl, posterUrl }: VideoBackgroundProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasPlayError, setHasPlayError] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = 0.75;
+    console.log('VideoBackground mounted with URL:', videoUrl);
+    let mounted = true;
+    
+    const playVideo = async () => {
+      if (!videoRef.current) {
+        console.log('Video ref not available');
+        return;
+      }
       
-      // Ensure video plays
-      const playVideo = async () => {
-        try {
-          await videoRef.current?.play();
-        } catch (error) {
-          console.error('Video autoplay failed:', error);
+      try {
+        console.log('Attempting to play video from URL:', videoUrl);
+        videoRef.current.playbackRate = 0.75;
+        await videoRef.current.play();
+        if (mounted) {
+          console.log('Video playing successfully');
+          setHasPlayError(false);
         }
-      };
-      
+      } catch (err) {
+        if (mounted) {
+          setHasPlayError(true);
+          console.error('Video playback error:', {
+            err,
+            videoElement: videoRef.current,
+            readyState: videoRef.current?.readyState,
+            networkState: videoRef.current?.networkState,
+            videoError: videoRef.current?.error,
+            currentSrc: videoRef.current?.currentSrc
+          });
+        }
+      }
+    };
+
+    // Try to play when component mounts
+    if (document.readyState === 'complete') {
       playVideo();
+    } else {
+      window.addEventListener('load', playVideo);
     }
-  }, []);
+
+    // Try to play again when user interacts with the page
+    const handleInteraction = () => {
+      if (hasPlayError) {
+        console.log('Retrying video playback after user interaction');
+        playVideo();
+      }
+    };
+
+    window.addEventListener('click', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('load', playVideo);
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+    };
+  }, [hasPlayError, videoUrl]);
 
   return (
-    <div className="absolute inset-0 w-full h-full overflow-hidden">
+    <div className="absolute inset-0 w-full h-full overflow-hidden bg-stone-950">
       {/* Preload overlay while video loads */}
       <div 
-        className={`absolute inset-0 bg-brand-text transition-opacity duration-1000 ${
+        className={`absolute inset-0 bg-black transition-opacity duration-1000 ${
           isLoaded ? 'opacity-0' : 'opacity-100'
         }`} 
       />
       
-      <video
-        ref={videoRef}
-        autoPlay
-        loop
-        muted
-        playsInline
-        poster={posterUrl}
-        onLoadedData={() => setIsLoaded(true)}
-        className={`
-          object-cover w-full h-full
-          scale-105
-          transition-all duration-[2000ms]
-          ${isLoaded ? 'opacity-100 blur-0' : 'opacity-0 blur-sm'}
-        `}
-      >
-        <source src={videoUrl} type="video/mp4" />
-      </video>
+      {!loadError && (
+        <video
+          ref={videoRef}
+          autoPlay
+          loop
+          muted
+          playsInline
+          poster={posterUrl}
+          preload="auto"
+          onLoadStart={() => console.log('Video load started')}
+          onLoadedMetadata={() => console.log('Video metadata loaded')}
+          onLoadedData={() => {
+            console.log('Video loaded successfully:', {
+              duration: videoRef.current?.duration,
+              size: `${videoRef.current?.videoWidth}x${videoRef.current?.videoHeight}`,
+              currentSrc: videoRef.current?.currentSrc
+            });
+            setIsLoaded(true);
+          }}
+          onError={(e) => {
+            console.error('Video loading error:', {
+              event: e,
+              videoUrl,
+              target: e.currentTarget,
+              error: e.currentTarget?.error
+            });
+            setLoadError(true);
+          }}
+          className={`
+            object-cover w-full h-full
+            scale-105
+            transition-all duration-[2000ms]
+            ${isLoaded ? 'opacity-100 blur-0' : 'opacity-0 blur-sm'}
+          `}
+        >
+          <source src={videoUrl} type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+      )}
       
       {/* Multiple gradient overlays for better text contrast */}
       <div className="absolute inset-0">

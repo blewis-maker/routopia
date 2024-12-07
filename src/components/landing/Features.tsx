@@ -1,4 +1,4 @@
-import { MapPin, Route, Activity, Cloud, Brain, Users } from 'lucide-react';
+import { MapPin, Route, Bike, Cloud, Brain, Users } from 'lucide-react';
 import { typography } from '@/styles/tokens/typography';
 import { colors } from '@/styles/tokens/colors';
 import { combineClasses } from '@/utils/formatters';
@@ -26,7 +26,7 @@ const features = [
     name: 'Activity Tracking',
     description:
       'Monitor your progress, track your achievements, and analyze your performance with detailed statistics and insights.',
-    icon: Activity,
+    icon: Bike,
   },
   {
     name: 'Dynamic Route Optimization',
@@ -44,13 +44,13 @@ const features = [
 
 export default function Features() {
   return (
-    <div id="features" className="py-24 sm:py-32 bg-gradient-to-b from-black/60 via-black/80 to-black">
+    <div id="features" className="py-24 sm:py-32 bg-gradient-to-b from-stone-950 via-stone-950/95 to-stone-950">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl lg:text-center">
           <h2 className={combineClasses(
             "text-brand-primary font-montserrat",
             "text-sm font-semibold tracking-wider uppercase",
-            "bg-gradient-to-r from-teal-400 to-emerald-400 text-transparent bg-clip-text"
+            "bg-gradient-to-r from-teal-400 to-emerald-400 text-transparent bg-clip-text animate-gradient-text"
           )}>
             Everything you need
           </h2>
@@ -87,10 +87,10 @@ export default function Features() {
                   <div className={combineClasses(
                     "flex-shrink-0 flex items-center justify-center",
                     "h-12 w-12 rounded-lg",
-                    "bg-brand-primary-teal-500/10 group-hover:bg-brand-primary-teal-500/20",
+                    "bg-teal-500/10 group-hover:bg-teal-500/20",
                     "transition-colors duration-300"
                   )}>
-                    <feature.icon className="h-6 w-6 text-brand-primary-teal-500" />
+                    <feature.icon className="h-6 w-6 text-teal-500" />
                   </div>
                   <h3 className={combineClasses(
                     "text-xl font-semibold text-white",

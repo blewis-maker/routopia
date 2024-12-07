@@ -2,37 +2,29 @@ import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import type { NextRequest } from 'next/server'
 
-export async function middleware(req: NextRequest) {
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
-  const isAuthenticated = !!token
-  
-  const protectedPaths = [
-    '/routopia',
-    '/routes',
-    '/profile',
-    '/settings',
-    '/api/chat',
-    '/api/routes',
-  ]
+export async function middleware(request: NextRequest) {
+  const token = await getToken({ req: request })
+  const { pathname } = request.nextUrl
 
-  const isProtectedPath = protectedPaths.some(path => 
-    req.nextUrl.pathname.startsWith(path)
-  )
-
-  if (isProtectedPath && !isAuthenticated) {
-    return NextResponse.redirect(new URL('/', req.url))
+  // Redirect authenticated users from / to /home
+  if (token && pathname === '/') {
+    return NextResponse.redirect(new URL('/home', request.url))
   }
 
+  // Allow all other requests to proceed
   return NextResponse.next()
 }
 
 export const config = {
   matcher: [
-    '/routopia/:path*',
-    '/routes/:path*',
-    '/profile/:path*',
-    '/settings/:path*',
-    '/api/chat/:path*',
-    '/api/routes/:path*',
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json|.*\\.png$).*)',
   ],
 }
