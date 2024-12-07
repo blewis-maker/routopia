@@ -39,6 +39,8 @@ interface TributaryFlowProps {
   onConnectionPointClick?: (point: ConnectionPoint) => void;
   onDragStart?: (point: ConnectionPoint) => void;
   onDragEnd?: (point: ConnectionPoint) => void;
+  flowIntensity?: number; // New prop for controlling flow intensity
+  riverStyle?: 'natural' | 'geometric'; // New prop for different river styles
 }
 
 export const TributaryFlow: React.FC<TributaryFlowProps> = ({
@@ -58,6 +60,8 @@ export const TributaryFlow: React.FC<TributaryFlowProps> = ({
   onConnectionPointClick,
   onDragStart,
   onDragEnd,
+  flowIntensity = 0.5,
+  riverStyle = 'natural',
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [viewBox, setViewBox] = useState<string>('0 0 100 100');
@@ -94,18 +98,23 @@ export const TributaryFlow: React.FC<TributaryFlowProps> = ({
     );
   }, [mainRoute, tributaries, previewTributaries, poiClusters, connectionPoints]);
 
-  // Generate path data
-  const { mainPathData, tributaryPaths } = useMemo(() => {
-    const mainSmooth = smoothPath(mainRoute.coordinates as [number, number][], smoothness);
-    const tributarySmooth = tributaries.map(tributary => 
-      smoothPath(tributary.coordinates as [number, number][], smoothness)
-    );
+  // Enhanced path generation for main route
+  const mainPathData = useMemo(() => {
+    return smoothPath(mainRoute.coordinates, 
+      riverStyle === 'natural' ? smoothness * 1.2 : smoothness);
+  }, [mainRoute, smoothness, riverStyle]);
 
-    return {
-      mainPathData: mainSmooth,
-      tributaryPaths: tributarySmooth,
-    };
-  }, [mainRoute, tributaries, smoothness]);
+  // Enhanced tributary path generation
+  const tributaryPaths = useMemo(() => {
+    return tributaries.map(tributary => {
+      const path = smoothPath(tributary.coordinates, 
+        riverStyle === 'natural' ? smoothness * 0.8 : smoothness);
+      return {
+        path,
+        flowIntensity: tributary.flowVolume || flowIntensity
+      };
+    });
+  }, [tributaries, smoothness, flowIntensity, riverStyle]);
 
   // Helper function to get cluster color
   const getClusterColor = (type: POICluster['type']) => {
@@ -124,15 +133,17 @@ export const TributaryFlow: React.FC<TributaryFlowProps> = ({
       viewBox={viewBox}
       preserveAspectRatio="xMidYMid meet"
     >
-      {/* Main route */}
+      {/* Main route with enhanced river styling */}
       <motion.path
         d={mainPathData}
         stroke={mainColor}
         strokeWidth={width}
         fill="none"
-        strokeDasharray="4 4"
+        strokeLinecap="round"
+        strokeDasharray={riverStyle === 'natural' ? "8 4" : "4 4"}
         animate={{
           strokeDashoffset: [0, -20],
+          pathLength: [0.8, 1],
         }}
         transition={{
           duration: 2 / flowSpeed,
@@ -141,20 +152,22 @@ export const TributaryFlow: React.FC<TributaryFlowProps> = ({
         }}
       />
 
-      {/* Tributary routes */}
-      {tributaryPaths.map((path, index) => (
+      {/* Enhanced tributary rendering */}
+      {tributaryPaths.map((tributaryPath, index) => (
         <motion.path
           key={`tributary-${index}`}
-          d={path}
+          d={tributaryPath.path}
           stroke={tributaryColor}
           strokeWidth={width * 0.8}
           fill="none"
-          strokeDasharray="4 4"
+          strokeLinecap="round"
+          strokeDasharray={riverStyle === 'natural' ? "6 3" : "4 4"}
           animate={{
-            strokeDashoffset: [0, -20],
+            strokeDashoffset: [0, -15],
+            pathLength: [0.7, 1],
           }}
           transition={{
-            duration: 2 / flowSpeed,
+            duration: 2 / (flowSpeed * tributaryPath.flowIntensity),
             ease: "linear",
             repeat: Infinity,
             delay: index * 0.2,

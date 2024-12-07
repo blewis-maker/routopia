@@ -1,88 +1,94 @@
+import type { Position } from 'geojson';
+
+interface FlowPoint {
+  x: number;
+  y: number;
+  flow: number; // Flow intensity (0-1)
+}
+
 /**
- * Generates a smooth path through a set of points using cubic bezier curves
+ * Generates a smooth river-like path with natural curves
  */
-export const smoothPath = (points: [number, number][], smoothness: number = 0.5): string => {
+export const smoothPath = (points: Position[], smoothness: number = 0.5): string => {
   if (points.length < 2) return '';
-  if (points.length === 2) {
-    return `M ${points[0][0]},${points[0][1]} L ${points[1][0]},${points[1][1]}`;
+  
+  // Convert to 2D points for easier handling
+  const path2D = points.map(p => ({ x: p[0], y: p[1] }));
+  
+  // Calculate control points for natural river bends
+  const controlPoints = generateRiverControlPoints(path2D, smoothness);
+  
+  // Generate SVG path
+  let pathData = `M ${path2D[0].x},${path2D[0].y}`;
+  
+  for (let i = 0; i < path2D.length - 1; i++) {
+    const [cp1, cp2] = controlPoints[i];
+    const next = path2D[i + 1];
+    pathData += ` C ${cp1.x},${cp1.y} ${cp2.x},${cp2.y} ${next.x},${next.y}`;
   }
-
-  const controlPoints = generateControlPoints(points, smoothness);
-  let path = `M ${points[0][0]},${points[0][1]}`;
-
-  for (let i = 0; i < points.length - 1; i++) {
-    const [cp1x, cp1y] = controlPoints.cp1[i];
-    const [cp2x, cp2y] = controlPoints.cp2[i];
-    const [x, y] = points[i + 1];
-    path += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x},${y}`;
-  }
-
-  return path;
+  
+  return pathData;
 };
 
 /**
- * Generates control points for cubic bezier curves
+ * Generates a cubic bezier path optimized for tributary visualization
  */
-const generateControlPoints = (points: [number, number][], smoothness: number) => {
-  const cp1: [number, number][] = [];
-  const cp2: [number, number][] = [];
+export const cubicBezierPath = (
+  start: Position,
+  end: Position,
+  flowIntensity: number = 0.5
+): string => {
+  // Calculate control points for natural tributary joining
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  
+  // Adjust control points based on flow intensity
+  const cp1 = {
+    x: start[0] + (dx * 0.25) + (dy * 0.2 * flowIntensity),
+    y: start[1] + (dy * 0.25) - (dx * 0.2 * flowIntensity)
+  };
+  
+  const cp2 = {
+    x: end[0] - (dx * 0.25) + (dy * 0.1 * flowIntensity),
+    y: end[1] - (dy * 0.25) - (dx * 0.1 * flowIntensity)
+  };
+  
+  return `M ${start[0]},${start[1]} C ${cp1.x},${cp1.y} ${cp2.x},${cp2.y} ${end[0]},${end[1]}`;
+};
 
+// Helper function to generate natural river bends
+function generateRiverControlPoints(points: FlowPoint[], smoothness: number) {
+  const controlPoints: Array<[FlowPoint, FlowPoint]> = [];
+  
   for (let i = 0; i < points.length - 1; i++) {
     const current = points[i];
     const next = points[i + 1];
     const prev = points[i - 1] || current;
     const subsequent = points[i + 2] || next;
-
-    // Calculate the distance between points
+    
+    // Calculate natural bend based on surrounding points
+    const angle = Math.atan2(next.y - prev.y, next.x - prev.x);
     const distance = Math.sqrt(
-      Math.pow(next[0] - current[0], 2) + Math.pow(next[1] - current[1], 2)
+      Math.pow(next.x - current.x, 2) + Math.pow(next.y - current.y, 2)
     );
-
-    // Calculate control point distances proportional to the distance between points
-    const cp1Distance = distance * smoothness;
-    const cp2Distance = distance * smoothness;
-
-    // Calculate the direction vector
-    const angle1 = Math.atan2(next[1] - prev[1], next[0] - prev[0]);
-    const angle2 = Math.atan2(subsequent[1] - current[1], subsequent[0] - current[0]);
-
-    // Generate control points
-    cp1.push([
-      current[0] + Math.cos(angle1) * cp1Distance,
-      current[1] + Math.sin(angle1) * cp1Distance,
-    ]);
-
-    cp2.push([
-      next[0] - Math.cos(angle2) * cp2Distance,
-      next[1] - Math.sin(angle2) * cp2Distance,
-    ]);
+    
+    // Adjust control points based on flow characteristics
+    const cp1 = {
+      x: current.x + Math.cos(angle) * distance * smoothness,
+      y: current.y + Math.sin(angle) * distance * smoothness,
+      flow: current.flow
+    };
+    
+    const nextAngle = Math.atan2(subsequent.y - current.y, subsequent.x - current.x);
+    const cp2 = {
+      x: next.x - Math.cos(nextAngle) * distance * smoothness,
+      y: next.y - Math.sin(nextAngle) * distance * smoothness,
+      flow: next.flow
+    };
+    
+    controlPoints.push([cp1, cp2]);
   }
-
-  return { cp1, cp2 };
-};
-
-/**
- * Generates a cubic bezier curve between two points
- */
-export const cubicBezierPath = (
-  start: [number, number],
-  end: [number, number],
-  smoothness: number = 0.5
-): string => {
-  const dx = end[0] - start[0];
-  const dy = end[1] - start[1];
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  const controlDistance = distance * smoothness;
-
-  const cp1: [number, number] = [
-    start[0] + (dx / 3),
-    start[1] + (dy / 3),
-  ];
-
-  const cp2: [number, number] = [
-    end[0] - (dx / 3),
-    end[1] - (dy / 3),
-  ];
-
-  return `M ${start[0]},${start[1]} C ${cp1[0]},${cp1[1]} ${cp2[0]},${cp2[1]} ${end[0]},${end[1]}`;
-}; 
+  
+  return controlPoints;
+} 
