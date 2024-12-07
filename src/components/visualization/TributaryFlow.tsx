@@ -33,7 +33,7 @@ interface TributaryFlowProps {
   tributaryColor?: string;
   previewColor?: string;
   width?: number;
-  smoothness?: number;  // New: controls curve smoothness (0-1)
+  smoothness?: number;  // Controls curve smoothness (0-1)
   onPreviewClick?: (index: number) => void;
   onClusterClick?: (cluster: POICluster) => void;
   onConnectionPointClick?: (point: ConnectionPoint) => void;
@@ -52,7 +52,7 @@ export const TributaryFlow: React.FC<TributaryFlowProps> = ({
   tributaryColor = '#60a5fa',
   previewColor = '#94a3b8',
   width = 4,
-  smoothness = 0.5,  // New
+  smoothness = 0.5,
   onPreviewClick,
   onClusterClick,
   onConnectionPointClick,
@@ -60,132 +60,52 @@ export const TributaryFlow: React.FC<TributaryFlowProps> = ({
   onDragEnd,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
-  const [draggedPoint, setDraggedPoint] = useState<ConnectionPoint | null>(null);
+  const [viewBox, setViewBox] = useState<string>('0 0 100 100');
 
-  // Calculate flow volumes and path data
-  const { mainPathData, tributaryPaths, flowVolumes } = useMemo(() => {
-    // Calculate flow volume for each segment
-    const volumes = new Map<string, number>();
-    const baseVolume = 1;
-    
-    // Start with main route segments
-    mainRoute.coordinates.forEach((_, i) => {
-      if (i < mainRoute.coordinates.length - 1) {
-        volumes.set(`main-${i}`, baseVolume);
-      }
-    });
+  // Calculate viewport bounds
+  useEffect(() => {
+    // Collect all points from all paths
+    const allPoints: [number, number][] = [
+      ...(mainRoute.coordinates as [number, number][]),
+      ...tributaries.flatMap(t => t.coordinates as [number, number][]),
+      ...previewTributaries.flatMap(t => t.coordinates as [number, number][]),
+      ...poiClusters.map(c => c.coordinates),
+      ...connectionPoints.map(c => c.coordinates),
+    ];
 
-    // Add tributary contributions
-    tributaries.forEach((tributary, tIndex) => {
-      const connectionPoint = tributary.coordinates[tributary.coordinates.length - 1] as [number, number];
-      const mainSegmentIndex = findNearestSegment(connectionPoint, mainRoute.coordinates as [number, number][]);
-      
-      if (mainSegmentIndex !== -1) {
-        const currentVolume = volumes.get(`main-${mainSegmentIndex}`) || baseVolume;
-        volumes.set(`main-${mainSegmentIndex}`, currentVolume + 0.3);
-      }
-    });
+    // Calculate bounds
+    const bounds = allPoints.reduce(
+      (acc, [x, y]) => ({
+        minX: Math.min(acc.minX, x),
+        minY: Math.min(acc.minY, y),
+        maxX: Math.max(acc.maxX, x),
+        maxY: Math.max(acc.maxY, y),
+      }),
+      { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
+    );
 
-    // Generate smooth paths
+    // Add padding (20% of the largest dimension)
+    const width = bounds.maxX - bounds.minX || 100;
+    const height = bounds.maxY - bounds.minY || 100;
+    const padding = Math.max(width, height) * 0.2;
+
+    setViewBox(
+      `${bounds.minX - padding} ${bounds.minY - padding} ${width + padding * 2} ${height + padding * 2}`
+    );
+  }, [mainRoute, tributaries, previewTributaries, poiClusters, connectionPoints]);
+
+  // Generate path data
+  const { mainPathData, tributaryPaths } = useMemo(() => {
     const mainSmooth = smoothPath(mainRoute.coordinates as [number, number][], smoothness);
-    const tributarySmooth = tributaries.map(t => 
-      smoothPath(t.coordinates as [number, number][], smoothness)
+    const tributarySmooth = tributaries.map(tributary => 
+      smoothPath(tributary.coordinates as [number, number][], smoothness)
     );
 
     return {
       mainPathData: mainSmooth,
       tributaryPaths: tributarySmooth,
-      flowVolumes: volumes,
     };
   }, [mainRoute, tributaries, smoothness]);
-
-  // Dynamic flow animation based on elevation and volume
-  const generateFlowAnimation = (index: number, isMain: boolean = false, elevation?: number) => {
-    const baseSpeed = flowSpeed;
-    const volumeFactor = isMain ? (flowVolumes.get(`main-${index}`) || 1) : 1;
-    const elevationFactor = elevation ? 1 + (elevation / 1000) : 1;
-    const finalSpeed = baseSpeed * elevationFactor / volumeFactor;
-
-    return {
-      strokeDashoffset: [0, -20],
-      transition: {
-        duration: 1.5 / finalSpeed,
-        ease: "linear",
-        repeat: Infinity,
-        delay: index * 0.2,
-      },
-    };
-  };
-
-  // Enhanced preview animation
-  const generatePreviewAnimation = () => ({
-    opacity: [0.4, 0.7],
-    transition: {
-      duration: 1.5,
-      ease: "easeInOut",
-      repeat: Infinity,
-      repeatType: "mirror" as const,
-    },
-  });
-
-  // Calculate variable width based on flow volume
-  const getSegmentWidth = (segmentIndex: number, isMain: boolean = false) => {
-    if (!isMain) return width * 0.8;
-    const volume = flowVolumes.get(`main-${segmentIndex}`) || 1;
-    return width * Math.sqrt(volume);
-  };
-
-  // Helper function to find nearest segment on main route
-  const findNearestSegment = (point: [number, number], routeCoords: [number, number][]) => {
-    let minDist = Infinity;
-    let nearestIndex = -1;
-
-    for (let i = 0; i < routeCoords.length - 1; i++) {
-      const dist = pointToLineDistance(point, routeCoords[i], routeCoords[i + 1]);
-      if (dist < minDist) {
-        minDist = dist;
-        nearestIndex = i;
-      }
-    }
-
-    return nearestIndex;
-  };
-
-  // Helper function to calculate point-to-line distance
-  const pointToLineDistance = (
-    point: [number, number],
-    lineStart: [number, number],
-    lineEnd: [number, number]
-  ) => {
-    const A = point[0] - lineStart[0];
-    const B = point[1] - lineStart[1];
-    const C = lineEnd[0] - lineStart[0];
-    const D = lineEnd[1] - lineStart[1];
-
-    const dot = A * C + B * D;
-    const lenSq = C * C + D * D;
-    let param = -1;
-
-    if (lenSq !== 0) param = dot / lenSq;
-
-    let xx, yy;
-
-    if (param < 0) {
-      xx = lineStart[0];
-      yy = lineStart[1];
-    } else if (param > 1) {
-      xx = lineEnd[0];
-      yy = lineEnd[1];
-    } else {
-      xx = lineStart[0] + param * C;
-      yy = lineStart[1] + param * D;
-    }
-
-    const dx = point[0] - xx;
-    const dy = point[1] - yy;
-
-    return Math.sqrt(dx * dx + dy * dy);
-  };
 
   // Helper function to get cluster color
   const getClusterColor = (type: POICluster['type']) => {
@@ -197,72 +117,54 @@ export const TributaryFlow: React.FC<TributaryFlowProps> = ({
     }
   };
 
-  // Helper function to handle drag constraints
-  const getDragConstraints = () => {
-    if (!svgRef.current) return {};
-    const bounds = svgRef.current.getBoundingClientRect();
-    return {
-      left: 0,
-      right: bounds.width,
-      top: 0,
-      bottom: bounds.height,
-    };
-  };
-
   return (
-    <svg ref={svgRef} className="tributary-flow" style={{ width: '100%', height: '100%' }}>
-      {/* Water flow effect gradient */}
-      <defs>
-        <linearGradient id="flowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" style={{ stopColor: mainColor, stopOpacity: 0.8 }} />
-          <stop offset="50%" style={{ stopColor: mainColor, stopOpacity: 0.9 }} />
-          <stop offset="100%" style={{ stopColor: mainColor, stopOpacity: 0.8 }} />
-        </linearGradient>
-      </defs>
+    <svg
+      ref={svgRef}
+      style={{ width: '100%', height: '100%' }}
+      viewBox={viewBox}
+      preserveAspectRatio="xMidYMid meet"
+    >
+      {/* Main route */}
+      <motion.path
+        d={mainPathData}
+        stroke={mainColor}
+        strokeWidth={width}
+        fill="none"
+        strokeDasharray="4 4"
+        animate={{
+          strokeDashoffset: [0, -20],
+        }}
+        transition={{
+          duration: 2 / flowSpeed,
+          ease: "linear",
+          repeat: Infinity,
+        }}
+      />
 
-      {/* Main route with enhanced flow effect */}
-      <g>
-        {/* Background flow path */}
-        <motion.path
-          d={mainPathData}
-          stroke="url(#flowGradient)"
-          strokeWidth={width * 1.2}
-          fill="none"
-          strokeLinecap="round"
-          style={{ opacity: 0.3 }}
-        />
-        {/* Main flow path */}
-        <motion.path
-          d={mainPathData}
-          stroke={mainColor}
-          strokeWidth={width}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray="4 4"
-          animate={generateFlowAnimation(0, true, mainRoute.elevation)}
-          style={{ filter: 'url(#glow)' }}
-        />
-      </g>
-
-      {/* Tributary routes with enhanced effects */}
+      {/* Tributary routes */}
       {tributaryPaths.map((path, index) => (
-        <g key={`tributary-${index}`}>
-          <motion.path
-            d={path}
-            stroke={tributaryColor}
-            strokeWidth={getSegmentWidth(index)}
-            fill="none"
-            strokeLinecap="round"
-            strokeDasharray="4 4"
-            animate={generateFlowAnimation(index + 1, false, tributaries[index].elevation)}
-            style={{ opacity: 0.8 }}
-          />
-        </g>
+        <motion.path
+          key={`tributary-${index}`}
+          d={path}
+          stroke={tributaryColor}
+          strokeWidth={width * 0.8}
+          fill="none"
+          strokeDasharray="4 4"
+          animate={{
+            strokeDashoffset: [0, -20],
+          }}
+          transition={{
+            duration: 2 / flowSpeed,
+            ease: "linear",
+            repeat: Infinity,
+            delay: index * 0.2,
+          }}
+        />
       ))}
 
-      {/* Preview tributaries with smooth curves */}
+      {/* Preview tributaries */}
       {previewTributaries.map((tributary, index) => {
-        const previewPath = smoothPath(tributary.coordinates, smoothness);
+        const previewPath = smoothPath(tributary.coordinates as [number, number][], smoothness);
         return (
           <motion.path
             key={`preview-${index}`}
@@ -270,9 +172,16 @@ export const TributaryFlow: React.FC<TributaryFlowProps> = ({
             stroke={previewColor}
             strokeWidth={width * 0.8}
             fill="none"
-            strokeLinecap="round"
             strokeDasharray="6 4"
-            animate={generatePreviewAnimation()}
+            animate={{
+              opacity: [0.4, 0.7],
+            }}
+            transition={{
+              duration: 1.5,
+              ease: "easeInOut",
+              repeat: Infinity,
+              repeatType: "mirror",
+            }}
             style={{ cursor: onPreviewClick ? 'pointer' : 'default' }}
             onClick={() => onPreviewClick?.(index)}
             whileHover={{ scale: 1.02 }}
@@ -315,7 +224,6 @@ export const TributaryFlow: React.FC<TributaryFlowProps> = ({
       {/* Connection Points */}
       {connectionPoints.map((point, index) => (
         <g key={`connection-${index}`}>
-          {/* Connection point indicator ring */}
           <motion.circle
             cx={point.coordinates[0]}
             cy={point.coordinates[1]}
@@ -334,29 +242,16 @@ export const TributaryFlow: React.FC<TributaryFlowProps> = ({
               ease: "easeInOut",
             }}
           />
-          {/* Draggable connection point */}
           <motion.circle
             cx={point.coordinates[0]}
             cy={point.coordinates[1]}
             r={width * point.suitability}
             fill={point.isActive ? mainColor : previewColor}
             opacity={0.8}
-            style={{ cursor: 'grab' }}
+            style={{ cursor: 'pointer' }}
             whileHover={{ scale: 1.2 }}
-            whileDrag={{ scale: 1.3, cursor: 'grabbing' }}
-            drag
-            dragConstraints={getDragConstraints()}
-            onDragStart={() => {
-              setDraggedPoint(point);
-              onDragStart?.(point);
-            }}
-            onDragEnd={() => {
-              onDragEnd?.(point);
-              setDraggedPoint(null);
-            }}
             onClick={() => onConnectionPointClick?.(point)}
           />
-          {/* Suitability indicator */}
           {point.suitability > 0.7 && (
             <motion.circle
               cx={point.coordinates[0]}
@@ -378,29 +273,4 @@ export const TributaryFlow: React.FC<TributaryFlowProps> = ({
       ))}
     </svg>
   );
-};
-
-// Helper function to generate SVG path data from GeoJSON coordinates
-const generatePathData = (geometry: GeoJSON.LineString): string => {
-  if (!geometry?.coordinates?.length) return '';
-  
-  return geometry.coordinates
-    .map((coord, i) => `${i === 0 ? 'M' : 'L'} ${coord[0]} ${coord[1]}`)
-    .join(' ');
-};
-
-// Helper function to calculate bounds for the SVG viewport
-const calculateBounds = (geometries: GeoJSON.LineString[]) => {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-  geometries.forEach(geometry => {
-    geometry.coordinates.forEach(([x, y]) => {
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-    });
-  });
-
-  return { minX, minY, maxX, maxY };
 }; 

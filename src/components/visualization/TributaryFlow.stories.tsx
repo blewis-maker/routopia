@@ -2,26 +2,14 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { TributaryFlow } from './TributaryFlow';
 import type { Position } from 'geojson';
 
-const meta: Meta<typeof TributaryFlow> = {
-  title: 'Visualization/TributaryFlow',
-  component: TributaryFlow,
-  parameters: {
-    layout: 'centered',
-  },
-  tags: ['autodocs'],
-};
-
-export default meta;
-type Story = StoryObj<typeof TributaryFlow>;
-
-// Sample route with elevation data
+// Sample route with wider spread coordinates
 const mainRoute = {
   type: 'LineString' as const,
   coordinates: [
     [0, 0],
-    [100, 0],
-    [150, 50],
-    [200, 50],
+    [200, 0],
+    [300, 100],
+    [400, 100],
   ] as Position[],
   elevation: 100,
 };
@@ -30,73 +18,93 @@ const tributaries = [
   {
     type: 'LineString' as const,
     coordinates: [
-      [50, 50],
-      [100, 0],
+      [100, 150],  // Start point
+      [195, 5],    // End point near but not exactly on main route
     ] as Position[],
     elevation: 200,
   },
   {
     type: 'LineString' as const,
     coordinates: [
-      [150, 100],
-      [150, 50],
+      [300, 200],  // Start point
+      [305, 98],   // End point near but not exactly on main route
     ] as Position[],
     elevation: 150,
   },
 ];
 
-const previewTributaries: GeoJSON.LineString[] = [
+// Preview tributaries
+const previewTributaries = [
   {
-    type: 'LineString',
+    type: 'LineString' as const,
     coordinates: [
-      [75, -50],
-      [75, 0],
-    ],
+      [150, -100],
+      [155, 3],    // End point near main route
+    ] as Position[],
   },
   {
-    type: 'LineString',
+    type: 'LineString' as const,
     coordinates: [
-      [175, 75],
-      [175, 50],
-    ],
+      [350, 150],
+      [345, 102],  // End point near main route
+    ] as Position[],
   },
 ];
 
-// Sample POI clusters
+// POI clusters
 const poiClusters = [
   {
-    coordinates: [50, 0] as [number, number],
+    coordinates: [100, 0] as [number, number],
     density: 0.8,
     type: 'scenic' as const,
   },
   {
-    coordinates: [150, 50] as [number, number],
+    coordinates: [300, 100] as [number, number],
     density: 1,
     type: 'activity' as const,
   },
   {
-    coordinates: [175, 50] as [number, number],
+    coordinates: [350, 100] as [number, number],
     density: 0.6,
     type: 'rest' as const,
   },
 ];
 
-// Sample connection points
+// Connection points
 const connectionPoints = [
   {
-    coordinates: [100, 0] as [number, number],
+    coordinates: [200, 0] as [number, number],
     suitability: 0.9,
     isActive: true,
   },
   {
-    coordinates: [150, 50] as [number, number],
+    coordinates: [300, 100] as [number, number],
     suitability: 0.8,
   },
   {
-    coordinates: [75, 0] as [number, number],
+    coordinates: [150, 0] as [number, number],
     suitability: 0.5,
   },
 ];
+
+const meta: Meta<typeof TributaryFlow> = {
+  title: 'Visualization/TributaryFlow',
+  component: TributaryFlow,
+  parameters: {
+    layout: 'centered',
+  },
+  decorators: [
+    (Story) => (
+      <div style={{ width: '800px', height: '600px', background: '#000' }}>
+        <Story />
+      </div>
+    ),
+  ],
+  tags: ['autodocs'],
+};
+
+export default meta;
+type Story = StoryObj<typeof TributaryFlow>;
 
 export const Default: Story = {
   args: {
@@ -125,6 +133,29 @@ export const SingleRoute: Story = {
   },
 };
 
+export const SmoothFlow: Story = {
+  args: {
+    mainRoute,
+    tributaries,
+    flowSpeed: 1,
+    smoothness: 0.7,  // Higher smoothness for more curved paths
+    width: 6,
+  },
+};
+
+export const WithPOIs: Story = {
+  args: {
+    mainRoute,
+    tributaries,
+    poiClusters,
+    flowSpeed: 1,
+    width: 4,
+    onClusterClick: (cluster) => {
+      console.log('Cluster clicked:', cluster);
+    },
+  },
+};
+
 export const WithPreview: Story = {
   args: {
     mainRoute,
@@ -140,20 +171,7 @@ export const WithPreview: Story = {
   },
 };
 
-export const WithClusters: Story = {
-  args: {
-    mainRoute,
-    tributaries,
-    poiClusters,
-    flowSpeed: 1,
-    width: 4,
-    onClusterClick: (cluster) => {
-      console.log('Cluster clicked:', cluster);
-    },
-  },
-};
-
-export const WithConnectionPoints: Story = {
+export const WithConnections: Story = {
   args: {
     mainRoute,
     tributaries,
@@ -163,42 +181,6 @@ export const WithConnectionPoints: Story = {
     onConnectionPointClick: (point) => {
       console.log('Connection point clicked:', point);
     },
-    onDragStart: (point) => {
-      console.log('Started dragging point:', point);
-    },
-    onDragEnd: (point) => {
-      console.log('Finished dragging point:', point);
-    },
-  },
-};
-
-export const SmoothFlow: Story = {
-  args: {
-    mainRoute,
-    tributaries,
-    flowSpeed: 1,
-    smoothness: 0.7,  // Higher smoothness for more curved paths
-    width: 6,
-  },
-};
-
-export const DynamicWidth: Story = {
-  args: {
-    mainRoute,
-    tributaries: [
-      ...tributaries,
-      {
-        type: 'LineString',
-        coordinates: [
-          [175, 75],
-          [175, 50],
-        ],
-        elevation: 120,
-      },
-    ],
-    flowSpeed: 1,
-    smoothness: 0.5,
-    width: 4,
   },
 };
 
@@ -236,12 +218,6 @@ export const FullFeatures: Story = {
     },
     onConnectionPointClick: (point) => {
       console.log('Connection point clicked:', point);
-    },
-    onDragStart: (point) => {
-      console.log('Started dragging point:', point);
-    },
-    onDragEnd: (point) => {
-      console.log('Finished dragging point:', point);
     },
   },
 }; 
