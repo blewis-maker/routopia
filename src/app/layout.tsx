@@ -1,6 +1,4 @@
-import '@/app/globals.css';
-import '@/styles/typography.css';
-import '@/styles/animations.css';
+import '@/styles';
 import { Providers } from '@/app/providers';
 import { Metadata, Viewport } from 'next';
 import { montserrat, inter } from './fonts';
@@ -60,9 +58,9 @@ export default async function RootLayout({
   const session = await getServerSession(authOptions);
 
   return (
-    <html lang="en" className={`${montserrat.variable} ${inter.variable} scroll-smooth`} suppressHydrationWarning>
-      <body className="antialiased font-sans bg-stone-950 text-stone-50" suppressHydrationWarning>
-        <Providers session={session}>
+    <html lang="en" className={`${montserrat.variable} ${inter.variable}`}>
+      <body className="antialiased bg-background-primary text-text-primary">
+        <Providers>
           <AppShell>{children}</AppShell>
         </Providers>
       </body>

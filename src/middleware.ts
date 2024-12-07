@@ -4,27 +4,24 @@ import type { NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
   const token = await getToken({ req: request })
-  const { pathname } = request.nextUrl
 
-  // Redirect authenticated users from / to /home
-  if (token && pathname === '/') {
-    return NextResponse.redirect(new URL('/home', request.url))
+  // Check if the request is for the dashboard area
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    if (!token) {
+      // Redirect to login if not authenticated
+      const loginUrl = new URL('/api/auth/signin', request.url)
+      loginUrl.searchParams.set('callbackUrl', request.nextUrl.pathname)
+      return NextResponse.redirect(loginUrl)
+    }
   }
 
-  // Allow all other requests to proceed
   return NextResponse.next()
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json|.*\\.png$).*)',
+    '/dashboard/:path*',
+    '/api/activities/:path*',
+    '/api/routes/:path*',
   ],
 }

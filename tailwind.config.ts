@@ -1,53 +1,44 @@
 import type { Config } from "tailwindcss";
+import { tokens } from './src/styles/tokens';
 
 const config: Config = {
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./.storybook/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.stories.{js,ts,jsx,tsx}"
   ],
   theme: {
     extend: {
-      fontFamily: {
-        montserrat: ['var(--font-montserrat)', 'sans-serif'],
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-      },
       colors: {
-        brand: {
-          primary: '#10B981', // emerald-500
-          'primary-dark': '#059669', // emerald-600
-          text: '#1F2937', // gray-800
+        ...tokens.colors.brand,
+        background: {
+          primary: 'var(--background-primary)',
+          secondary: 'var(--background-secondary)',
         },
       },
-      keyframes: {
-        bounce: {
-          '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-20px)' },
-        },
-        glow: {
-          '0%, 100%': {
-            filter: 'drop-shadow(0 0 8px rgba(45, 212, 191, 0.3))',
-          },
-          '50%': {
-            filter: 'drop-shadow(0 0 20px rgba(45, 212, 191, 0.6))',
-          },
-        },
-        'gradient-text': {
-          '0%, 100%': {
-            'background-size': '200% 200%',
-            'background-position': 'left center',
-          },
-          '50%': {
-            'background-size': '200% 200%',
-            'background-position': 'right center',
-          },
-        },
+      fontFamily: {
+        montserrat: tokens.typography.fonts.primary,
+        sans: tokens.typography.fonts.secondary,
       },
-      animation: {
-        'bounce-slow': 'bounce 2s ease-in-out infinite',
-        'gradient-text': 'gradient-text 3s ease infinite',
-        'logo-active': 'bounce 2s ease-in-out infinite, glow 2s ease-in-out infinite',
+      fontSize: tokens.typography.scale,
+      fontWeight: {
+        light: String(tokens.typography.weight.light),
+        normal: String(tokens.typography.weight.normal),
+        medium: String(tokens.typography.weight.medium),
+        semibold: String(tokens.typography.weight.semibold),
+        bold: String(tokens.typography.weight.bold),
       },
+      lineHeight: {
+        none: String(tokens.typography.lineHeight.none),
+        tight: String(tokens.typography.lineHeight.tight),
+        snug: String(tokens.typography.lineHeight.snug),
+        normal: String(tokens.typography.lineHeight.normal),
+        relaxed: String(tokens.typography.lineHeight.relaxed),
+        loose: String(tokens.typography.lineHeight.loose),
+      },
+      letterSpacing: tokens.typography.letterSpacing,
     },
   },
   plugins: [],

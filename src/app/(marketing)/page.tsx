@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Text, Heading } from '@/components/common/Typography';
 import SignUpModal from '@/components/SignUpModal';
 import VideoBackground from '@/components/landing/VideoBackground';
@@ -8,6 +8,12 @@ import Features from '@/components/landing/Features';
 
 export default function LandingPage() {
   const [isSignUpOpen, setIsSignUpOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 200); // Slightly delayed after AppShell
+    return () => clearTimeout(timer);
+  }, []);
 
   const scrollToLearnMore = () => {
     const featuresSection = document.getElementById('features');
@@ -19,7 +25,9 @@ export default function LandingPage() {
   return (
     <div className="relative">
       {/* Hero Section */}
-      <div className="relative min-h-screen">
+      <div className={`relative min-h-screen transition-opacity duration-500 ${
+        mounted ? 'opacity-100' : 'opacity-0'
+      }`}>
         {/* Video Background */}
         <VideoBackground videoUrl="/hero-bg.mp4" />
 

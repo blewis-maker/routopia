@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { User } from 'lucide-react';
+import { User, Menu, X } from 'lucide-react';
 import { montserrat } from '@/app/fonts';
 import { usePathname } from 'next/navigation';
 
@@ -14,8 +14,13 @@ const navigationItems = [
   { name: 'Activity Hub', href: '/activity-hub' },
 ];
 
-export default function NavigationBar() {
+interface NavigationBarProps {
+  className?: string;
+}
+
+export default function NavigationBar({ className = '' }: NavigationBarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const isLandingPage = pathname === '/';
 
@@ -43,8 +48,11 @@ export default function NavigationBar() {
       ${montserrat.className}
       ${isScrolled 
         ? 'bg-stone-900/80 backdrop-blur-md border-b border-stone-800'
-        : 'bg-transparent'
+        : isLandingPage 
+          ? 'bg-transparent'
+          : 'bg-stone-900'
       }
+      ${className}
     `}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
@@ -64,8 +72,8 @@ export default function NavigationBar() {
             </span>
           </Link>
 
-          {/* Navigation */}
-          <div className="flex items-center space-x-8">
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-8">
             {isLandingPage ? (
               <Link
                 href="/login"
@@ -96,6 +104,60 @@ export default function NavigationBar() {
               </>
             )}
           </div>
+
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2 rounded-md text-stone-300 hover:text-white"
+          >
+            {isMobileMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile menu */}
+      <div className={`
+        md:hidden
+        transition-all duration-300 ease-in-out
+        ${isMobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}
+        overflow-hidden
+        ${isScrolled ? 'bg-stone-900/80 backdrop-blur-md' : 'bg-stone-900'}
+      `}>
+        <div className="px-4 pt-2 pb-3 space-y-1">
+          {isLandingPage ? (
+            <Link
+              href="/login"
+              className="block px-3 py-2 rounded-md text-base font-medium text-stone-300 hover:text-white hover:bg-stone-800"
+            >
+              Login
+            </Link>
+          ) : (
+            <>
+              {navigationItems.map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={(e) => {
+                    handleNavClick(e, item.href, item.scroll);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="block px-3 py-2 rounded-md text-base font-medium text-stone-300 hover:text-white hover:bg-stone-800"
+                >
+                  {item.name}
+                </Link>
+              ))}
+              <Link
+                href="/login"
+                className="block px-3 py-2 rounded-md text-base font-medium text-stone-300 hover:text-white hover:bg-stone-800"
+              >
+                Login
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </nav>

@@ -1,0 +1,27 @@
+.poi-marker {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.poi-marker:hover {
+  transform: scale(1.1);
+}
+
+.poi-marker__icon {
+  width: 24px;
+  height: 24px;
+  fill: var(--poi-color, #3BA47A);
+  stroke: white;
+  stroke-width: 1;
+}
+
+.poi-marker__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--background-primary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+} 

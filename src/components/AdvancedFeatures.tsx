@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import '../styles/AdvancedFeatures.css';
+import '@/styles/components/features/AdvancedFeatures.css';
 import type { UserPreferences, FeatureFlags, WeatherAlert } from '../types/advanced';
 import { getWeatherAlerts } from '../services/weather';
 import { optimizeRoute } from '../services/routing';

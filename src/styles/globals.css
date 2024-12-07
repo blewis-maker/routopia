@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background-primary: #ffffff;
+  --background-secondary: #F8FAFC;
+  --background-tertiary: #F1F5F9;
+  
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --text-tertiary: #64748B;
+}
+
+[data-theme="dark"] {
+  --background-primary: #0F172A;
+  --background-secondary: #1E293B;
+  --background-tertiary: #334155;
+  
+  --text-primary: #F8FAFC;
+  --text-secondary: #E2E8F0;
+  --text-tertiary: #CBD5E1;
+}
+
+@layer base {
+  body {
+    @apply bg-white dark:bg-gray-900 text-gray-900 dark:text-white;
+  }
+}
+
+@layer utilities {
+  .bg-background-primary {
+    background-color: var(--background-primary);
+  }
+  .bg-background-secondary {
+    background-color: var(--background-secondary);
+  }
+  .bg-background-tertiary {
+    background-color: var(--background-tertiary);
+  }
+  .text-text-primary {
+    color: var(--text-primary);
+  }
+  .text-text-secondary {
+    color: var(--text-secondary);
+  }
+  .text-text-tertiary {
+    color: var(--text-tertiary);
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 rounded-lg font-semibold bg-gradient-to-r from-teal-400 to-emerald-400 
+           hover:from-teal-300 hover:to-emerald-300 transform transition-all duration-200 
+           hover:scale-[1.02] hover:shadow-lg hover:shadow-teal-500/25;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 rounded-lg font-semibold border border-stone-700 
+           hover:bg-stone-800 transition-all duration-200;
+  }
+
+  .btn-tertiary {
+    @apply px-4 py-2 rounded-lg font-semibold text-stone-400 
+           hover:text-stone-300 transition-colors duration-200;
+  }
+} 

@@ -12,33 +12,22 @@ export default function AppShell({ children }: AppShellProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => setMounted(true), 100);
+    return () => clearTimeout(timer);
   }, []);
 
-  // Prevent hydration mismatch by not rendering navigation until mounted
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-background-primary">
-        <main className="relative">
-          {children}
-        </main>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-background-primary">
-      <NavigationBar />
-      <CommandPalette />
+    <div className={`min-h-screen bg-background-primary transition-opacity duration-300 ${
+      mounted ? 'opacity-100' : 'opacity-0'
+    }`}>
+      <NavigationBar className={mounted ? 'opacity-100' : 'opacity-0'} />
+      {mounted && <CommandPalette />}
       
       <main className="relative">
         {children}
       </main>
 
-      {/* Toast Container for Notifications */}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2">
-        {/* Toasts will be rendered here */}
-      </div>
+      <div className="fixed bottom-4 right-4 z-50 space-y-2" />
     </div>
   );
 } 

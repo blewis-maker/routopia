@@ -1,0 +1,25 @@
+.route-drawing {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.route-drawing__line {
+  stroke: var(--route-color, #2BAF9D);
+  stroke-width: 3;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.route-drawing__point {
+  fill: var(--point-color, #3BA47A);
+  stroke: white;
+  stroke-width: 2;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.route-drawing__point:hover {
+  transform: scale(1.2);
+} 

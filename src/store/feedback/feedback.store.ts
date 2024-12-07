@@ -1,95 +1,52 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { Alert, Notification, InteractionFeedback } from '@/types/feedback.types';
 
 interface FeedbackState {
-  // Core state
-  alerts: Alert[];
-  notifications: Notification[];
-  interactionFeedback: InteractionFeedback[];
-  
-  // Feedback settings
-  settings: {
-    alertDuration: number;
-    notificationDuration: number;
-    feedbackTypes: Set<string>;
-  };
-
-  // Actions
-  addAlert: (alert: Alert) => void;
-  dismissAlert: (alertId: string) => void;
-  addNotification: (notification: Notification) => void;
-  markAsRead: (notificationId: string) => void;
-  addFeedback: (feedback: InteractionFeedback) => void;
-  clearFeedback: (feedbackId: string) => void;
-  updateSettings: (settings: Partial<FeedbackState['settings']>) => void;
-  clearAll: () => void;
+  alerts: Array<{
+    id: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+  }>;
+  notifications: Array<{
+    id: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+  }>;
+  interactionFeedback: Array<{
+    id: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+  }>;
+  addAlert: (alert: { message: string; type: 'success' | 'error' | 'info' | 'warning' }) => void;
+  addNotification: (notification: { message: string; type: 'success' | 'error' | 'info' | 'warning' }) => void;
+  addFeedback: (feedback: { message: string; type: 'success' | 'error' | 'info' | 'warning' }) => void;
+  clearAlerts: () => void;
+  clearNotifications: () => void;
+  clearFeedback: () => void;
 }
 
 export const useFeedbackStore = create<FeedbackState>()(
   devtools(
     (set) => ({
-      // Initial state
       alerts: [],
       notifications: [],
       interactionFeedback: [],
-      settings: {
-        alertDuration: 5000,
-        notificationDuration: 7000,
-        feedbackTypes: new Set(['success', 'error', 'warning', 'info'])
-      },
-
-      // Actions
       addAlert: (alert) =>
         set((state) => ({
-          alerts: [...state.alerts, alert]
+          alerts: [...state.alerts, { ...alert, id: Math.random().toString() }],
         })),
-
-      dismissAlert: (alertId) =>
-        set((state) => ({
-          alerts: state.alerts.filter(alert => alert.id !== alertId)
-        })),
-
       addNotification: (notification) =>
         set((state) => ({
-          notifications: [...state.notifications, notification]
+          notifications: [...state.notifications, { ...notification, id: Math.random().toString() }],
         })),
-
-      markAsRead: (notificationId) =>
-        set((state) => ({
-          notifications: state.notifications.map(notif =>
-            notif.id === notificationId
-              ? { ...notif, read: true }
-              : notif
-          )
-        })),
-
       addFeedback: (feedback) =>
         set((state) => ({
-          interactionFeedback: [...state.interactionFeedback, feedback]
+          interactionFeedback: [...state.interactionFeedback, { ...feedback, id: Math.random().toString() }],
         })),
-
-      clearFeedback: (feedbackId) =>
-        set((state) => ({
-          interactionFeedback: state.interactionFeedback.filter(
-            feedback => feedback.id !== feedbackId
-          )
-        })),
-
-      updateSettings: (newSettings) =>
-        set((state) => ({
-          settings: {
-            ...state.settings,
-            ...newSettings
-          }
-        })),
-
-      clearAll: () =>
-        set({
-          alerts: [],
-          notifications: [],
-          interactionFeedback: []
-        })
-    })
+      clearAlerts: () => set({ alerts: [] }),
+      clearNotifications: () => set({ notifications: [] }),
+      clearFeedback: () => set({ interactionFeedback: [] }),
+    }),
+    { name: 'feedback-store' }
   )
 ); 

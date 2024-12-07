@@ -1,30 +1,31 @@
-:root {
-  /* Light mode defaults */
-  --background-primary: #ffffff;
-  --background-secondary: #F7F4F1;
-  --background-tertiary: #EFE9E3;
-  
-  --text-primary: #2E2E2E;
-  --text-secondary: #4B5563;
-  --text-tertiary: #6B7280;
-  
-  --action-primary: #2BAF9D;
-  --action-secondary: #3BA47A;
-  --action-hover: #238C7E;
-  --action-disabled: #99E0D5;
+@layer base {
+  :root {
+    --color-primary: theme('colors.teal.400');
+    --color-primary-dark: theme('colors.teal.500');
+    --color-primary-light: theme('colors.teal.300');
+    
+    --color-secondary: theme('colors.emerald.400');
+    --color-secondary-dark: theme('colors.emerald.500');
+    --color-secondary-light: theme('colors.emerald.300');
+  }
+
+  .dark {
+    --color-primary: theme('colors.teal.500');
+    --color-primary-dark: theme('colors.teal.600');
+    --color-primary-light: theme('colors.teal.400');
+    
+    --color-secondary: theme('colors.emerald.500');
+    --color-secondary-dark: theme('colors.emerald.600');
+    --color-secondary-light: theme('colors.emerald.400');
+  }
 }
 
-[data-theme="dark"] {
-  --background-primary: #1A1A1A;
-  --background-secondary: #2E2E2E;
-  --background-tertiary: #404040;
-  
-  --text-primary: #F3F0E7;
-  --text-secondary: #D1D5DB;
-  --text-tertiary: #9CA3AF;
-  
-  --action-primary: #33C1AC;
-  --action-secondary: #47AF87;
-  --action-hover: #2BAF9D;
-  --action-disabled: #1A695E;
+@layer utilities {
+  .bg-gradient-brand {
+    @apply bg-gradient-to-r from-teal-400 to-emerald-400;
+  }
+
+  .text-gradient-brand {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400;
+  }
 } 
