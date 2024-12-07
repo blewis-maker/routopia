@@ -51,3 +51,45 @@ export const typeGuards = {
     );
   }
 }; 
+
+export type TypographyScale = 
+  | 'xs' 
+  | 'sm' 
+  | 'base' 
+  | 'lg' 
+  | 'xl' 
+  | '2xl' 
+  | '3xl' 
+  | '4xl' 
+  | '5xl'
+
+export type ColorToken = 
+  | 'primary' 
+  | 'primary-dark'
+  | 'secondary'
+  | 'secondary-dark'
+  | 'bg-primary'
+  | 'bg-secondary'
+  | 'bg-hover'
+  | 'text-primary'
+  | 'text-secondary'
+
+export const isTypographyScale = (value: unknown): value is TypographyScale => {
+  const validScales = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl']
+  return typeof value === 'string' && validScales.includes(value)
+}
+
+export const isColorToken = (value: unknown): value is ColorToken => {
+  const validTokens = [
+    'primary',
+    'primary-dark',
+    'secondary',
+    'secondary-dark',
+    'bg-primary',
+    'bg-secondary',
+    'bg-hover',
+    'text-primary',
+    'text-secondary'
+  ]
+  return typeof value === 'string' && validTokens.includes(value)
+} 

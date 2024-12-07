@@ -1,156 +1,176 @@
 'use client';
 
 import Link from 'next/link';
-import { MapPin, Navigation, Route, Compass, ArrowRight, Play } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowRight, ChevronDown } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { combineClasses, getTypographyClass } from '@/utils/formatters';
+import SignUpModal from '@/components/SignUpModal';
 import VideoBackground from '@/components/landing/VideoBackground';
+import Features from '@/components/landing/Features';
 
 export default function Home() {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isSignUpModalOpen, setIsSignUpModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
-    <div className="min-h-screen">
+    <main className="relative">
+      {/* Sign Up Modal */}
+      <SignUpModal 
+        isOpen={isSignUpModalOpen} 
+        onClose={() => setIsSignUpModalOpen(false)} 
+      />
+
+      {/* Navbar - Highest z-index */}
+      <header className={combineClasses(
+        "fixed top-0 left-0 right-0 z-50",
+        "transition-all duration-300",
+        isScrolled ? "bg-black/80 backdrop-blur-sm shadow-lg" : "bg-transparent",
+        "py-4"
+      )}>
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+          <div className="flex items-center">
+            <Link href="/" className="flex items-center">
+              <Image
+                src="/routopia-logo.png"
+                alt="Routopia"
+                width={40}
+                height={40}
+                className="h-10 w-auto"
+              />
+              <span className="ml-3 text-white font-bold text-2xl">Routopia</span>
+            </Link>
+          </div>
+
+          <div className="hidden md:flex items-center gap-8">
+            <Link href="#features" className="text-white/80 hover:text-white transition-colors">Features</Link>
+            <Link href="/route-planner" className="text-white/80 hover:text-white transition-colors">Route Planner</Link>
+            <Link href="/poi-explorer" className="text-white/80 hover:text-white transition-colors">POI Explorer</Link>
+            <Link href="/activity-hub" className="text-white/80 hover:text-white transition-colors">Activity Hub</Link>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <Link href="/login" className="text-white/80 hover:text-white transition-colors">Login</Link>
+            <button 
+              onClick={() => setIsSignUpModalOpen(true)}
+              className={combineClasses(
+                "px-4 py-2 rounded-lg",
+                "bg-brand-primary hover:bg-brand-primary/90",
+                "text-white font-medium",
+                "transition-all duration-300",
+                "transform hover:scale-105"
+              )}
+            >
+              Get Started
+            </button>
+          </div>
+        </nav>
+      </header>
+
       {/* Hero Section */}
-      <section className="relative min-h-[90vh] flex items-center">
-        <VideoBackground
-          videoUrl="/hero-bg.mp4"
-          posterUrl="/routopia-logo.png"
-        />
+      <section className="relative min-h-screen">
+        {/* Video Background */}
+        <div className="absolute inset-0 z-0">
+          <VideoBackground
+            videoUrl="/hero-bg.mp4"
+            posterUrl="/routopia-logo.png"
+          />
+        </div>
         
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <div className="max-w-3xl mx-auto lg:mx-0">
-            <h1 className="font-montserrat text-5xl sm:text-6xl lg:text-7xl tracking-tight font-extrabold text-white animate-fade-in-up">
-              <span className="block mb-2">Discover Your</span>
-              <span className="block bg-gradient-to-r from-brand-primary to-emerald-400 text-transparent bg-clip-text animate-gradient-text">
-                Perfect Route
-              </span>
-            </h1>
-            
-            <p className="mt-8 font-inter text-xl leading-relaxed text-white/90 max-w-2xl animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-              AI-powered route planning that adapts to your preferences, weather conditions, and points of interest.
-              Experience smarter navigation for your outdoor adventures.
-            </p>
-            
-            <div className="mt-12 flex flex-col sm:flex-row sm:items-center gap-6 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
-              <Link 
-                href="/routopia"
-                className="
-                  inline-flex items-center justify-center 
-                  px-8 py-4 
-                  text-base font-medium
-                  rounded-lg 
-                  text-white 
-                  bg-brand-primary
-                  hover:bg-brand-primary/90
-                  transform hover:scale-105
-                  transition-all duration-300
-                  shadow-lg hover:shadow-brand-primary/25
-                "
-              >
-                Get Started
-                <ArrowRight className="ml-3 -mr-1 h-5 w-5 animate-bounce-x" />
-              </Link>
+        {/* Hero Content */}
+        <div className="relative z-10 flex items-center justify-center min-h-screen">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+            <div className="max-w-3xl">            
+              <h1 className={combineClasses(
+                "font-montserrat tracking-tight font-extrabold text-white",
+                getTypographyClass('5xl'),
+                "animate-fade-in-up"
+              )}>
+                <span className="block mb-2">Discover Your</span>
+                <span className="block bg-gradient-to-r from-brand-primary to-emerald-400 text-transparent bg-clip-text animate-gradient-text">
+                  Perfect Route
+                </span>
+              </h1>
               
-              <Link
-                href="#features"
-                className="
-                  inline-flex items-center justify-center 
-                  px-8 py-4 
-                  text-base font-medium
-                  rounded-lg 
-                  text-white 
-                  border-2 border-white/20
-                  hover:bg-white/10 
-                  backdrop-blur-sm
-                  transform hover:scale-105
-                  transition-all duration-300
-                "
-              >
-                Learn More
-              </Link>
+              <p className={combineClasses(
+                "mt-8 font-inter text-white/90 max-w-2xl",
+                getTypographyClass('xl'),
+                "leading-relaxed animate-fade-in-up"
+              )} style={{ animationDelay: '0.2s' }}>
+                AI-powered route planning that adapts to your preferences, weather conditions, and points of interest.
+                Experience smarter navigation for your outdoor adventures.
+              </p>
+              
+              <div className="mt-12 flex flex-col sm:flex-row sm:items-center gap-6 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+                <button 
+                  onClick={() => setIsSignUpModalOpen(true)}
+                  className={combineClasses(
+                    "inline-flex items-center justify-center",
+                    "px-8 py-4",
+                    "text-base font-medium",
+                    "rounded-lg",
+                    "text-white",
+                    "bg-brand-primary",
+                    "hover:bg-brand-primary/90",
+                    "transform hover:scale-105",
+                    "transition-all duration-300",
+                    "shadow-lg hover:shadow-brand-primary/25"
+                  )}
+                >
+                  Get Started
+                  <ArrowRight className="ml-3 -mr-1 h-5 w-5 animate-bounce-x" />
+                </button>
+                
+                <Link
+                  href="#features"
+                  className={combineClasses(
+                    "inline-flex items-center justify-center",
+                    "px-8 py-4",
+                    "text-base font-medium",
+                    "rounded-lg",
+                    "text-white",
+                    "border-2 border-white/20",
+                    "hover:bg-white/10",
+                    "backdrop-blur-sm",
+                    "transform hover:scale-105",
+                    "transition-all duration-300"
+                  )}
+                >
+                  Learn More
+                </Link>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Scroll Indicator */}
+        <button 
+          onClick={() => {
+            document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          className={combineClasses(
+            "absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10",
+            "flex flex-col items-center gap-2",
+            "text-white/60 hover:text-white",
+            "transition-colors duration-300",
+            "animate-bounce cursor-pointer"
+          )}
+        >
+          <span className="text-sm font-medium">Scroll to explore</span>
+          <ChevronDown className="h-6 w-6" />
+        </button>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="relative py-24 sm:py-32 bg-brand-offwhite">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h2 className="font-montserrat text-base font-semibold text-brand-primary tracking-wide uppercase">
-              Features
-            </h2>
-            <p className="mt-2 font-montserrat text-3xl font-extrabold text-brand-text sm:text-4xl">
-              Everything you need for smarter navigation
-            </p>
-            <p className="mt-4 max-w-2xl mx-auto font-inter text-xl text-brand-text/80">
-              Experience the future of route planning with our comprehensive set of features.
-            </p>
-          </div>
-
-          <div className="mt-20">
-            <div className="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-2">
-              {[
-                {
-                  title: 'AI Route Generation',
-                  description: 'Intelligent pathfinding that considers your preferences, terrain, and points of interest.',
-                  icon: Route,
-                },
-                {
-                  title: 'Smart POI Discovery',
-                  description: 'Automatically discover and integrate interesting locations along your journey.',
-                  icon: MapPin,
-                },
-                {
-                  title: 'Real-time Navigation',
-                  description: 'Turn-by-turn directions with live updates and route optimization.',
-                  icon: Navigation,
-                },
-                {
-                  title: 'Weather Integration',
-                  description: 'Plan around weather conditions with integrated forecasts and alerts.',
-                  icon: Compass,
-                },
-              ].map((feature) => (
-                <div
-                  key={feature.title}
-                  className="relative flex flex-col gap-6 p-8 rounded-2xl bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-lg bg-brand-primary/10">
-                      <feature.icon className="h-6 w-6 text-brand-primary" />
-                    </div>
-                    <h3 className="font-montserrat text-xl font-semibold text-brand-text">
-                      {feature.title}
-                    </h3>
-                  </div>
-                  <p className="font-inter text-brand-text/80 leading-relaxed">
-                    {feature.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="relative py-16 sm:py-24 bg-gradient-to-b from-brand-offwhite to-white">
-        <div className="max-w-7xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="font-montserrat text-3xl font-extrabold tracking-tight text-brand-text sm:text-4xl">
-            <span className="block">Ready to get started?</span>
-            <span className="block text-brand-primary mt-2">
-              Start planning your next adventure today.
-            </span>
-          </h2>
-          <div className="mt-8">
-            <Link
-              href="/routopia"
-              className="inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-medium rounded-lg text-white bg-brand-primary hover:bg-brand-primary/90 transition-colors duration-200 shadow-lg hover:shadow-xl"
-            >
-              Get Started
-              <ArrowRight className="ml-2 -mr-1 h-5 w-5" />
-            </Link>
-          </div>
-        </div>
-      </section>
-    </div>
+      <Features />
+    </main>
   );
 }

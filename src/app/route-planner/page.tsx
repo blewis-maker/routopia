@@ -1,76 +1,42 @@
 'use client';
 
 import { useState } from 'react';
-import { RouteBuilder } from '@/components/route/RouteBuilder';
-import { POISelector } from '@/components/route/POISelector';
-import { WeatherOverlay } from '@/components/route/WeatherOverlay';
-import { ActivityOptions } from '@/components/route/ActivityOptions';
-import { RealTimeMap } from '@/components/route/RealTimeMap';
+import { RouteCreator } from '@/components/route/RouteCreator';
+import { RoutePreferences } from '@/components/route/RoutePreferences';
+import { RoutePreview } from '@/components/route/RoutePreview';
+import { RouteVisualization } from '@/components/route/RouteVisualization';
+import { RouteInteractionPanel } from '@/components/route/RouteInteractionPanel';
 import { useAuth } from '@/hooks/useAuth';
-import type { Route, POI, ActivityType } from '@/types';
 
 export default function RoutePlannerPage() {
-  const { session, status } = useAuth();
-  const [selectedActivity, setSelectedActivity] = useState<ActivityType | null>(null);
-  const [selectedPOIs, setSelectedPOIs] = useState<POI[]>([]);
-  const [route, setRoute] = useState<Route | null>(null);
-
-  if (status === 'loading') {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-emerald-500"></div>
-      </div>
-    );
-  }
-
-  if (!session) {
-    return null; // Protected by middleware, will redirect
-  }
+  const [activeRoute, setActiveRoute] = useState(null);
+  const { user } = useAuth();
 
   return (
-    <div className="flex h-screen">
-      {/* Left Panel */}
-      <div className="w-[400px] bg-stone-900 p-4 overflow-y-auto">
-        <h1 className="text-2xl font-bold mb-6 text-white">Route Planner</h1>
-        
-        <div className="space-y-6">
-          {/* Activity Options */}
-          <ActivityOptions
-            selectedActivity={selectedActivity}
-            onActivitySelect={setSelectedActivity}
-          />
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
+      <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Panel - Route Creation */}
+          <div className="lg:col-span-1">
+            <RoutePreferences />
+            <RouteCreator onRouteCreate={setActiveRoute} />
+          </div>
 
-          {/* Route Builder */}
-          <RouteBuilder
-            activity={selectedActivity}
-            selectedPOIs={selectedPOIs}
-            route={route}
-            onRouteUpdate={setRoute}
-          />
+          {/* Center Panel - Map Visualization */}
+          <div className="lg:col-span-2">
+            <RouteVisualization route={activeRoute} />
+            <RoutePreview route={activeRoute} />
+          </div>
+        </div>
 
-          {/* POI Selector */}
-          <POISelector
-            activity={selectedActivity}
-            selectedPOIs={selectedPOIs}
-            onPOISelect={setSelectedPOIs}
-          />
-
-          {/* Weather Overlay Controls */}
-          <WeatherOverlay
-            route={route}
-            activity={selectedActivity}
+        {/* Bottom Panel - Interaction Controls */}
+        <div className="mt-8">
+          <RouteInteractionPanel 
+            route={activeRoute}
+            onRouteUpdate={setActiveRoute}
+            user={user}
           />
         </div>
-      </div>
-
-      {/* Map View */}
-      <div className="flex-1 relative">
-        <RealTimeMap
-          route={route}
-          pois={selectedPOIs}
-          activity={selectedActivity}
-          showWeather={true}
-        />
       </div>
     </div>
   );

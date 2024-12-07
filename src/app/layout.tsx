@@ -1,4 +1,5 @@
 import '@/app/globals.css';
+import '@/styles/typography.css';
 import { AuthProvider } from '@/components/AuthProvider';
 import AppShell from '@/components/layout/AppShell';
 import { Metadata } from 'next';
@@ -20,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${montserrat.variable} ${inter.variable}`}>
-      <body className="antialiased">
+    <html lang="en" className={`${montserrat.variable} ${inter.variable}`} suppressHydrationWarning>
+      <body className="antialiased font-sans bg-background text-foreground" suppressHydrationWarning>
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>

@@ -62,7 +62,8 @@
     "react-dom": "^18.2.0",
     "styled-components": "^6.1.13",
     "tailwind-merge": "^2.0.0",
-    "uuid": "^11.0.3"
+    "uuid": "^11.0.3",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "@tailwindcss/aspect-ratio": "^0.4.2",

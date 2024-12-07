@@ -1,0 +1,30 @@
+:root {
+  /* Light mode defaults */
+  --background-primary: #ffffff;
+  --background-secondary: #F7F4F1;
+  --background-tertiary: #EFE9E3;
+  
+  --text-primary: #2E2E2E;
+  --text-secondary: #4B5563;
+  --text-tertiary: #6B7280;
+  
+  --action-primary: #2BAF9D;
+  --action-secondary: #3BA47A;
+  --action-hover: #238C7E;
+  --action-disabled: #99E0D5;
+}
+
+[data-theme="dark"] {
+  --background-primary: #1A1A1A;
+  --background-secondary: #2E2E2E;
+  --background-tertiary: #404040;
+  
+  --text-primary: #F3F0E7;
+  --text-secondary: #D1D5DB;
+  --text-tertiary: #9CA3AF;
+  
+  --action-primary: #33C1AC;
+  --action-secondary: #47AF87;
+  --action-hover: #2BAF9D;
+  --action-disabled: #1A695E;
+} 
