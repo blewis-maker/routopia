@@ -1,400 +1,176 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import type { 
-  ActivityType, 
-  Route, 
-  RouteSegment, 
-  RoutePreferences, 
-  RouteMetrics,
-  RouteValidationResult,
-  OptimizationType,
-  OptimizationLevel
-} from '@/types/route/types';
-import { RouteDrawing } from './RouteDrawing';
-import { RoutePreview } from './RoutePreview';
-import { RoutePreferences as RoutePreferencesComponent } from './RoutePreferences';
-import { routeService } from '@/services/routeService';
-import { MultiSegmentRouteOptimizer } from '@/services/route/MultiSegmentRouteOptimizer';
-import { TerrainAnalysisService } from '@/services/terrain/TerrainAnalysisService';
-import { WeatherService } from '@/services/weather/WeatherService';
-import { TrafficService } from '@/services/traffic/TrafficService';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { Toast } from '@/components/common/Toast';
+import React from 'react';
+import { MapView } from '../shared/MapView';
+import { RouteSidebar } from '../shared/RouteSidebar';
+import { ChatInterface } from '../chat/ChatInterface';
+import { MapToolbar } from '../map/MapToolbar';
+import { MapLegend } from '../map/MapLegend';
+import { POIMarkers } from '../map/POIMarkers';
+import { RouteLayer } from '../map/RouteLayer';
+import { useRouteCollaboration } from '@/hooks/useRouteCollaboration';
+import { useMCPClient } from '@/hooks/useMCPClient';
 
-interface Props {
-  activityType: ActivityType;
-  onRouteCreate: (route: Route) => void;
-  onCancel: () => void;
-  mapInstance?: mapboxgl.Map;
+interface RouteCreatorProps {
+  sessionId: string;
 }
 
-export const RouteCreator: React.FC<Props> = ({
-  activityType,
-  onRouteCreate,
-  onCancel,
-  mapInstance
-}) => {
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
-  const [currentSegment, setCurrentSegment] = useState<RouteSegment | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [routeName, setRouteName] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [validationResult, setValidationResult] = useState<RouteValidationResult | null>(null);
+export const RouteCreator: React.FC<RouteCreatorProps> = ({ sessionId }) => {
+  const [selectedTributaryId, setSelectedTributaryId] = React.useState<string | undefined>();
+  const [selectedPOIId, setSelectedPOIId] = React.useState<string | undefined>();
+  const [isLoading, setIsLoading] = React.useState(true);
 
-  const [preferences, setPreferences] = useState<RoutePreferences>({
-    activityType,
-    avoidHighways: false,
-    avoidTraffic: true,
-    preferScenic: false,
-    maxElevationGain: 100,
-    safetyThreshold: 0.8,
-    weatherSensitivity: 0.5,
-    terrainSensitivity: 0.5,
-    weights: {
-      distance: 0.2,
-      duration: 0.2,
-      effort: 0.2,
-      safety: 0.2,
-      comfort: 0.2
-    },
-    optimizationLevel: 'advanced' as OptimizationLevel
-  });
+  // Use existing hooks for MCP integration
+  const mcpClient = useMCPClient();
+  const {
+    state: routeState,
+    updateMainRoute,
+    addTributary,
+    updateTributary,
+    addPOI,
+    updateCursor,
+    selectTributary,
+  } = useRouteCollaboration(sessionId);
 
-  const validateRoute = useCallback((): RouteValidationResult => {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-
-    if (!routeName.trim()) {
-      errors.push('Route name is required');
-    }
-
-    if (routeSegments.length === 0) {
-      errors.push('At least one route segment is required');
-    }
-
-    routeSegments.forEach((segment, index) => {
-      if (segment.distance === 0) {
-        errors.push(`Segment ${index + 1} has invalid distance`);
-      }
-      if (!segment.startPoint || !segment.endPoint) {
-        errors.push(`Segment ${index + 1} has invalid points`);
-      }
-    });
-
-    if (preferences.maxDistance && routeSegments.reduce((sum, seg) => sum + seg.distance, 0) > preferences.maxDistance) {
-      warnings.push('Total route distance exceeds preferred maximum');
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      warnings
-    };
-  }, [routeName, routeSegments, preferences]);
-
-  const handleSegmentComplete = async (points: [number, number][]) => {
-    if (points.length < 2) {
-      setError('A segment must have at least two points');
-      return;
-    }
-
-    try {
-      const newSegment: RouteSegment = {
-        id: `segment-${routeSegments.length + 1}`,
-        startPoint: {
-          latitude: points[0][0],
-          longitude: points[0][1]
-        },
-        endPoint: {
-          latitude: points[points.length - 1][0],
-          longitude: points[points.length - 1][1]
-        },
-        type: activityType,
-        distance: 0, // Will be calculated
-        duration: 0, // Will be calculated
-        metrics: {
-          distance: 0,
-          duration: 0,
-          elevation: {
-            gain: 0,
-            loss: 0,
-            profile: []
-          },
-          safety: 0.9,
-          weatherImpact: 0,
-          terrainDifficulty: 'easy',
-          surfaceType: 'paved'
-        }
-      };
-
-      setCurrentSegment(newSegment);
-      setRouteSegments([...routeSegments, newSegment]);
-      setIsDrawing(false);
-      setShowPreview(true);
-      setError(null);
-    } catch (err) {
-      setError('Failed to create route segment');
-      console.error('Segment creation error:', err);
+  // Handle map interactions
+  const handleTributaryHover = (tributaryId: string | null) => {
+    if (tributaryId) {
+      setSelectedTributaryId(tributaryId);
     }
   };
 
-  const handleAddSegment = () => {
-    const validation = validateRoute();
-    if (validation.errors?.length) {
-      setError(validation.errors[0]);
-      return;
-    }
-    setIsDrawing(true);
-    setShowPreview(false);
+  const handleTributaryClick = (tributaryId: string) => {
+    setSelectedTributaryId(tributaryId);
+    selectTributary(tributaryId);
   };
 
-  const handleOptimizeRoute = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const weatherService = new WeatherService();
-      const terrainService = new TerrainAnalysisService();
-      const trafficService = new TrafficService();
-      
-      const optimizer = new MultiSegmentRouteOptimizer(
-        weatherService,
-        terrainService,
-        trafficService
-      );
-
-      const optimizedRoute: Route = {
-        id: `route-${Date.now()}`,
-        name: routeName,
-        segments: routeSegments,
-        preferences,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
-      const result = await optimizer.optimizeMultiSegmentRoute(optimizedRoute);
-      setRouteSegments(result.segments);
-      return result;
-    } catch (error) {
-      console.error('Failed to optimize route:', error);
-      setError('Failed to optimize route. Please try again.');
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
+  const handlePOIClick = (poiId: string) => {
+    setSelectedPOIId(poiId);
   };
 
-  const handleSaveRoute = async () => {
-    const validation = validateRoute();
-    setValidationResult(validation);
-
-    if (!validation.isValid) {
-      setError(validation.errors?.[0] || 'Invalid route');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const optimizedRoute = await handleOptimizeRoute();
-      if (!optimizedRoute) return;
-
-      await routeService.saveRoute(optimizedRoute);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-      onRouteCreate(optimizedRoute);
-    } catch (error) {
-      console.error('Failed to save route:', error);
-      setError('Failed to save route. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleMapClick = (point: [number, number]) => {
+    updateCursor(point);
   };
+
+  // Convert route state to component props
+  const mapRoute = routeState.mainRoute.coordinates.length > 0 ? {
+    coordinates: routeState.mainRoute.coordinates,
+    color: '#2563EB', // Primary blue for main river
+    metadata: routeState.mainRoute.metadata
+  } : undefined;
 
   return (
-    <ErrorBoundary>
-      <div className="route-creator">
-        {error && (
-          <Toast 
-            message={error}
-            type="error"
-            duration={5000}
-            onClose={() => setError(null)}
-          />
-        )}
-        {saveSuccess && (
-          <Toast 
-            message="Route saved successfully"
-            type="success"
-            duration={3000}
-            onClose={() => setSaveSuccess(false)}
-          />
-        )}
-        <div className="route-form">
-          <label htmlFor="routeName">
-            Route Name
-            <input
-              id="routeName"
-              type="text"
-              className={`form-input ${!routeName.trim() && validationResult ? 'error' : ''}`}
-              aria-label="Route Name"
-              value={routeName}
-              onChange={(e) => setRouteName(e.target.value)}
-              required
-            />
-            {!routeName.trim() && validationResult && (
-              <span className="error-message">Route name is required</span>
-            )}
-          </label>
-          
-          <div className="segments-container">
-            <h3>Route Segments</h3>
-            {routeSegments.map((segment, index) => (
-              <div key={segment.id} className="segment-item">
-                <span>Segment {index + 1}: {segment.type}</span>
-                <span>Distance: {segment.distance}m</span>
-                {segment.metrics.weatherImpact !== null && (
-                  <span>Weather Impact: {Math.round(segment.metrics.weatherImpact * 100)}%</span>
-                )}
-              </div>
-            ))}
-            <button 
-              onClick={handleAddSegment}
-              className="add-segment-button"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Processing...' : 'Add New Segment'}
-            </button>
-          </div>
+    <div className="flex h-screen">
+      {/* Main Map Area */}
+      <div className="relative flex-1">
+        <MapView
+          center={[-74.6, 40.1]} // Default center, should come from user preferences
+          zoom={11}
+          route={mapRoute}
+          tributaries={routeState.tributaries}
+          markers={routeState.pois.map(poi => ({
+            id: poi.id,
+            position: poi.position,
+            label: poi.metadata?.name || '',
+            type: poi.metadata?.type || 'default'
+          }))}
+          interactive={true}
+          loading={isLoading}
+          onTributaryHover={handleTributaryHover}
+          onTributaryClick={handleTributaryClick}
+          onMarkerClick={handlePOIClick}
+          onRouteClick={handleMapClick}
+        />
 
-          <button
-            onClick={handleSaveRoute}
-            className="save-button"
-            disabled={isLoading || routeSegments.length === 0}
-          >
-            {isLoading ? 'Optimizing...' : 'Optimize and Save Route'}
-          </button>
+        {/* Map Controls */}
+        <div className="absolute top-4 right-4 z-10">
+          <MapToolbar
+            onLayerToggle={(layer) => console.log('Toggle layer:', layer)}
+            onToolSelect={(tool) => console.log('Selected tool:', tool)}
+          />
         </div>
 
-        <RouteDrawing
-          activityType={activityType}
-          isDrawing={isDrawing}
-          onDrawComplete={handleSegmentComplete}
-          onDrawCancel={onCancel}
-          mapInstance={mapInstance}
-          enableUndo
-          snapToRoads
-        />
-        
-        <RoutePreview
-          segments={routeSegments}
-          currentSegment={currentSegment}
-          isVisible={showPreview}
-          onConfirm={handleSaveRoute}
-          onEdit={() => setIsDrawing(true)}
-          onCancel={onCancel}
-          mapInstance={mapInstance}
-        />
-
-        <RoutePreferencesComponent
-          preferences={preferences}
-          onChange={setPreferences}
-        />
-
-        {validationResult?.warnings?.map((warning, index) => (
-          <Toast
-            key={index}
-            type="warning"
-            message={warning}
-            onClose={() => {
-              setValidationResult({
-                ...validationResult,
-                warnings: validationResult.warnings?.filter((_, i) => i !== index)
-              });
-            }}
+        {/* Map Legend */}
+        <div className="absolute top-4 left-4 z-10">
+          <MapLegend
+            items={[
+              {
+                color: '#2563EB',
+                label: 'Main Route (Car)',
+                type: 'route',
+              },
+              {
+                color: '#10B981',
+                label: 'Scenic Tributary',
+                type: 'tributary',
+              },
+              {
+                color: '#8B5CF6',
+                label: 'Cultural Tributary',
+                type: 'tributary',
+              },
+              {
+                color: '#F59E0B',
+                label: 'Activity Tributary',
+                type: 'tributary',
+              },
+              {
+                color: '#EF4444',
+                label: 'Points of Interest',
+                type: 'poi',
+              },
+            ]}
           />
-        ))}
+        </div>
 
-        <style jsx>{`
-          .route-creator {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            padding: 1rem;
-          }
-
-          .route-form {
-            background: white;
-            padding: 1rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-          }
-
-          .form-input {
-            width: 100%;
-            padding: 0.5rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-top: 0.25rem;
-          }
-
-          .form-input.error {
-            border-color: #ff4444;
-          }
-
-          .error-message {
-            color: #ff4444;
-            font-size: 0.875rem;
-            margin-top: 0.25rem;
-          }
-
-          .segments-container {
-            margin: 1rem 0;
-          }
-
-          .segment-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.5rem;
-            background: #f5f5f5;
-            border-radius: 4px;
-            margin: 0.5rem 0;
-          }
-
-          button {
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            border: none;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s;
-          }
-
-          button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-          }
-
-          .add-segment-button {
-            background: #4444FF;
-            color: white;
-            width: 100%;
-            margin-top: 0.5rem;
-          }
-
-          .save-button {
-            background: #44FF44;
-            color: white;
-            width: 100%;
-            margin-top: 1rem;
-          }
-
-          button:hover:not(:disabled) {
-            opacity: 0.9;
-          }
-        `}</style>
+        {/* Active Users */}
+        <div className="absolute bottom-4 left-4 z-10 flex space-x-2">
+          {routeState.activeUsers.map(user => (
+            <div
+              key={user.id}
+              className="bg-white rounded-full p-2 shadow-lg text-sm flex items-center space-x-2"
+            >
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span>{user.name}</span>
+            </div>
+          ))}
+        </div>
       </div>
-    </ErrorBoundary>
+
+      {/* Right Sidebar */}
+      <div className="w-96 border-l border-gray-200">
+        <RouteSidebar
+          routeName="Mountain Valley Explorer"
+          routeDescription="A diverse route combining scenic views, cultural sites, and outdoor activities"
+          mainRoute={{
+            coordinates: routeState.mainRoute.coordinates,
+            metadata: {
+              type: 'CAR',
+              distance: 15.2,
+              duration: 25,
+              trafficLevel: 'moderate',
+              safety: 'high'
+            }
+          }}
+          tributaries={routeState.tributaries}
+          selectedTributaryId={selectedTributaryId}
+          onTributarySelect={handleTributaryClick}
+        />
+      </div>
+
+      {/* Chat Interface */}
+      <div className="absolute bottom-4 right-4 z-10 w-96">
+        <ChatInterface
+          onSuggestion={(suggestion) => {
+            if (suggestion.type === 'TRIBUTARY') {
+              addTributary(
+                suggestion.coordinates,
+                suggestion.connectionPoint,
+                suggestion.activityType,
+                suggestion.metadata
+              );
+            }
+          }}
+        />
+      </div>
+    </div>
   );
 }; 

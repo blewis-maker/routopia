@@ -10,6 +10,21 @@ interface Tributary {
   coordinates: [number, number][];
   color?: string;
   type: 'scenic' | 'cultural' | 'activity';
+  description?: string;
+  connectionPoint: [number, number];
+  metadata?: {
+    activityType: string;
+    difficulty: string;
+    duration: number;
+    distance: number;
+    elevation?: number;
+    surface: string[];
+    weather?: {
+      temperature: number;
+      condition: string;
+      wind: number;
+    };
+  };
 }
 
 interface POIMarker {
@@ -17,6 +32,14 @@ interface POIMarker {
   position: [number, number];
   label: string;
   type: string;
+  metadata?: {
+    description?: string;
+    rating?: number;
+    hours?: string;
+    bestTime?: string;
+    photos?: string[];
+    tributaryId?: string;
+  };
 }
 
 interface MapViewProps {
@@ -26,6 +49,13 @@ interface MapViewProps {
   route?: {
     coordinates: [number, number][];
     color?: string;
+    metadata?: {
+      type: string;
+      distance: number;
+      duration: number;
+      trafficLevel: string;
+      safety: string;
+    };
   };
   tributaries?: Tributary[];
   interactive?: boolean;
@@ -35,6 +65,8 @@ interface MapViewProps {
   onMarkerClick?: (markerId: string) => void;
   onRouteClick?: (point: [number, number]) => void;
 }
+
+export type { Tributary, POIMarker };
 
 export const MapView: React.FC<MapViewProps> = ({
   center,
