@@ -3,6 +3,7 @@ import React from 'react'
 import '../src/styles/globals.css'
 import { withThemeByDataAttribute } from '@storybook/addon-themes'
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime'
+import { ThemeProvider } from '../src/styles/theme/themeProvider'
 
 // Mock Next.js Image component
 const NextImage = ({ src, alt, ...props }: any) => {
@@ -40,6 +41,19 @@ const preview: Preview = {
         query: {},
       },
     },
+    backgrounds: {
+      default: 'light',
+      values: [
+        {
+          name: 'light',
+          value: '#ffffff',
+        },
+        {
+          name: 'dark',
+          value: '#0c0a09', // stone-950
+        },
+      ],
+    },
   },
   decorators: [
     withThemeByDataAttribute({
@@ -56,9 +70,11 @@ const preview: Preview = {
       
       return (
         <AppRouterContext.Provider value={mockRouter}>
-          <div className={isFullscreen ? 'w-full h-full' : 'p-4 bg-white dark:bg-gray-800'}>
-            <Story />
-          </div>
+          <ThemeProvider>
+            <div className={isFullscreen ? 'w-full h-full' : 'p-4 bg-white dark:bg-gray-800'}>
+              <Story />
+            </div>
+          </ThemeProvider>
         </AppRouterContext.Provider>
       );
     },

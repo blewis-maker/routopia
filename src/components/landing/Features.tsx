@@ -1,130 +1,81 @@
-import { MapPin, Route, Bike, Cloud, Brain, Users } from 'lucide-react';
-import { typography } from '@/styles/tokens/typography';
-import { colors } from '@/styles/tokens/colors';
-import { combineClasses } from '@/utils/formatters';
-import AIFeatureShowcase from './Features/AIFeatureShowcase';
-import ActivityTypesGrid from './Features/ActivityTypesGrid';
-import CommunityHighlights from './Features/CommunityHighlights';
+import React from 'react';
+import { MapIcon, ActivitySquare, Navigation, Cloud, Brain, Users } from 'lucide-react';
 
 const features = [
   {
-    name: 'AI-Powered Route Generation',
-    description:
-      'Our advanced AI understands your preferences and creates optimal routes tailored to your needs, considering factors like difficulty, scenery, and points of interest.',
-    icon: Brain,
+    icon: MapIcon,
+    title: 'Intelligent Route Planning',
+    description: 'AI-powered route suggestions based on your preferences, weather conditions, and real-time data.',
   },
   {
-    name: 'Real-Time Weather Integration',
-    description:
-      'Stay informed with up-to-date weather conditions and forecasts along your route, helping you plan the perfect time for your adventure.',
+    icon: ActivitySquare,
+    title: 'Activity Tracking',
+    description: 'Track your outdoor activities with detailed statistics, elevation profiles, and performance insights.',
+  },
+  {
+    icon: Navigation,
+    title: 'Points of Interest',
+    description: 'Discover interesting locations along your route, from scenic viewpoints to local attractions.',
+  },
+  {
     icon: Cloud,
+    title: 'Weather Integration',
+    description: 'Real-time weather forecasts and conditions to help you plan the perfect outdoor adventure.',
   },
   {
-    name: 'Smart POI Discovery',
-    description:
-      'Automatically discover and integrate interesting locations along your route, from scenic viewpoints to local cafes and historical landmarks.',
-    icon: MapPin,
+    icon: Brain,
+    title: 'Smart Recommendations',
+    description: 'Personalized suggestions for routes and activities based on your preferences and history.',
   },
   {
-    name: 'Activity Tracking',
-    description:
-      'Monitor your progress, track your achievements, and analyze your performance with detailed statistics and insights.',
-    icon: Bike,
-  },
-  {
-    name: 'Dynamic Route Optimization',
-    description:
-      'Routes automatically adjust based on real-time conditions, crowd levels, and your preferences to ensure the best possible experience.',
-    icon: Route,
-  },
-  {
-    name: 'Community Features',
-    description:
-      'Share your favorite routes, discover popular paths from other users, and join a community of outdoor enthusiasts.',
     icon: Users,
+    title: 'Community Features',
+    description: 'Share routes, connect with other outdoor enthusiasts, and join group activities.',
   },
 ];
 
 export default function Features() {
   return (
-    <div id="features" className="py-24 sm:py-32 bg-gradient-to-b from-stone-950 via-stone-950/95 to-stone-950">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        {/* Main Features */}
-        <div className="mx-auto max-w-2xl lg:text-center">
-          <h2 className={combineClasses(
-            "text-brand-primary font-montserrat",
-            "text-sm font-semibold tracking-wider uppercase",
-            "bg-gradient-to-r from-teal-400 to-emerald-400 text-transparent bg-clip-text animate-gradient-text"
-          )}>
-            Everything you need
+    <section id="features" className="py-24 bg-stone-950">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">
+            Why Choose Routopia?
           </h2>
-          <p className={combineClasses(
-            "mt-2 font-bold tracking-tight text-white",
-            "text-4xl font-primary",
-            "leading-tight"
-          )}>
-            Intelligent Route Planning
-          </p>
-          <p className={combineClasses(
-            "mt-6 text-lg leading-8 text-gray-300",
-            "font-secondary"
-          )}>
-            Experience the future of route planning with our comprehensive set of features,
-            designed to make your outdoor adventures more enjoyable and efficient.
+          <p className="mt-4 text-lg text-stone-400 max-w-2xl mx-auto">
+            Experience the perfect blend of technology and outdoor adventure with our comprehensive features.
           </p>
         </div>
 
-        {/* Feature Grid */}
-        <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
-          <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3">
-            {features.map((feature) => (
-              <div 
-                key={feature.name} 
-                className={combineClasses(
-                  "relative group p-8 rounded-2xl",
-                  "bg-white/5 backdrop-blur-sm",
-                  "border border-white/10",
-                  "hover:bg-white/10",
-                  "transition-all duration-300",
-                  "transform hover:scale-105"
-                )}
-              >
-                <dt className="flex items-center gap-x-3">
-                  <div className={combineClasses(
-                    "flex-shrink-0 flex items-center justify-center",
-                    "h-12 w-12 rounded-lg",
-                    "bg-teal-500/10 group-hover:bg-teal-500/20",
-                    "transition-colors duration-300"
-                  )}>
-                    <feature.icon className="h-6 w-6 text-teal-500" />
-                  </div>
-                  <h3 className={combineClasses(
-                    "text-xl font-semibold text-white",
-                    "font-primary leading-snug"
-                  )}>
-                    {feature.name}
-                  </h3>
-                </dt>
-                <dd className="mt-4">
-                  <p className={combineClasses(
-                    "text-base text-gray-300",
-                    "font-secondary leading-relaxed"
-                  )}>
-                    {feature.description}
-                  </p>
-                </dd>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {features.map((feature, index) => (
+            <div
+              key={index}
+              className="p-6 rounded-xl bg-stone-900/50 border border-stone-800 hover:border-stone-700 transition-colors"
+            >
+              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-teal-500/20 to-emerald-500/20 flex items-center justify-center mb-4">
+                <feature.icon className="w-6 h-6 text-teal-400" />
               </div>
-            ))}
-          </dl>
+              <h3 className="text-xl font-semibold text-white mb-2">
+                {feature.title}
+              </h3>
+              <p className="text-stone-400">
+                {feature.description}
+              </p>
+            </div>
+          ))}
         </div>
 
-        {/* Additional Feature Sections */}
-        <div className="mt-32 space-y-32">
-          <AIFeatureShowcase />
-          <ActivityTypesGrid />
-          <CommunityHighlights />
+        {/* Call to Action */}
+        <div className="mt-16 text-center">
+          <button
+            onClick={() => document.getElementById('signup')?.click()}
+            className="px-8 py-4 rounded-lg font-semibold text-lg bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 transform transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-teal-500/25"
+          >
+            Get Started Now
+          </button>
         </div>
       </div>
-    </div>
+    </section>
   );
 } 
