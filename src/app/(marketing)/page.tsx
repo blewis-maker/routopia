@@ -29,7 +29,7 @@ export default function LandingPage() {
             className="mb-6 font-montserrat"
           >
             Discover Your{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400 animate-gradient-text">
               Perfect Route
             </span>
           </Heading>

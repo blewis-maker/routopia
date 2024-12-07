@@ -1,6 +1,6 @@
 {
   "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
   "/_not-found/page": "app/_not-found/page.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/(marketing)/page": "app/(marketing)/page.js"
+  "/(marketing)/page": "app/(marketing)/page.js",
+  "/(dashboard)/home/page": "app/(dashboard)/home/page.js"
 }

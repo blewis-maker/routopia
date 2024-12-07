@@ -61,7 +61,7 @@ export type TypographyScale =
   | '2xl' 
   | '3xl' 
   | '4xl' 
-  | '5xl'
+  | '5xl';
 
 export type ColorToken = 
   | 'primary' 

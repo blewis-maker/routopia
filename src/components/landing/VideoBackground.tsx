@@ -14,7 +14,7 @@ export default function VideoBackground({ videoUrl, posterUrl }: VideoBackground
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
-    console.log('VideoBackground mounted with URL:', videoUrl);
+    console.log('VideoBackground mounted, videoUrl:', videoUrl);
     let mounted = true;
     
     const playVideo = async () => {
@@ -24,7 +24,7 @@ export default function VideoBackground({ videoUrl, posterUrl }: VideoBackground
       }
       
       try {
-        console.log('Attempting to play video from URL:', videoUrl);
+        console.log('Attempting to play video');
         videoRef.current.playbackRate = 0.75;
         await videoRef.current.play();
         if (mounted) {
@@ -32,31 +32,24 @@ export default function VideoBackground({ videoUrl, posterUrl }: VideoBackground
           setHasPlayError(false);
         }
       } catch (err) {
+        console.error('Error playing video:', err);
         if (mounted) {
           setHasPlayError(true);
-          console.error('Video playback error:', {
-            err,
-            videoElement: videoRef.current,
-            readyState: videoRef.current?.readyState,
-            networkState: videoRef.current?.networkState,
-            videoError: videoRef.current?.error,
-            currentSrc: videoRef.current?.currentSrc
-          });
         }
       }
     };
 
-    // Try to play when component mounts
     if (document.readyState === 'complete') {
+      console.log('Document ready, playing video');
       playVideo();
     } else {
+      console.log('Document not ready, adding load listener');
       window.addEventListener('load', playVideo);
     }
 
-    // Try to play again when user interacts with the page
     const handleInteraction = () => {
       if (hasPlayError) {
-        console.log('Retrying video playback after user interaction');
+        console.log('User interaction detected, retrying video');
         playVideo();
       }
     };
@@ -74,13 +67,6 @@ export default function VideoBackground({ videoUrl, posterUrl }: VideoBackground
 
   return (
     <div className="absolute inset-0 w-full h-full overflow-hidden bg-stone-950">
-      {/* Preload overlay while video loads */}
-      <div 
-        className={`absolute inset-0 bg-black transition-opacity duration-1000 ${
-          isLoaded ? 'opacity-0' : 'opacity-100'
-        }`} 
-      />
-      
       {!loadError && (
         <video
           ref={videoRef}
@@ -93,49 +79,36 @@ export default function VideoBackground({ videoUrl, posterUrl }: VideoBackground
           onLoadStart={() => console.log('Video load started')}
           onLoadedMetadata={() => console.log('Video metadata loaded')}
           onLoadedData={() => {
-            console.log('Video loaded successfully:', {
-              duration: videoRef.current?.duration,
-              size: `${videoRef.current?.videoWidth}x${videoRef.current?.videoHeight}`,
-              currentSrc: videoRef.current?.currentSrc
-            });
+            console.log('Video loaded successfully');
             setIsLoaded(true);
           }}
           onError={(e) => {
-            console.error('Video loading error:', {
-              event: e,
-              videoUrl,
-              target: e.currentTarget,
-              error: e.currentTarget?.error
-            });
+            console.error('Video loading error:', e);
             setLoadError(true);
           }}
-          className={`
-            object-cover w-full h-full
-            scale-105
-            transition-all duration-[2000ms]
-            ${isLoaded ? 'opacity-100 blur-0' : 'opacity-0 blur-sm'}
-          `}
+          style={{ 
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            zIndex: 0 
+          }}
         >
           <source src={videoUrl} type="video/mp4" />
           Your browser does not support the video tag.
         </video>
       )}
       
-      {/* Multiple gradient overlays for better text contrast */}
-      <div className="absolute inset-0">
-        {/* Top vignette */}
+      {/* Gradient overlays */}
+      <div className="absolute inset-0 z-[1]">
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent" />
-        
-        {/* Bottom vignette - stronger for text */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-        
-        {/* Side vignettes */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
       </div>
 
-      {/* Subtle noise texture */}
+      {/* Noise texture */}
       <div
-        className="absolute inset-0 mix-blend-overlay opacity-[0.02]"
+        className="absolute inset-0 mix-blend-overlay opacity-[0.02] z-[2]"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
         }}

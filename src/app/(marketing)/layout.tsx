@@ -9,15 +9,11 @@ export default function MarketingLayout({
 }) {
   return (
     <div className="relative min-h-screen bg-stone-950">
-      <VideoBackground 
-        videoUrl="/hero-bg.mp4"
-      />
-
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 hover:opacity-75 transition-opacity">
+          <Link href="/" className="flex items-center gap-2">
             <Image
               src="/routopia-logo.png"
               alt="Routopia"

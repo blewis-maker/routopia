@@ -4,6 +4,8 @@ import '@/styles/animations.css';
 import { Providers } from '@/app/providers';
 import { Metadata, Viewport } from 'next';
 import { montserrat, inter } from './fonts';
+import { getServerSession } from 'next-auth';
+import { authOptions } from './api/auth/[...nextauth]/route';
 
 export const viewport: Viewport = {
   themeColor: '#0F172A',
@@ -49,15 +51,17 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getServerSession(authOptions);
+
   return (
     <html lang="en" className={`${montserrat.variable} ${inter.variable} scroll-smooth`} suppressHydrationWarning>
       <body className="antialiased font-sans bg-stone-950 text-stone-50" suppressHydrationWarning>
-        <Providers>
+        <Providers session={session}>
           {children}
         </Providers>
       </body>
