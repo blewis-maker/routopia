@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { Button } from '../ui/Button';
-import { Typography } from '../ui/Typography';
+import { Button } from '@/components/ui/Button';
+import { Typography } from '@/components/ui/Typography';
 
 const meta = {
   title: 'Components/Common/UI',

@@ -1,85 +1,39 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { useChat } from '@/hooks/useChat';
-import { POISuggestion } from './POISuggestion';
-import logger from '@/utils/logger';
-import { RouteContext } from '@/types/route';
-import { GeoPoint } from '@/types/geo';
-import { ActivityType } from '@/types/activity';
-import { ChatMessage, ChatResponse } from '@/types/chat';
+import React from 'react';
+
+interface Message {
+  id: string;
+  content: string;
+  sender: 'user' | 'assistant';
+}
 
 interface ChatInterfaceProps {
-  onRouteUpdate?: (route: RouteContext) => void;
-  onLocationSelect?: (location: GeoPoint) => void;
-  onActivitySelect?: (activity: ActivityType) => void;
+  initialMessages: Message[];
+  onSend?: (message: string) => void;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
-  onRouteUpdate,
-  onLocationSelect,
-  onActivitySelect,
+  initialMessages = [],
+  onSend,
 }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { sendMessage } = useChat();
+  const [messages, setMessages] = React.useState(initialMessages);
+  const [input, setInput] = React.useState('');
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim()) return;
 
-    setIsLoading(true);
-    const userMessage: ChatMessage = {
-      id: `msg_${Date.now()}`,
-      role: 'user',
+    const newMessage: Message = {
+      id: Date.now().toString(),
       content: input,
-      timestamp: new Date().toISOString(),
+      sender: 'user',
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages([...messages, newMessage]);
+    onSend?.(input);
     setInput('');
-
-    try {
-      logger.info('Sending message to chat service', { content: input });
-      const response: ChatResponse = await sendMessage(input);
-
-      // Handle route updates
-      if (response.context?.route && onRouteUpdate) {
-        onRouteUpdate(response.context.route);
-      }
-
-      // Handle location selection
-      if (response.context?.location && onLocationSelect) {
-        onLocationSelect(response.context.location);
-      }
-
-      const assistantMessage: ChatMessage = {
-        id: `msg_${Date.now()}_response`,
-        role: 'assistant',
-        content: response.content,
-        timestamp: new Date().toISOString(),
-        context: {
-          route: response.context?.route,
-          location: response.context?.location,
-          suggestions: response.context?.suggestions,
-        },
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
-      logger.error('Error in chat interaction', error);
-      const errorMessage: ChatMessage = {
-        id: `msg_${Date.now()}_error`,
-        role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
-        timestamp: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [input, isLoading, onRouteUpdate, onLocationSelect, sendMessage]);
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -88,48 +42,40 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <div
             key={message.id}
             className={`flex ${
-              message.role === 'user' ? 'justify-end' : 'justify-start'
+              message.sender === 'user' ? 'justify-end' : 'justify-start'
             }`}
           >
             <div
-              className={`max-w-3/4 p-3 rounded-lg ${
-                message.role === 'user'
+              className={`max-w-[80%] rounded-lg p-3 ${
+                message.sender === 'user'
                   ? 'bg-blue-500 text-white'
-                  : 'bg-gray-200 text-gray-800'
+                  : 'bg-gray-100'
               }`}
             >
-              <p>{message.content}</p>
-              {message.context?.suggestions && (
-                <POISuggestion suggestions={message.context.suggestions} />
-              )}
+              {message.content}
             </div>
           </div>
         ))}
       </div>
-
       <form onSubmit={handleSubmit} className="p-4 border-t">
-        <div className="flex space-x-2">
+        <div className="flex gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type your message..."
-            className="flex-1 p-2 border rounded-lg"
-            disabled={isLoading}
+            className="flex-1 px-3 py-2 border rounded"
           />
           <button
             type="submit"
-            disabled={isLoading}
-            className={`px-4 py-2 rounded-lg ${
-              isLoading
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-blue-500 hover:bg-blue-600'
-            } text-white`}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
-            {isLoading ? 'Sending...' : 'Send'}
+            Send
           </button>
         </div>
       </form>
     </div>
   );
-}; 
+};
+
+export default ChatInterface; 

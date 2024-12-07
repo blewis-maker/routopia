@@ -15,7 +15,7 @@ const meta = {
 } satisfies Meta<typeof MainApplicationView>;
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj<typeof MainApplicationView>;
 
 const sampleUser = {
   id: 'user-1',
@@ -48,30 +48,31 @@ const samplePosts = [
 export const CommunityHub: Story = {
   args: {
     currentView: 'community',
-    posts: samplePosts,
     currentUser: sampleUser,
-    featuredRoutes: [
-      {
-        id: 'route-1',
-        name: 'Mountain Trail',
-        distance: 8.5,
-        elevation: 750,
-        rating: 4.8,
-      },
-    ],
+    posts: samplePosts,
+    route: {
+      id: 'route-1',
+      name: 'Mountain Trail',
+      distance: 8.5,
+      elevation: 750,
+      type: 'hiking',
+      difficulty: 'moderate',
+    },
   },
 };
 
 export const UserProfileView: Story = {
   args: {
     currentView: 'profile',
-    user: sampleUser,
+    currentUser: sampleUser,
     userRoutes: [
       {
-        id: 'route-1',
-        name: 'Mountain Trail',
-        distance: 8.5,
-        elevation: 750,
+        id: 'route-2',
+        name: 'Forest Loop',
+        distance: 5.2,
+        elevation: 350,
+        type: 'hiking',
+        difficulty: 'easy',
       },
     ],
   },
@@ -80,15 +81,14 @@ export const UserProfileView: Story = {
 export const RouteSharingView: Story = {
   args: {
     currentView: 'share',
+    currentUser: sampleUser,
     route: {
-      id: 'route-1',
+      id: 'route-3',
       name: 'Mountain Trail',
+      distance: 8.5,
+      elevation: 750,
       type: 'hiking',
-      metrics: {
-        distance: 8.5,
-        elevation: 750,
-        duration: 240,
-      },
+      difficulty: 'moderate',
     },
   },
 };
@@ -96,14 +96,20 @@ export const RouteSharingView: Story = {
 export const ActivityFeed: Story = {
   args: {
     currentView: 'feed',
+    currentUser: sampleUser,
+    posts: samplePosts,
     activities: [
       {
         id: 'activity-1',
-        user: sampleUser,
         type: 'route_completed',
+        user: sampleUser,
         route: {
-          id: 'route-1',
-          name: 'Mountain Trail',
+          id: 'route-4',
+          name: 'Valley Path',
+          distance: 6.3,
+          elevation: 450,
+          type: 'hiking',
+          difficulty: 'moderate',
         },
         timestamp: new Date().toISOString(),
       },
@@ -114,12 +120,20 @@ export const ActivityFeed: Story = {
 export const Notifications: Story = {
   args: {
     currentView: 'notifications',
+    currentUser: sampleUser,
     notifications: [
       {
         id: 'notif-1',
-        type: 'like',
+        type: 'route_like',
         user: sampleUser,
-        content: 'liked your route',
+        route: {
+          id: 'route-5',
+          name: 'Ridge Trail',
+          distance: 7.8,
+          elevation: 850,
+          type: 'hiking',
+          difficulty: 'hard',
+        },
         timestamp: new Date().toISOString(),
       },
     ],

@@ -1,75 +1,66 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { RouteGPT } from './RouteGPT';
-import { RoutePanel } from './RoutePanel';
-import { RoutesWrapper } from './RoutesWrapper';
-import { TrafficOverlay } from './TrafficOverlay';
+import { MainApplicationView } from '@/components/app/MainApplicationView';
+import type { Route } from '@/components/app/MainApplicationView';
 
 const meta = {
   title: 'Components/Route',
-  component: RoutePanel,
+  component: MainApplicationView,
   parameters: {
-    layout: 'centered',
+    layout: 'fullscreen',
   },
-} satisfies Meta<typeof RoutePanel>;
+} satisfies Meta<typeof MainApplicationView>;
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj<typeof MainApplicationView>;
 
-export const Panel: Story = {
-  render: () => (
-    <RoutePanel
-      route={{
-        name: 'Mountain Trail',
-        distance: 8.5,
-        elevation: 750,
-        duration: 180,
-        difficulty: 'moderate',
-      }}
-      onEdit={() => console.log('Edit clicked')}
-      onDelete={() => console.log('Delete clicked')}
-    />
-  ),
+const sampleRoute: Route = {
+  id: 'route-1',
+  name: 'Mountain Trail',
+  type: 'hiking',
+  distance: 8.5,
+  elevation: 750,
+  duration: 180,
+  difficulty: 'moderate',
 };
 
-export const GPTAssistant: Story = {
-  render: () => (
-    <RouteGPT
-      onSuggestion={(suggestion) => console.log('Suggestion:', suggestion)}
-    />
-  ),
+export const NewRoute: Story = {
+  args: {
+    currentView: 'route',
+    route: {
+      id: 'new',
+      name: '',
+      type: 'hiking',
+      distance: 0,
+      elevation: 0,
+    },
+  },
 };
 
-export const RouteList: Story = {
-  render: () => (
-    <RoutesWrapper
-      routes={[
-        {
-          id: 'route-1',
-          name: 'Mountain Trail',
-          distance: 8.5,
-          elevation: 750,
-          duration: 180,
-          difficulty: 'moderate',
-        },
-        {
-          id: 'route-2',
-          name: 'Forest Loop',
-          distance: 5.2,
-          elevation: 350,
-          duration: 120,
-          difficulty: 'easy',
-        },
-      ]}
-      onRouteSelect={(route) => console.log('Selected:', route)}
-    />
-  ),
+export const RouteInProgress: Story = {
+  args: {
+    currentView: 'route',
+    route: {
+      ...sampleRoute,
+      id: 'in-progress',
+      name: 'New Mountain Trail',
+    },
+  },
 };
 
-export const Traffic: Story = {
-  render: () => (
-    <TrafficOverlay
-      routeId="route-1"
-      onTrafficUpdate={(data) => console.log('Traffic data:', data)}
-    />
-  ),
+export const RouteComplete: Story = {
+  args: {
+    currentView: 'route',
+    route: sampleRoute,
+  },
+};
+
+export const RouteOptimization: Story = {
+  args: {
+    currentView: 'route',
+    route: {
+      ...sampleRoute,
+      id: 'optimized',
+      name: 'Optimized Mountain Trail',
+    },
+  },
 }; 

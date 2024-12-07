@@ -1,165 +1,185 @@
+import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { MainApplicationView } from '@/components/app/MainApplicationView';
-import { MapView } from '@/components/shared/MapView';
-import { RouteCreator } from '@/components/route/RouteCreator';
-import { RoutePreferences } from '@/components/route/RoutePreferences';
+import { MapView } from '../../components/shared/MapView';
+import { RouteVisualization } from '../../components/route/RouteVisualization';
+
+interface CompositeRouteViewProps {
+  routeName: string;
+  routeDescription?: string;
+  center: [number, number];
+  zoom: number;
+}
+
+const CompositeRouteView: React.FC<CompositeRouteViewProps> = ({
+  routeName,
+  routeDescription,
+  center,
+  zoom,
+}) => {
+  const [selectedTributaryId, setSelectedTributaryId] = React.useState<string | undefined>();
+  const [selectedPOIId, setSelectedPOIId] = React.useState<string | undefined>();
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  // Handle initial loading
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000); // Give the map style a second to load
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Sample data for the river-tributary metaphor
+  const mainRoute = {
+    coordinates: [
+      [-74.5, 40],
+      [-74.6, 40.1],
+      [-74.7, 40.15],
+    ],
+    color: '#2563EB', // Primary blue for main river
+  };
+
+  const tributaries = [
+    {
+      id: 'scenic-loop',
+      name: 'Scenic Mountain Loop',
+      type: 'scenic' as const,
+      description: 'A beautiful detour through mountain vistas',
+      coordinates: [
+        [-74.6, 40.1],  // Connects to main route
+        [-74.62, 40.12],
+        [-74.61, 40.13],
+      ],
+      color: '#10B981',
+      pois: [
+        {
+          id: 'vista-1',
+          name: 'Mountain Overlook',
+          type: 'scenic',
+          description: 'Panoramic views of the valley',
+          position: [-74.62, 40.12] as [number, number],
+        },
+        {
+          id: 'waterfall',
+          name: 'Hidden Waterfall',
+          type: 'scenic',
+          description: 'A serene 30-foot waterfall',
+          position: [-74.61, 40.13] as [number, number],
+        },
+      ],
+    },
+    {
+      id: 'historic-district',
+      name: 'Historic District Path',
+      type: 'cultural' as const,
+      description: 'Explore local heritage sites',
+      coordinates: [
+        [-74.7, 40.15], // Connects to main route
+        [-74.71, 40.16],
+        [-74.72, 40.15],
+      ],
+      color: '#8B5CF6',
+      pois: [
+        {
+          id: 'museum',
+          name: 'City Museum',
+          type: 'cultural',
+          description: 'Local history and artifacts',
+          position: [-74.71, 40.16] as [number, number],
+        },
+        {
+          id: 'old-church',
+          name: 'St. Mary\'s Church',
+          type: 'cultural',
+          description: '19th century architecture',
+          position: [-74.72, 40.15] as [number, number],
+        },
+      ],
+    },
+  ];
+
+  // Flatten POIs for the map
+  const markers = tributaries.flatMap(tributary =>
+    tributary.pois.map(poi => ({
+      id: poi.id,
+      position: poi.position,
+      label: poi.name,
+      type: poi.type,
+    }))
+  );
+
+  const handleTributarySelect = (tributaryId: string) => {
+    setSelectedTributaryId(tributaryId);
+    const tributary = tributaries.find(t => t.id === tributaryId);
+    if (tributary) {
+      // Center map on middle coordinate of tributary
+      const midIndex = Math.floor(tributary.coordinates.length / 2);
+      const center = tributary.coordinates[midIndex];
+      // TODO: Implement map centering logic
+    }
+  };
+
+  const handlePOISelect = (poiId: string) => {
+    setSelectedPOIId(poiId);
+    const poi = markers.find(m => m.id === poiId);
+    if (poi) {
+      // TODO: Implement map centering logic
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="h-[600px]">
+        <MapView
+          center={center}
+          zoom={zoom}
+          route={mainRoute}
+          tributaries={tributaries}
+          markers={markers}
+          interactive={true}
+          loading={isLoading}
+          onTributaryHover={(id) => setSelectedTributaryId(id || undefined)}
+          onTributaryClick={(id) => setSelectedTributaryId(id)}
+          onMarkerClick={(id) => setSelectedPOIId(id)}
+        />
+      </div>
+      <RouteVisualization
+        routeName={routeName}
+        routeDescription={routeDescription}
+        tributaries={tributaries}
+        onTributarySelect={handleTributarySelect}
+        onPOISelect={handlePOISelect}
+        selectedTributaryId={selectedTributaryId}
+      />
+    </div>
+  );
+};
 
 const meta = {
-  title: 'Flows/RouteCreation',
-  component: MainApplicationView,
+  title: 'Composite/RouteCreation',
+  component: CompositeRouteView,
   parameters: {
     layout: 'fullscreen',
-    docs: {
-      description: {
-        component: 'Route creation process with various states and interactions.',
-      },
-    },
   },
-} satisfies Meta<typeof MainApplicationView>;
+} satisfies Meta<typeof CompositeRouteView>;
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj<typeof CompositeRouteView>;
 
-// Sample route data at different stages
-const emptyRoute = {
-  id: 'new',
-  name: '',
-  type: 'hiking',
-  coordinates: [],
-};
-
-const inProgressRoute = {
-  id: 'in-progress',
-  name: 'Mountain Trail',
-  type: 'hiking',
-  coordinates: [
-    { lat: 40.0219, lng: -105.3046, elevation: 1740 },
-    { lat: 40.0225, lng: -105.3052, elevation: 1780 },
-  ],
-};
-
-const completedRoute = {
-  id: 'completed',
-  name: 'Boulder Flatirons Loop',
-  type: 'hiking',
-  coordinates: [
-    { lat: 40.0219, lng: -105.3046, elevation: 1740 },
-    { lat: 40.0225, lng: -105.3052, elevation: 1780 },
-    { lat: 40.0231, lng: -105.3058, elevation: 1820 },
-    { lat: 40.0237, lng: -105.3064, elevation: 1860 },
-    { lat: 40.0243, lng: -105.3070, elevation: 1900 },
-  ],
-  distance: 5.2,
-  elevation: 450,
-  duration: 180,
-};
-
-export const NewRoute: Story = {
+export const RiverAndTributaries: Story = {
   args: {
-    route: emptyRoute,
-    mode: 'create',
-    showPreferences: true,
-    preferences: {
-      difficulty: 'moderate',
-      maxDistance: 10,
-      maxElevation: 500,
-      avoidHighways: true,
-      preferScenic: true,
-    },
+    routeName: 'Mountain Valley Explorer',
+    routeDescription: 'A diverse route combining scenic views, cultural sites, and outdoor activities',
+    center: [-74.6, 40.1],
+    zoom: 11,
   },
 };
 
-export const RouteInProgress: Story = {
+export const EmptyRoute: Story = {
   args: {
-    route: inProgressRoute,
-    mode: 'create',
-    showPreferences: true,
-    drawingEnabled: true,
-    suggestions: [
-      {
-        id: 'suggestion-1',
-        name: 'Summit Path',
-        coordinates: [
-          { lat: 40.0231, lng: -105.3058, elevation: 1820 },
-          { lat: 40.0237, lng: -105.3064, elevation: 1860 },
-        ],
-      },
-    ],
-  },
-};
-
-export const RouteCompletion: Story = {
-  args: {
-    route: completedRoute,
-    mode: 'review',
-    showStats: true,
-    stats: {
-      distance: 5.2,
-      elevation: 450,
-      duration: 180,
-      difficulty: 'moderate',
-      terrain: 'mixed',
-    },
-  },
-};
-
-export const AIAssisted: Story = {
-  args: {
-    route: inProgressRoute,
-    mode: 'ai-assist',
-    aiSuggestions: [
-      {
-        id: 'ai-1',
-        description: 'Continue to the summit for best views',
-        coordinates: [
-          { lat: 40.0231, lng: -105.3058, elevation: 1820 },
-          { lat: 40.0237, lng: -105.3064, elevation: 1860 },
-        ],
-      },
-      {
-        id: 'ai-2',
-        description: 'Alternative path with gentler elevation gain',
-        coordinates: [
-          { lat: 40.0228, lng: -105.3055, elevation: 1800 },
-          { lat: 40.0234, lng: -105.3061, elevation: 1830 },
-        ],
-      },
-    ],
-  },
-};
-
-export const RouteOptimization: Story = {
-  args: {
-    route: completedRoute,
-    mode: 'optimize',
-    optimizationCriteria: {
-      elevation: 'minimize',
-      distance: 'balance',
-      scenery: 'maximize',
-    },
-    alternativeRoutes: [
-      {
-        id: 'alt-1',
-        name: 'Scenic Route',
-        coordinates: [...completedRoute.coordinates],
-        stats: {
-          distance: 5.5,
-          elevation: 480,
-          duration: 190,
-          sceneryScore: 8.5,
-        },
-      },
-      {
-        id: 'alt-2',
-        name: 'Quick Route',
-        coordinates: [...completedRoute.coordinates],
-        stats: {
-          distance: 4.8,
-          elevation: 400,
-          duration: 160,
-          sceneryScore: 6.5,
-        },
-      },
-    ],
+    routeName: 'New Route',
+    routeDescription: 'Start planning your route',
+    center: [-74.6, 40.1],
+    zoom: 11,
   },
 }; 

@@ -1,191 +1,138 @@
-# Visual Testing Guide for Routopia
+# Visual Testing Guide: River-Tributary Route Visualization
 
-## Tools & Infrastructure
+This guide explains how to effectively use Storybook and Percy for testing the river-tributary route visualization components.
 
-1. **Storybook**
-   - Development environment for UI components
-   - Access at `http://localhost:6006`
-   - Run with `npm run storybook`
-   - Build with `npm run build-storybook`
+## Component Structure
 
-2. **Percy**
-   - Visual regression testing
-   - Token: `web_e7ce4ce1584bdcf66e0850fa8925ef8e257ac5847361dfb81626c21c1162ad47`
-   - Run with `npm run test:percy`
+The route visualization system consists of three main components:
 
-3. **Chromatic**
-   - Visual testing and component documentation
-   - Token: `chpt_adf0229281cc802`
-   - Run with `npm run test:chromatic`
+1. **MapView**: Displays the main route (river) and its tributaries on a map
+2. **RouteVisualization**: Sidebar panel showing the hierarchical structure
+3. **CompositeRouteView**: Combines both components for a complete experience
 
-4. **Parallel Testing**
-   - Run both Percy and Chromatic simultaneously
-   - Command: `npm run test:visual:parallel`
+## Running Storybook
 
-## Running Tests
+To start Storybook locally:
 
 ```bash
-# Development
-npm run storybook              # Start Storybook development server
-npm run build-storybook        # Build Storybook static files
-
-# Individual Tests
-npm run test:percy            # Run Percy tests
-npm run test:chromatic        # Run Chromatic tests
-
-# Parallel Testing
-npm run test:visual:parallel  # Run both Percy and Chromatic
-
-# Git Workflow
-git add .                     # Stage changes
-git commit -m "your message"  # Commit changes
-git push origin main         # Push to main branch
-```
-
-## CI/CD Integration
-
-Visual tests automatically run on:
-1. Push to `main` branch
-2. Pull requests targeting `main`
-3. Manual trigger through GitHub Actions
-
-### Environment Setup
-
-1. **Percy Configuration**
-   - Token added to GitHub Secrets
-   - Configured in `.env.local`
-   - Integrated with Storybook
-
-2. **Chromatic Configuration**
-   - Token added to GitHub Secrets
-   - Configured in `.env.local`
-   - Auto-accepts changes on `main`
-
-3. **Storybook Configuration**
-   - Tailwind CSS integration
-   - Theme switching support
-   - Responsive viewports
-   - Accessibility checks
-
-## Testing Checklist
-
-### 1. Component Visual Testing
-
-#### Layout Components
-- [ ] AppShell renders correctly in all breakpoints
-- [ ] NavigationBar is responsive and maintains proper spacing
-- [ ] Sidebar collapses/expands smoothly
-- [ ] Command palette appears centered with proper overlay
-
-#### Map Components
-- [ ] MapView loads and displays correctly
-- [ ] Markers appear with proper icons and labels
-- [ ] Route lines render with correct colors and widths
-- [ ] Weather overlay is visible and properly positioned
-- [ ] POI markers cluster appropriately at different zoom levels
-
-#### Feature Components
-- [ ] ActivityTracker displays stats in a clear layout
-- [ ] Route planner tools are properly aligned
-- [ ] Weather widget shows all information clearly
-- [ ] AI chat interface maintains proper spacing
-
-### 2. Responsive Design
-
-#### Mobile (< 640px)
-- [ ] Navigation is accessible through hamburger menu
-- [ ] Map controls are touch-friendly
-- [ ] Forms are usable on small screens
-- [ ] No horizontal scrolling
-- [ ] Text remains readable
-
-#### Tablet (640px - 1024px)
-- [ ] Sidebar behavior is appropriate
-- [ ] Grid layouts adjust properly
-- [ ] Map and content balance is maintained
-- [ ] Touch targets are properly sized
-
-#### Desktop (> 1024px)
-- [ ] Layout utilizes space effectively
-- [ ] Advanced features are easily accessible
-- [ ] Multi-column layouts are properly aligned
-- [ ] Hover states work correctly
-
-### 3. Theme Testing
-
-#### Light Theme
-- [ ] All text is readable
-- [ ] Proper contrast ratios maintained
-- [ ] Icons are visible
-- [ ] Shadows and depth cues are appropriate
-
-#### Dark Theme
-- [ ] No harsh color transitions
-- [ ] Maps and overlays adjust properly
-- [ ] System preferences are respected
-- [ ] All states (hover, active, disabled) are visible
-
-### 4. Animation & Interactions
-
-- [ ] Route drawing animations are smooth
-- [ ] Marker placement has proper feedback
-- [ ] Modal transitions are fluid
-- [ ] Loading states are informative
-- [ ] Error states are clearly visible
-- [ ] Success feedback is noticeable
-
-### 5. Cross-browser Testing
-
-#### Chrome
-- [ ] All features work as expected
-- [ ] Performance is smooth
-- [ ] No console errors
-
-#### Firefox
-- [ ] Map renders correctly
-- [ ] Animations work properly
-- [ ] Forms behave consistently
-
-#### Safari
-- [ ] iOS-specific behaviors work
-- [ ] Gestures are properly handled
-- [ ] No visual artifacts
-
-### 6. Accessibility
-
-- [ ] Proper heading hierarchy
-- [ ] ARIA labels are meaningful
-- [ ] Keyboard navigation works
-- [ ] Screen reader compatibility
-- [ ] Color contrast meets WCAG standards
-- [ ] Focus states are visible
-
-## Running Visual Tests
-
-```bash
-# Start Storybook
 npm run storybook
-
-# Run Percy visual regression tests
-npm run test:visual
-
-# Run local development server
-npm run dev
 ```
 
-## CI Integration
+This will launch Storybook at http://localhost:6006
 
-Visual tests are automatically run:
-1. On pull requests
-2. After merging to main
-3. Before deployments
+## Available Stories
 
-## Reporting Issues
+### MapView Stories
+- Default: Basic map setup
+- WithTributaries: Shows main route with connected tributaries
+- WithPOIs: Displays points of interest along tributaries
+- InteractiveRoute: Demonstrates hover and click interactions
 
-When reporting visual issues:
-1. Screenshot the problem
-2. Note the browser and device
-3. Steps to reproduce
-4. Expected vs actual appearance
-5. Link to Storybook story if applicable
-``` 
+### RouteVisualization Stories
+- Default: Shows the sidebar with collapsed tributaries
+- WithSelectedTributary: Demonstrates expanded tributary view
+- Empty: Shows the empty state
+
+### Composite Stories
+- RiverAndTributaries: Full implementation with map and sidebar
+- EmptyRoute: Starting state for new route creation
+
+## Visual Testing with Percy
+
+We use Percy to capture and compare screenshots of our components in different states.
+
+### Running Visual Tests
+
+To run the visual tests locally:
+
+```bash
+npm run test:visual
+```
+
+This will:
+1. Build Storybook
+2. Start the Storybook server
+3. Run Percy tests
+4. Generate visual diffs
+
+### Test Coverage
+
+Our visual tests cover:
+
+1. **Component States**
+   - Default views
+   - Interactive states (hover, selected)
+   - Empty states
+   - Loading states
+
+2. **Interactions**
+   - Tributary selection
+   - POI selection
+   - Hover effects
+
+3. **Responsive Design**
+   - Desktop (1920x1080)
+   - Tablet (1024x768)
+   - Mobile (375x812)
+
+### Best Practices
+
+1. **Component Testing**
+   - Test each component in isolation first
+   - Test composite views for integration
+   - Verify all interactive states
+
+2. **Visual Regression**
+   - Review all Percy snapshots carefully
+   - Pay attention to hover states and animations
+   - Check responsive layouts
+
+3. **Story Organization**
+   - Keep stories focused and minimal
+   - Use consistent naming conventions
+   - Document key interactions
+
+## Workflow Integration
+
+The visual tests are integrated into our CI/CD pipeline:
+
+1. Tests run automatically on pull requests
+2. Percy generates visual diffs for review
+3. Changes must be approved before merging
+
+## Troubleshooting
+
+Common issues and solutions:
+
+1. **Missing Screenshots**
+   - Ensure Storybook is running on port 6006
+   - Check Percy token is set correctly
+   - Verify test paths are correct
+
+2. **Inconsistent Results**
+   - Clear Storybook cache: `npm run clean-storybook`
+   - Rebuild: `npm run build-storybook`
+   - Check for animation-related issues
+
+3. **Failed Tests**
+   - Review Percy diffs carefully
+   - Check for intentional vs unintentional changes
+   - Verify viewport sizes match expectations
+
+## Adding New Tests
+
+When adding new components or features:
+
+1. Create isolated component stories
+2. Add composite stories if needed
+3. Update visual tests to cover new cases
+4. Document any special considerations
+
+## Maintenance
+
+Regular maintenance tasks:
+
+1. Review and update baseline screenshots
+2. Clean up unused stories
+3. Verify test coverage
+4. Update documentation as needed 

@@ -1,29 +1,18 @@
-import type { Preview } from '@storybook/react'
-import React from 'react'
-import '../src/styles/globals.css'
-import { withThemeByDataAttribute } from '@storybook/addon-themes'
-import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime'
-import { ThemeProvider } from '../src/styles/theme/themeProvider'
+import React, { useEffect } from 'react';
+import type { Preview } from '@storybook/react';
+import { initialize as initializeMSW, mswLoader } from 'msw-storybook-addon';
+import '../src/styles/globals.css';
+import { ThemeProvider } from '../src/styles/theme/themeProvider';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
-// Mock Next.js Image component
-const NextImage = ({ src, alt, ...props }: any) => {
-  return <img src={src} alt={alt} {...props} />;
-};
+// Initialize MSW
+initializeMSW();
 
-// Mock router context
-const mockRouter = {
-  back: () => Promise.resolve(),
-  forward: () => Promise.resolve(),
-  push: () => Promise.resolve(),
-  replace: () => Promise.resolve(),
-  refresh: () => Promise.resolve(),
-  prefetch: () => Promise.resolve(),
-  route: '/',
-  pathname: '/',
-  params: {},
-  query: {},
-  asPath: '/',
-};
+// Initialize Mapbox
+if (process.env.NEXT_PUBLIC_MAPBOX_TOKEN) {
+  mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+}
 
 const preview: Preview = {
   parameters: {
@@ -34,56 +23,24 @@ const preview: Preview = {
         date: /Date$/i,
       },
     },
-    nextjs: {
-      appDirectory: true,
-      navigation: {
-        pathname: '/',
-        query: {},
-      },
-    },
     backgrounds: {
       default: 'light',
       values: [
-        {
-          name: 'light',
-          value: '#ffffff',
-        },
-        {
-          name: 'dark',
-          value: '#0c0a09', // stone-950
-        },
+        { name: 'light', value: '#ffffff' },
+        { name: 'dark', value: '#0a0a0a' },
       ],
     },
   },
   decorators: [
-    withThemeByDataAttribute({
-      themes: {
-        light: '',
-        dark: 'dark',
-      },
-      defaultTheme: 'light',
-      attributeName: 'data-theme',
-    }),
-    (Story, context) => {
-      // Check if the story is set to fullscreen
-      const isFullscreen = context.parameters?.layout === 'fullscreen';
-      
-      return (
-        <AppRouterContext.Provider value={mockRouter}>
-          <ThemeProvider>
-            <div className={isFullscreen ? 'w-full h-full' : 'p-4 bg-white dark:bg-gray-800'}>
-              <Story />
-            </div>
-          </ThemeProvider>
-        </AppRouterContext.Provider>
-      );
-    },
+    (Story) => (
+      <ThemeProvider>
+        <div className="min-h-screen bg-white dark:bg-neutral-950">
+          <Story />
+        </div>
+      </ThemeProvider>
+    ),
   ],
-}
+  loaders: [mswLoader],
+};
 
-// Mock Next.js components and hooks
-if (typeof global.Image === 'undefined') {
-  global.Image = NextImage;
-}
-
-export default preview 
+export default preview; 

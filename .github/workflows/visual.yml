@@ -1,45 +1,43 @@
-name: Visual Testing
+name: Visual Regression Tests
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
-  visual-testing:
+  visual-regression:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+    - uses: actions/checkout@v2
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: npm ci
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
+    - name: Install Playwright
+      run: npx playwright install --with-deps
       
-      - name: Install dependencies
-        run: |
-          npm ci
-          npx playwright install --with-deps
+    - name: Build Storybook
+      run: npm run build-storybook
       
-      - name: Build Storybook
-        run: npm run build-storybook
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
+    - name: Start Storybook
+      run: npx http-server storybook-static -p 6006 &
       
-      - name: Run Chromatic
-        uses: chromaui/action@v1
-        with:
-          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-          storybookBuildDir: storybook-static
-          exitZeroOnChanges: true
-        continue-on-error: true
-      
-      - name: Run Percy
-        run: npx percy storybook ./storybook-static
-        env:
-          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
-        continue-on-error: true
+    - name: Run Percy Tests
+      run: npx percy exec -- npx playwright test src/tests/visual/stories/
+      env:
+        PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
+        
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v2
+      with:
+        name: playwright-results
+        path: test-results/
