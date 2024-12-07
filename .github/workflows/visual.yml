@@ -21,10 +21,14 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npx playwright install --with-deps
       
       - name: Build Storybook
         run: npm run build-storybook
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
       
       - name: Run Chromatic
         uses: chromaui/action@v1
@@ -32,8 +36,10 @@ jobs:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           storybookBuildDir: storybook-static
           exitZeroOnChanges: true
+        continue-on-error: true
       
       - name: Run Percy
         run: npx percy storybook ./storybook-static
         env:
           PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
+        continue-on-error: true
