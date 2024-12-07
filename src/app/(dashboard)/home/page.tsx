@@ -1,67 +1,106 @@
-import { Heading } from '@/components/common/Typography';
+'use client';
+
+import { useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import type { MapRef } from '@/components/Map';
+import ChatWindow from '@/components/chat/ChatWindow';
+import { SearchPanel } from '@/components/SearchPanel';
+import { RoutePanel } from '@/components/RoutePanel';
+
+// Dynamically import Map component with no SSR
+const Map = dynamic(() => import('@/components/Map'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full w-full flex items-center justify-center bg-stone-900">
+      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-teal-500"></div>
+    </div>
+  ),
+});
 
 export default function DashboardPage() {
+  const mapRef = useRef<MapRef>(null);
+  const [startLocation, setStartLocation] = useState<string>('');
+  const [destination, setDestination] = useState<string>('');
+  const [showSearchPanel, setShowSearchPanel] = useState(false);
+  const [showRoutePanel, setShowRoutePanel] = useState(false);
+
+  const handleChatResponse = (message: string) => {
+    mapRef.current?.showResponse(message);
+  };
+
+  const handleLocationSelect = (coords: [number, number]) => {
+    console.log('Location selected:', coords);
+  };
+
+  const handleToolSelect = (tool: string) => {
+    switch (tool) {
+      case 'SEARCH':
+        setShowSearchPanel(true);
+        break;
+      case 'ROUTE':
+        setShowRoutePanel(true);
+        break;
+      // Add other tool handlers
+    }
+  };
+
   return (
-    <div className="p-8">
-      <Heading 
-        level={1}
-        variant="2xl"
-        className="mb-6 font-montserrat"
-      >
-        Welcome to Routopia
-      </Heading>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Quick Actions */}
-        <div className="bg-stone-800 rounded-xl p-6 border border-stone-700">
-          <Heading 
-            level={2}
-            variant="lg"
-            className="mb-4"
-          >
-            Quick Actions
-          </Heading>
-          <div className="space-y-3">
-            <button className="w-full p-3 bg-stone-700 rounded-lg hover:bg-stone-600 transition-colors text-left">
-              🗺️ Create New Route
-            </button>
-            <button className="w-full p-3 bg-stone-700 rounded-lg hover:bg-stone-600 transition-colors text-left">
-              🎯 Explore POIs
-            </button>
-            <button className="w-full p-3 bg-stone-700 rounded-lg hover:bg-stone-600 transition-colors text-left">
-              📊 View Activities
-            </button>
-          </div>
+    <div className="flex flex-col h-screen bg-stone-900">
+      <main className="flex-1 flex relative">
+        {/* Left Chat Panel */}
+        <div className="w-[350px] flex flex-col bg-stone-900 border-r border-stone-800">
+          <ChatWindow
+            onSendMessage={handleChatResponse}
+            onDestinationChange={setDestination}
+          />
         </div>
 
-        {/* Recent Routes */}
-        <div className="bg-stone-800 rounded-xl p-6 border border-stone-700">
-          <Heading 
-            level={2}
-            variant="lg"
-            className="mb-4"
-          >
-            Recent Routes
-          </Heading>
-          <div className="text-stone-400">
-            No routes created yet. Start planning your next adventure!
-          </div>
+        {/* Center Map Container */}
+        <div className="flex-1 relative">
+          <ErrorBoundary>
+            <Map 
+              ref={mapRef}
+              startLocation={null}
+              endLocation={null}
+              waypoints={[]}
+              onLocationSelect={handleLocationSelect}
+              onStartLocationChange={setStartLocation}
+              onDestinationChange={setDestination}
+            />
+          </ErrorBoundary>
+
+          {/* Floating Panels */}
+          {showSearchPanel && (
+            <SearchPanel
+              onClose={() => setShowSearchPanel(false)}
+              onLocationSelect={handleLocationSelect}
+            />
+          )}
+
+          {showRoutePanel && (
+            <RoutePanel
+              onClose={() => setShowRoutePanel(false)}
+              startLocation={null}
+              endLocation={null}
+              waypoints={[]}
+              onStartLocationChange={(loc) => setStartLocation(loc.address)}
+              onEndLocationChange={(loc) => setDestination(loc.address)}
+              onWaypointAdd={() => {}}
+            />
+          )}
         </div>
 
-        {/* Weather Widget Placeholder */}
-        <div className="bg-stone-800 rounded-xl p-6 border border-stone-700">
-          <Heading 
-            level={2}
-            variant="lg"
-            className="mb-4"
-          >
-            Weather
-          </Heading>
-          <div className="text-stone-400">
-            Weather information coming soon...
+        {/* Right Routes Panel */}
+        <div className="w-[350px] flex flex-col bg-stone-900 border-l border-stone-800">
+          <div className="p-4 border-b border-stone-800">
+            <h2 className="text-white text-lg font-semibold">My Routes</h2>
+          </div>
+          <div className="flex-1 overflow-auto p-4">
+            {/* Routes list will go here */}
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 } 

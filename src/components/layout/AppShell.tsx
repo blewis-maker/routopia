@@ -1,7 +1,6 @@
 'use client';
 
 import { ReactNode, useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
 import NavigationBar from './NavigationBar';
 import CommandPalette from './CommandPalette';
 
@@ -10,9 +9,7 @@ interface AppShellProps {
 }
 
 export default function AppShell({ children }: AppShellProps) {
-  const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
-  const isLandingPage = pathname === '/';
 
   useEffect(() => {
     setMounted(true);
@@ -21,7 +18,7 @@ export default function AppShell({ children }: AppShellProps) {
   // Prevent hydration mismatch by not rendering navigation until mounted
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-brand-offwhite font-inter">
+      <div className="min-h-screen bg-background-primary">
         <main className="relative">
           {children}
         </main>
@@ -30,8 +27,8 @@ export default function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="min-h-screen bg-brand-offwhite font-inter">
-      {!isLandingPage && <NavigationBar />}
+    <div className="min-h-screen bg-background-primary">
+      <NavigationBar />
       <CommandPalette />
       
       <main className="relative">

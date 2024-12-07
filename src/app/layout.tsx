@@ -6,6 +6,7 @@ import { Metadata, Viewport } from 'next';
 import { montserrat, inter } from './fonts';
 import { getServerSession } from 'next-auth';
 import { authOptions } from './api/auth/[...nextauth]/route';
+import AppShell from '@/components/layout/AppShell';
 
 export const viewport: Viewport = {
   themeColor: '#0F172A',
@@ -62,7 +63,7 @@ export default async function RootLayout({
     <html lang="en" className={`${montserrat.variable} ${inter.variable} scroll-smooth`} suppressHydrationWarning>
       <body className="antialiased font-sans bg-stone-950 text-stone-50" suppressHydrationWarning>
         <Providers session={session}>
-          {children}
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>

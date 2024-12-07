@@ -10,6 +10,14 @@ const config: Config = {
     extend: {
       fontFamily: {
         montserrat: ['var(--font-montserrat)', 'sans-serif'],
+        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+      },
+      colors: {
+        brand: {
+          primary: '#10B981', // emerald-500
+          'primary-dark': '#059669', // emerald-600
+          text: '#1F2937', // gray-800
+        },
       },
       keyframes: {
         bounce: {

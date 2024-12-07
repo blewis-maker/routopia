@@ -2,6 +2,9 @@ import { MapPin, Route, Bike, Cloud, Brain, Users } from 'lucide-react';
 import { typography } from '@/styles/tokens/typography';
 import { colors } from '@/styles/tokens/colors';
 import { combineClasses } from '@/utils/formatters';
+import AIFeatureShowcase from './Features/AIFeatureShowcase';
+import ActivityTypesGrid from './Features/ActivityTypesGrid';
+import CommunityHighlights from './Features/CommunityHighlights';
 
 const features = [
   {
@@ -46,6 +49,7 @@ export default function Features() {
   return (
     <div id="features" className="py-24 sm:py-32 bg-gradient-to-b from-stone-950 via-stone-950/95 to-stone-950">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
+        {/* Main Features */}
         <div className="mx-auto max-w-2xl lg:text-center">
           <h2 className={combineClasses(
             "text-brand-primary font-montserrat",
@@ -69,6 +73,8 @@ export default function Features() {
             designed to make your outdoor adventures more enjoyable and efficient.
           </p>
         </div>
+
+        {/* Feature Grid */}
         <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
           <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3">
             {features.map((feature) => (
@@ -110,6 +116,13 @@ export default function Features() {
               </div>
             ))}
           </dl>
+        </div>
+
+        {/* Additional Feature Sections */}
+        <div className="mt-32 space-y-32">
+          <AIFeatureShowcase />
+          <ActivityTypesGrid />
+          <CommunityHighlights />
         </div>
       </div>
     </div>

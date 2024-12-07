@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Menu, X } from 'lucide-react';
+import { User } from 'lucide-react';
+import { montserrat } from '@/app/fonts';
+import { usePathname } from 'next/navigation';
 
 const navigationItems = [
-  { name: 'Features', href: '#features' },
+  { name: 'Features', href: '/#features', scroll: true },
   { name: 'Route Planner', href: '/route-planner' },
   { name: 'POI Explorer', href: '/poi-explorer' },
   { name: 'Activity Hub', href: '/activity-hub' },
@@ -14,7 +16,8 @@ const navigationItems = [
 
 export default function NavigationBar() {
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const isLandingPage = pathname === '/';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -25,140 +28,74 @@ export default function NavigationBar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string, scroll?: boolean) => {
+    if (scroll && isLandingPage) {
+      e.preventDefault();
+      const element = document.getElementById(href.replace('/#', ''));
+      element?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
-    <nav
-      className={`
-        fixed top-0 left-0 right-0 z-50
-        transition-all duration-300 ease-in-out
-        ${isScrolled 
-          ? 'bg-white/80 backdrop-blur-md shadow-lg'
-          : 'bg-black/20 backdrop-blur-sm'
-        }
-      `}
-    >
+    <nav className={`
+      fixed top-0 left-0 right-0 z-50
+      transition-all duration-300 ease-in-out
+      ${montserrat.className}
+      ${isScrolled 
+        ? 'bg-stone-900/80 backdrop-blur-md border-b border-stone-800'
+        : 'bg-transparent'
+      }
+    `}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link href="/" className="flex-shrink-0 flex items-center space-x-3 group">
-            <div className="relative w-8 h-8 transform transition-transform group-hover:scale-110">
+          <Link href="/" className="flex items-center gap-2 group">
+            <div className="relative w-8 h-8">
               <Image
                 src="/routopia-logo.png"
                 alt="Routopia"
                 fill
-                className="object-contain"
+                className="object-contain transition-transform duration-200 group-hover:scale-110"
                 priority
               />
             </div>
-            <span className={`
-              font-montserrat font-bold text-lg
-              transition-colors duration-300
-              ${isScrolled ? 'text-brand-text' : 'text-white'}
-            `}>
+            <span className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">
               Routopia
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex md:items-center md:space-x-8">
-            {navigationItems.map((item) => (
+          {/* Navigation */}
+          <div className="flex items-center space-x-8">
+            {isLandingPage ? (
               <Link
-                key={item.name}
-                href={item.href}
-                className={`
-                  relative font-medium text-sm
-                  transition-colors duration-200
-                  hover:text-brand-primary
-                  group
-                  ${isScrolled ? 'text-brand-text' : 'text-white'}
-                `}
+                href="/login"
+                className="flex items-center gap-2 text-stone-300 hover:text-white transition-colors duration-200 font-medium"
               >
-                {item.name}
-                <span className="absolute inset-x-0 -bottom-1 h-0.5 bg-brand-primary transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200" />
+                <User className="w-4 h-4" />
+                Login
               </Link>
-            ))}
-            
-            <Link
-              href="/get-started"
-              className={`
-                inline-flex items-center justify-center
-                px-4 py-2
-                text-sm font-medium
-                rounded-lg
-                transition-all duration-200
-                transform hover:scale-105
-                ${isScrolled
-                  ? 'text-white bg-brand-primary hover:bg-brand-primary/90'
-                  : 'text-brand-primary bg-white hover:bg-white/90'
-                }
-              `}
-            >
-              Get Started
-            </Link>
+            ) : (
+              <>
+                {navigationItems.map((item) => (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={(e) => handleNavClick(e, item.href, item.scroll)}
+                    className="text-stone-300 hover:text-white transition-colors duration-200 font-medium"
+                  >
+                    {item.name}
+                  </Link>
+                ))}
+                <Link
+                  href="/login"
+                  className="flex items-center gap-2 text-stone-300 hover:text-white transition-colors duration-200 font-medium"
+                >
+                  <User className="w-4 h-4" />
+                  Login
+                </Link>
+              </>
+            )}
           </div>
-
-          {/* Mobile menu button */}
-          <div className="flex md:hidden">
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className={`
-                inline-flex items-center justify-center
-                p-2 rounded-md
-                transition-colors duration-200
-                ${isScrolled ? 'text-brand-text' : 'text-white'}
-                hover:text-brand-primary
-              `}
-            >
-              <span className="sr-only">Open main menu</span>
-              {isMobileMenuOpen ? (
-                <X className="block h-6 w-6" aria-hidden="true" />
-              ) : (
-                <Menu className="block h-6 w-6" aria-hidden="true" />
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile menu */}
-      <div className={`
-        md:hidden
-        transition-all duration-300 ease-in-out
-        ${isMobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}
-        overflow-hidden
-        ${isScrolled ? 'bg-white/90 backdrop-blur-md' : 'bg-black/80 backdrop-blur-md'}
-      `}>
-        <div className="px-2 pt-2 pb-3 space-y-1">
-          {navigationItems.map((item) => (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`
-                block px-3 py-2 rounded-md text-base font-medium
-                transition-colors duration-200
-                ${isScrolled
-                  ? 'text-brand-text hover:bg-gray-100'
-                  : 'text-white hover:bg-white/10'
-                }
-              `}
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              {item.name}
-            </Link>
-          ))}
-          <Link
-            href="/get-started"
-            className={`
-              block px-3 py-2 rounded-md text-base font-medium
-              transition-colors duration-200
-              ${isScrolled
-                ? 'bg-brand-primary text-white hover:bg-brand-primary/90'
-                : 'bg-white text-brand-primary hover:bg-white/90'
-              }
-            `}
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            Get Started
-          </Link>
         </div>
       </div>
     </nav>

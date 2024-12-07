@@ -18,9 +18,37 @@ export const authOptions: AuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   jwt: {
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    secret: process.env.NEXTAUTH_SECRET,
+  },
+  cookies: {
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
   },
   debug: process.env.NODE_ENV === 'development',
+  pages: {
+    signIn: '/login',
+    signOut: '/',
+  },
+  callbacks: {
+    async redirect({ url, baseUrl }) {
+      // After sign in, redirect to the dashboard home
+      if (url.startsWith(baseUrl)) {
+        return `${baseUrl}/home`;
+      }
+      // Allows relative callback URLs
+      else if (url.startsWith("/")) {
+        return `${baseUrl}${url}`;
+      }
+      return url;
+    }
+  }
 };
 
 const handler = NextAuth(authOptions);
