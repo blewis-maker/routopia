@@ -1,72 +1,83 @@
 export const colors = {
   brand: {
     primary: {
-      teal: {
-        50: '#E6F7F5',
-        100: '#CCF0EA',
-        200: '#99E0D5',
-        300: '#66D1C1',
-        400: '#33C1AC',
-        500: '#2BAF9D', // Primary brand color
-        600: '#238C7E',
-        700: '#1A695E',
-        800: '#12463F',
-        900: '#09231F',
-      },
-      green: {
-        50: '#E8F5F0',
-        100: '#D1EBE1',
-        200: '#A3D7C3',
-        300: '#75C3A5',
-        400: '#47AF87',
-        500: '#3BA47A', // Alternative primary
-        600: '#2F8362',
-        700: '#236249',
-        800: '#174231',
-        900: '#0C2118',
-      },
+      50: '#E6FFF9',
+      100: '#B3FFE6',
+      200: '#80FFD9',
+      300: '#4DFFCC',
+      400: '#1AFFBF',
+      500: '#00E6A6',
+      600: '#00B380',
+      700: '#008059',
+      800: '#004D33',
+      900: '#001A0C',
     },
-    neutral: {
-      brown: {
-        50: '#F7F4F1',
-        100: '#EFE9E3',
-        200: '#DFD3C7',
-        300: '#CFBDAB',
-        400: '#BFA78F',
-        500: '#A68E7B', // Primary neutral
-        600: '#8C7567',
-        700: '#695748',
-        800: '#463A30',
-        900: '#231D18',
-      },
+    secondary: {
+      50: '#F0FDF4',
+      100: '#DCFCE7',
+      200: '#BBF7D0',
+      300: '#86EFAC',
+      400: '#4ADE80',
+      500: '#22C55E',
+      600: '#16A34A',
+      700: '#15803D',
+      800: '#166534',
+      900: '#14532D',
     },
   },
-  semantic: {
-    background: {
-      primary: 'var(--background-primary)',
-      secondary: 'var(--background-secondary)',
-      tertiary: 'var(--background-tertiary)',
+  neutral: {
+    50: '#FAFAFA',
+    100: '#F4F4F5',
+    200: '#E4E4E7',
+    300: '#D4D4D8',
+    400: '#A1A1AA',
+    500: '#71717A',
+    600: '#52525B',
+    700: '#3F3F46',
+    800: '#27272A',
+    900: '#18181B',
+    950: '#121212',
+  },
+  surface: {
+    light: {
+      primary: '#FFFFFF',
+      secondary: '#F8FAFC',
+      tertiary: '#F1F5F9',
     },
-    text: {
-      primary: 'var(--text-primary)',
-      secondary: 'var(--text-secondary)',
-      tertiary: 'var(--text-tertiary)',
-    },
-    accent: {
-      yellow: '#F2C14E',
-      sage: '#BCCFB3',
-    },
-    state: {
-      success: '#4ADE80',
-      error: '#F87171',
-      warning: '#FBBF24',
-      info: '#60A5FA',
-    },
-    action: {
-      primary: 'var(--action-primary)',
-      secondary: 'var(--action-secondary)',
-      hover: 'var(--action-hover)',
-      disabled: 'var(--action-disabled)',
+    dark: {
+      primary: '#121212',
+      secondary: '#1E1E1E',
+      tertiary: '#2A2A2A',
     },
   },
-} 
+  text: {
+    light: {
+      primary: '#18181B',   // neutral-900
+      secondary: '#3F3F46', // neutral-700
+      tertiary: '#71717A',  // neutral-500
+    },
+    dark: {
+      primary: '#FAFAFA',   // neutral-50
+      secondary: '#E4E4E7', // neutral-200
+      tertiary: '#A1A1AA',  // neutral-400
+    },
+  },
+  state: {
+    success: {
+      light: '#22C55E',
+      dark: '#4ADE80',
+    },
+    error: {
+      light: '#EF4444',
+      dark: '#FCA5A5',
+    },
+    warning: {
+      light: '#F59E0B',
+      dark: '#FCD34D',
+    },
+    info: {
+      light: '#3B82F6',
+      dark: '#93C5FD',
+    },
+  },
+} as const; 
