@@ -1,112 +1,99 @@
-import { useState, useEffect } from 'react';
-import { useGeolocation } from '@/hooks/useGeolocation';
+import { Cloud, Sun, Wind, Droplets, CloudRain } from 'lucide-react';
 
 interface WeatherData {
   current: {
-    temperature: number;
+    temp: number;
     condition: string;
-    icon: string;
-    wind: number;
-    precipitation: number;
+    icon: React.ElementType;
+    wind: string;
+    humidity: string;
   };
-  forecast: Array<{
+  forecast: {
     day: string;
-    temperature: number;
+    temp: number;
     condition: string;
-    icon: string;
-  }>;
+    icon: React.ElementType;
+  }[];
 }
 
+// Mock weather data - replace with actual API call
+const weatherData: WeatherData = {
+  current: {
+    temp: 22,
+    condition: 'Partly Cloudy',
+    icon: Cloud,
+    wind: '12 km/h',
+    humidity: '65%',
+  },
+  forecast: [
+    {
+      day: 'Tomorrow',
+      temp: 24,
+      condition: 'Sunny',
+      icon: Sun,
+    },
+    {
+      day: 'Wed',
+      temp: 20,
+      condition: 'Rainy',
+      icon: CloudRain,
+    },
+    {
+      day: 'Thu',
+      temp: 21,
+      condition: 'Cloudy',
+      icon: Cloud,
+    },
+  ],
+};
+
 export function WeatherWidget() {
-  const { location, error, loading } = useGeolocation();
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [weatherLoading, setWeatherLoading] = useState(true);
-
-  useEffect(() => {
-    if (location) {
-      const fetchWeather = async () => {
-        try {
-          const response = await fetch(
-            `/api/weather?lat=${location.lat}&lng=${location.lng}`
-          );
-          const data = await response.json();
-          setWeather(data);
-        } catch (error) {
-          console.error('Failed to fetch weather:', error);
-        } finally {
-          setWeatherLoading(false);
-        }
-      };
-
-      fetchWeather();
-    }
-  }, [location]);
-
-  if (loading || weatherLoading) {
-    return (
-      <div className="animate-pulse">
-        <div className="h-8 bg-stone-700 rounded w-1/3 mb-4"></div>
-        <div className="h-32 bg-stone-700 rounded"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-stone-400 text-center py-4">
-        Unable to fetch weather information
-      </div>
-    );
-  }
-
-  if (!weather) {
-    return null;
-  }
-
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-white">Weather</h2>
+    <div className="bg-white rounded-lg shadow-sm p-6">
+      <h2 className="text-lg font-semibold text-gray-900 mb-4">Weather</h2>
       
-      <div className="bg-stone-700 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <div className="text-3xl font-medium text-white">
-              {weather.current.temperature}°C
+      {/* Current Weather */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <weatherData.current.icon className="h-12 w-12 text-gray-600" />
+          <div className="ml-4">
+            <div className="text-3xl font-bold text-gray-900">
+              {weatherData.current.temp}°C
             </div>
-            <div className="text-stone-400">{weather.current.condition}</div>
-          </div>
-          <img 
-            src={weather.current.icon} 
-            alt={weather.current.condition}
-            className="w-16 h-16"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-stone-400">Wind</span>
-            <div className="text-white">{weather.current.wind} km/h</div>
-          </div>
-          <div>
-            <span className="text-stone-400">Precipitation</span>
-            <div className="text-white">{weather.current.precipitation}%</div>
+            <div className="text-gray-500">{weatherData.current.condition}</div>
           </div>
         </div>
+        <div className="text-right">
+          <div className="flex items-center text-gray-500 mb-1">
+            <Wind className="h-4 w-4 mr-1" />
+            {weatherData.current.wind}
+          </div>
+          <div className="flex items-center text-gray-500">
+            <Droplets className="h-4 w-4 mr-1" />
+            {weatherData.current.humidity}
+          </div>
+        </div>
+      </div>
 
-        <div className="mt-4 pt-4 border-t border-stone-600">
-          <div className="flex justify-between">
-            {weather.forecast.map((day) => (
-              <div key={day.day} className="text-center">
-                <div className="text-stone-400 text-sm">{day.day}</div>
-                <img 
-                  src={day.icon} 
-                  alt={day.condition}
-                  className="w-8 h-8 mx-auto my-1"
-                />
-                <div className="text-white">{day.temperature}°C</div>
+      {/* Forecast */}
+      <div className="border-t pt-4">
+        <h3 className="text-sm font-medium text-gray-900 mb-3">3-Day Forecast</h3>
+        <div className="grid grid-cols-3 gap-4">
+          {weatherData.forecast.map((day) => (
+            <div
+              key={day.day}
+              className="text-center p-2 bg-gray-50 rounded-lg"
+            >
+              <div className="text-sm font-medium text-gray-900 mb-1">
+                {day.day}
               </div>
-            ))}
-          </div>
+              <day.icon className="h-6 w-6 mx-auto text-gray-600 mb-1" />
+              <div className="text-sm font-medium text-gray-900">
+                {day.temp}°C
+              </div>
+              <div className="text-xs text-gray-500">{day.condition}</div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

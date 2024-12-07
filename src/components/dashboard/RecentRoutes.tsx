@@ -1,120 +1,93 @@
-import { useState, useEffect } from 'react';
+import { MapPin, Calendar, Clock, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import type { RoutePreview } from '@/types/route';
+
+interface Route {
+  id: string;
+  name: string;
+  date: string;
+  duration: string;
+  distance: string;
+  startPoint: string;
+  endPoint: string;
+}
+
+const recentRoutes: Route[] = [
+  {
+    id: '1',
+    name: 'City Park Loop',
+    date: '2024-01-15',
+    duration: '45 min',
+    distance: '5.2 km',
+    startPoint: 'Central Park',
+    endPoint: 'Downtown Square',
+  },
+  {
+    id: '2',
+    name: 'Riverside Trail',
+    date: '2024-01-14',
+    duration: '1h 30min',
+    distance: '12.5 km',
+    startPoint: 'River Station',
+    endPoint: 'Harbor View',
+  },
+  {
+    id: '3',
+    name: 'Mountain Trek',
+    date: '2024-01-13',
+    duration: '2h 15min',
+    distance: '8.7 km',
+    startPoint: 'Base Camp',
+    endPoint: 'Summit Point',
+  },
+];
 
 export function RecentRoutes() {
-  const [routes, setRoutes] = useState<RoutePreview[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchRoutes = async () => {
-      try {
-        const response = await fetch('/api/routes/recent');
-        const data = await response.json();
-        setRoutes(data);
-      } catch (error) {
-        console.error('Failed to fetch recent routes:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRoutes();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="animate-pulse">
-        <div className="h-8 bg-stone-700 rounded w-1/3 mb-4"></div>
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 bg-stone-700 rounded"></div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-white">Recent Routes</h2>
-        <Link 
-          href="/routes" 
-          className="text-emerald-500 hover:text-emerald-400 text-sm"
+    <div className="bg-white rounded-lg shadow-sm p-6">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold text-gray-900">Recent Routes</h2>
+        <Link
+          href="/routes"
+          className="text-sm text-indigo-600 hover:text-indigo-500 flex items-center"
         >
-          View All
+          View all
+          <ArrowRight className="ml-1 h-4 w-4" />
         </Link>
       </div>
 
       <div className="space-y-4">
-        {routes.length === 0 ? (
-          <div className="text-center py-8 text-stone-400">
-            <p>No routes created yet.</p>
-            <Link 
-              href="/route-planner"
-              className="text-emerald-500 hover:text-emerald-400 mt-2 inline-block"
-            >
-              Create your first route
-            </Link>
+        {recentRoutes.map((route) => (
+          <div
+            key={route.id}
+            className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-medium text-gray-900">{route.name}</h3>
+                <div className="mt-1 space-y-1">
+                  <div className="flex items-center text-sm text-gray-500">
+                    <MapPin className="h-4 w-4 mr-1" />
+                    {route.startPoint} → {route.endPoint}
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <span className="flex items-center text-sm text-gray-500">
+                      <Calendar className="h-4 w-4 mr-1" />
+                      {new Date(route.date).toLocaleDateString()}
+                    </span>
+                    <span className="flex items-center text-sm text-gray-500">
+                      <Clock className="h-4 w-4 mr-1" />
+                      {route.duration}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <span className="text-sm font-medium text-gray-900">
+                {route.distance}
+              </span>
+            </div>
           </div>
-        ) : (
-          routes.map((route) => (
-            <Link 
-              key={route.id}
-              href={`/routes/${route.id}`}
-              className="block bg-stone-700 rounded-lg p-4 hover:bg-stone-600 transition-colors"
-            >
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <h3 className="font-medium text-white">{route.name}</h3>
-                  <p className="text-sm text-stone-400">
-                    {route.startLocation} → {route.endLocation}
-                  </p>
-                </div>
-                <span className="text-sm text-stone-400">
-                  {formatDate(route.createdAt)}
-                </span>
-              </div>
-
-              <div className="flex space-x-4 text-sm text-stone-400">
-                <span>{route.activityType}</span>
-                <span>{formatDistance(route.distance)}</span>
-                <span>{formatDuration(route.duration)}</span>
-              </div>
-
-              {route.thumbnail && (
-                <div className="mt-3">
-                  <img 
-                    src={route.thumbnail} 
-                    alt={route.name}
-                    className="w-full h-24 object-cover rounded"
-                  />
-                </div>
-              )}
-            </Link>
-          ))
-        )}
+        ))}
       </div>
     </div>
   );
-}
-
-function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  });
-}
-
-function formatDistance(meters: number): string {
-  const kilometers = meters / 1000;
-  return `${kilometers.toFixed(1)}km`;
-}
-
-function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return `${hours}h ${remainingMinutes}m`;
 } 

@@ -1,40 +1,27 @@
-import { useState, useEffect } from 'react';
+import { MapPin, Star, Navigation, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { useGeolocation } from '@/hooks/useGeolocation';
-import type { POI, POICategory } from '@/types/poi';
+import Image from 'next/image';
+import { usePOIData } from '@/hooks/usePOIData';
+
+// Helper function to construct Google Places photo URL
+function getGooglePhotoUrl(photoReference: string): string {
+  const maxWidth = 400; // Adjust size as needed
+  return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photoReference}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`;
+}
 
 export function POIHighlights() {
-  const { location, error, loading } = useGeolocation();
-  const [pois, setPois] = useState<POI[]>([]);
-  const [poisLoading, setPoisLoading] = useState(true);
+  const { pois, loading, error } = usePOIData(3);
 
-  useEffect(() => {
-    if (location) {
-      const fetchPOIs = async () => {
-        try {
-          const response = await fetch(
-            `/api/pois/nearby?lat=${location.lat}&lng=${location.lng}&limit=5`
-          );
-          const data = await response.json();
-          setPois(data.results);
-        } catch (error) {
-          console.error('Failed to fetch POIs:', error);
-        } finally {
-          setPoisLoading(false);
-        }
-      };
-
-      fetchPOIs();
-    }
-  }, [location]);
-
-  if (loading || poisLoading) {
+  if (loading) {
     return (
-      <div className="animate-pulse">
-        <div className="h-8 bg-stone-700 rounded w-1/3 mb-4"></div>
-        <div className="space-y-3">
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="flex justify-between items-center mb-4">
+          <div className="h-6 w-32 bg-gray-200 rounded animate-pulse"></div>
+          <div className="h-6 w-24 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 bg-stone-700 rounded"></div>
+            <div key={i} className="aspect-w-16 aspect-h-9 rounded-lg bg-gray-200 animate-pulse"></div>
           ))}
         </div>
       </div>
@@ -43,87 +30,75 @@ export function POIHighlights() {
 
   if (error) {
     return (
-      <div className="text-stone-400 text-center py-4">
-        Unable to fetch nearby points of interest
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="text-center text-gray-500">
+          <p>{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 text-indigo-600 hover:text-indigo-500"
+          >
+            Try again
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-white">Nearby Places</h2>
-        <Link 
-          href="/poi" 
-          className="text-emerald-500 hover:text-emerald-400 text-sm"
+    <div className="bg-white rounded-lg shadow-sm p-6">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold text-gray-900">Featured Places</h2>
+        <Link
+          href="/poi"
+          className="text-sm text-indigo-600 hover:text-indigo-500 flex items-center"
         >
-          View All
+          Explore more
+          <ArrowRight className="ml-1 h-4 w-4" />
         </Link>
       </div>
 
-      <div className="space-y-3">
-        {pois.length === 0 ? (
-          <div className="text-center py-8 text-stone-400">
-            <p>No points of interest found nearby</p>
-            <Link 
-              href="/poi"
-              className="text-emerald-500 hover:text-emerald-400 mt-2 inline-block"
-            >
-              Browse all locations
-            </Link>
-          </div>
-        ) : (
-          pois.map((poi) => (
-            <Link
-              key={poi.id}
-              href={`/poi/${poi.id}`}
-              className="block bg-stone-700 rounded-lg p-4 hover:bg-stone-600 transition-colors"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-medium text-white">{poi.name}</h3>
-                  <p className="text-sm text-stone-400">{poi.category}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {pois.map((poi) => (
+          <div
+            key={poi.id}
+            className="relative group"
+          >
+            <div className="aspect-w-16 aspect-h-9 rounded-lg overflow-hidden">
+              {poi.photoReference ? (
+                <Image
+                  src={getGooglePhotoUrl(poi.photoReference)}
+                  alt={poi.name}
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-200"
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                  <MapPin className="h-8 w-8 text-gray-400" />
                 </div>
-                {poi.rating && (
-                  <div className="flex items-center text-sm">
-                    <span className="text-yellow-400">★</span>
-                    <span className="text-white ml-1">{poi.rating}</span>
-                  </div>
-                )}
+              )}
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-lg">
+              <div className="absolute bottom-0 p-4 text-white">
+                <div className="flex items-center space-x-1 text-yellow-400 mb-1">
+                  <Star className="h-4 w-4 fill-current" />
+                  <span className="text-sm">{poi.rating}</span>
+                </div>
+                <h3 className="font-medium mb-1">{poi.name}</h3>
+                <div className="flex items-center text-sm text-gray-200">
+                  <MapPin className="h-4 w-4 mr-1" />
+                  {poi.location}
+                </div>
+                <div className="flex items-center mt-2 space-x-4 text-sm">
+                  <span className="text-gray-200">{poi.category}</span>
+                  <span className="flex items-center text-gray-200">
+                    <Navigation className="h-4 w-4 mr-1" />
+                    {poi.distance}
+                  </span>
+                </div>
               </div>
-
-              {poi.details && (
-                <div className="mt-2 text-sm">
-                  {poi.details.openingHours && (
-                    <div className="text-stone-400">
-                      {poi.details.openingHours}
-                    </div>
-                  )}
-                  {poi.details.pricing && (
-                    <div className="text-stone-400">
-                      Price Level: {poi.details.pricing.level}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {poi.realtime && (
-                <div className="mt-2 flex space-x-4 text-sm">
-                  {poi.realtime.crowdLevel && (
-                    <span className="text-stone-400">
-                      Crowd: {poi.realtime.crowdLevel}
-                    </span>
-                  )}
-                  {poi.realtime.waitTime !== undefined && (
-                    <span className="text-stone-400">
-                      Wait: {poi.realtime.waitTime}min
-                    </span>
-                  )}
-                </div>
-              )}
-            </Link>
-          ))
-        )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

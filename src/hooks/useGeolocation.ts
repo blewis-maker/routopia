@@ -5,64 +5,37 @@ interface Location {
   lng: number;
 }
 
-interface GeolocationState {
-  location: Location | null;
-  error: string | null;
-  loading: boolean;
-}
-
 export function useGeolocation() {
-  const [state, setState] = useState<GeolocationState>({
-    location: null,
-    error: null,
-    loading: true
-  });
+  const [location, setLocation] = useState<Location | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!navigator.geolocation) {
-      setState({
-        location: null,
-        error: 'Geolocation is not supported',
-        loading: false
-      });
+      setError('Geolocation is not supported by your browser');
+      setLoading(false);
       return;
     }
 
-    const handleSuccess = (position: GeolocationPosition) => {
-      setState({
-        location: {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
           lat: position.coords.latitude,
-          lng: position.coords.longitude
-        },
-        error: null,
-        loading: false
-      });
-    };
-
-    const handleError = (error: GeolocationPositionError) => {
-      setState({
-        location: null,
-        error: error.message,
-        loading: false
-      });
-    };
-
-    const options = {
-      enableHighAccuracy: true,
-      timeout: 5000,
-      maximumAge: 0
-    };
-
-    const watchId = navigator.geolocation.watchPosition(
-      handleSuccess,
-      handleError,
-      options
+          lng: position.coords.longitude,
+        });
+        setLoading(false);
+      },
+      (error) => {
+        setError(error.message);
+        setLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0,
+      }
     );
-
-    return () => {
-      navigator.geolocation.clearWatch(watchId);
-    };
   }, []);
 
-  return state;
+  return { location, error, loading };
 } 

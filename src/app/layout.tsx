@@ -1,14 +1,17 @@
 import '@/app/globals.css';
-import NavBar from '@/components/NavBar';
 import { AuthProvider } from '@/components/AuthProvider';
+import AppShell from '@/components/layout/AppShell';
 import { Metadata } from 'next';
+import { montserrat, inter } from './fonts';
 
 export const metadata: Metadata = {
-  title: 'Routopia',
-  description: 'Your AI-powered route planning assistant',
+  title: 'Routopia - AI-Powered Route Planning',
+  description: 'Discover your perfect route with AI-powered planning that adapts to your preferences, weather conditions, and points of interest.',
   icons: {
     icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
   },
+  manifest: '/site.webmanifest',
 };
 
 export default function RootLayout({
@@ -17,26 +20,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <head>
-        <link 
-          rel="preload" 
-          href="/next/image?url=%2F_next%2Fstatic%2Fmedia%2Flogo.png&w=256&q=75" 
-          as="image"
-        />
-        <link 
-          rel="preload"
-          href="/routopia.ico" 
-          as="image" 
-          type="image/x-icon"
-        />
-      </head>
-      <body>
+    <html lang="en" className={`${montserrat.variable} ${inter.variable}`}>
+      <body className="antialiased">
         <AuthProvider>
-          <NavBar />
-          <main className="pt-16">
-            {children}
-          </main>
+          <AppShell>{children}</AppShell>
         </AuthProvider>
       </body>
     </html>

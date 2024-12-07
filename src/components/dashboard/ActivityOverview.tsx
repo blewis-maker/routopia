@@ -1,53 +1,80 @@
-import { useState, useEffect } from 'react';
-import { useActivityStore } from '@/store/activity/activity.store';
-import type { ActivityType, ActivityStats, ActivityMetrics } from '@/types/activity';
+import { Activity, TrendingUp, Map, Clock } from 'lucide-react';
+
+interface ActivityStat {
+  label: string;
+  value: string;
+  change: string;
+  icon: React.ElementType;
+  trend: 'up' | 'down' | 'neutral';
+}
+
+const stats: ActivityStat[] = [
+  {
+    label: 'Total Distance',
+    value: '284.5 km',
+    change: '+4.75%',
+    icon: Activity,
+    trend: 'up',
+  },
+  {
+    label: 'Active Routes',
+    value: '12',
+    change: '+2',
+    icon: Map,
+    trend: 'up',
+  },
+  {
+    label: 'Avg. Duration',
+    value: '1h 45m',
+    change: '-5min',
+    icon: Clock,
+    trend: 'down',
+  },
+  {
+    label: 'Progress',
+    value: '87%',
+    change: '+2.3%',
+    icon: TrendingUp,
+    trend: 'up',
+  },
+];
 
 export function ActivityOverview() {
-  const store = useActivityStore();
-  const [stats, setStats] = useState<ActivityStats[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadStats = async () => {
-      setLoading(true);
-      try {
-        const activityStats = await store.getActivityStats();
-        setStats(activityStats);
-      } catch (error) {
-        console.error('Failed to load activity stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadStats();
-  }, [store]);
-
-  if (loading) {
-    return <div>Loading activity stats...</div>;
-  }
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {stats.map((stat) => (
-        <div key={stat.type} className="p-4 bg-white rounded-lg shadow">
-          <h3 className="text-lg font-semibold">{stat.type}</h3>
-          <div className="mt-2 space-y-2">
-            <p>Total Activities: {stat.count}</p>
-            <p>Total Distance: {(stat.totalDistance / 1000).toFixed(1)} km</p>
-            <p>Total Duration: {Math.round(stat.totalDuration / 60)} minutes</p>
-            <p>Average Speed: {stat.averageSpeed.toFixed(1)} km/h</p>
-            {stat.lastActivity && (
-              <div className="mt-4">
-                <h4 className="font-medium">Last Activity</h4>
-                <p>Date: {new Date(stat.lastActivity.date).toLocaleDateString()}</p>
-                <p>Distance: {(stat.lastActivity.metrics.distance / 1000).toFixed(1)} km</p>
-                <p>Duration: {Math.round(stat.lastActivity.metrics.duration / 60)} minutes</p>
+    <div className="bg-white rounded-lg shadow-sm p-6">
+      <h2 className="text-lg font-semibold text-gray-900 mb-4">Activity Overview</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((stat) => (
+          <div
+            key={stat.label}
+            className="p-4 bg-gray-50 rounded-lg"
+          >
+            <div className="flex items-center">
+              <div className="p-2 bg-indigo-500 rounded-lg">
+                <stat.icon className="h-5 w-5 text-white" />
               </div>
-            )}
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-600">{stat.label}</p>
+                <p className="text-lg font-semibold text-gray-900">{stat.value}</p>
+              </div>
+            </div>
+            <div className="mt-2">
+              <span
+                className={`text-sm font-medium ${
+                  stat.trend === 'up'
+                    ? 'text-green-600'
+                    : stat.trend === 'down'
+                    ? 'text-red-600'
+                    : 'text-gray-600'
+                }`}
+              >
+                {stat.change}
+              </span>
+              <span className="text-sm text-gray-600"> vs last month</span>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
