@@ -1,7 +1,7 @@
 import type { Preview } from '@storybook/react'
 import React from 'react'
 import '../src/styles/globals.css'
-import { withThemeByClassName } from '@storybook/addon-themes'
+import { withThemeByDataAttribute } from '@storybook/addon-themes'
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime'
 
 // Mock Next.js Image component
@@ -42,12 +42,13 @@ const preview: Preview = {
     },
   },
   decorators: [
-    withThemeByClassName({
+    withThemeByDataAttribute({
       themes: {
-        light: 'light',
+        light: '',
         dark: 'dark',
       },
       defaultTheme: 'light',
+      attributeName: 'data-theme',
     }),
     (Story, context) => {
       // Check if the story is set to fullscreen

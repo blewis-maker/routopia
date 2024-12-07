@@ -12,7 +12,14 @@ export default function ActivityHubPage() {
       </div>
       <div className="activity-hub__sidebar">
         <WeatherWidget />
-        <AIChat />
+        <AIChat
+          messages={[
+            {
+              role: 'assistant',
+              content: "I can help you track and analyze your activities. What would you like to know?",
+            },
+          ]}
+        />
       </div>
     </div>
   );

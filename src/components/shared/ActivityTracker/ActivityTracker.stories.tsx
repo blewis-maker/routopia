@@ -2,48 +2,42 @@ import type { Meta, StoryObj } from '@storybook/react'
 import { ActivityTracker } from './index'
 
 const meta = {
-  title: 'Components/Shared/ActivityTracker',
+  title: 'Components/ActivityTracker',
   component: ActivityTracker,
-  parameters: {
-    layout: 'centered',
-  },
 } satisfies Meta<typeof ActivityTracker>
 
 export default meta
-type Story = StoryObj<typeof meta>
+type Story = StoryObj<typeof ActivityTracker>
 
-export const Empty: Story = {
-  args: {
-    activities: [],
-  },
-}
-
-export const WithActivities: Story = {
+export const Default: Story = {
   args: {
     activities: [
       {
         id: '1',
-        type: 'route',
+        type: 'running',
         name: 'Morning Run',
         distance: 5.2,
-        duration: 1800,
-        date: new Date('2023-12-07T08:00:00'),
+        duration: 45,
+        elevation: 100,
+        date: '2024-01-20',
       },
       {
         id: '2',
         type: 'cycling',
         name: 'Evening Ride',
         distance: 15.5,
-        duration: 3600,
-        date: new Date('2023-12-06T18:00:00'),
+        duration: 60,
+        elevation: 250,
+        date: '2024-01-19',
       },
       {
         id: '3',
         type: 'hiking',
         name: 'Weekend Trail',
         distance: 8.3,
-        duration: 7200,
-        date: new Date('2023-12-05T10:00:00'),
+        duration: 120,
+        elevation: 450,
+        date: '2024-01-18',
       },
     ],
   },
@@ -51,42 +45,18 @@ export const WithActivities: Story = {
 
 export const Loading: Story = {
   args: {
-    isLoading: true,
+    loading: true,
   },
 }
 
 export const Error: Story = {
   args: {
-    error: 'Failed to load activities',
+    error: 'Unable to load activity data',
   },
 }
 
-export const WithFilters: Story = {
+export const Empty: Story = {
   args: {
-    activities: [
-      {
-        id: '1',
-        type: 'route',
-        name: 'Morning Run',
-        distance: 5.2,
-        duration: 1800,
-        date: new Date('2023-12-07T08:00:00'),
-      },
-      {
-        id: '2',
-        type: 'cycling',
-        name: 'Evening Ride',
-        distance: 15.5,
-        duration: 3600,
-        date: new Date('2023-12-06T18:00:00'),
-      },
-    ],
-    filters: {
-      type: ['route', 'cycling'],
-      dateRange: {
-        start: new Date('2023-12-01'),
-        end: new Date('2023-12-31'),
-      },
-    },
+    activities: [],
   },
 } 

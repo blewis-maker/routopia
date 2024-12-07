@@ -2,11 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react'
 import { WeatherWidget } from './index'
 
 const meta = {
-  title: 'Components/Shared/WeatherWidget',
+  title: 'Components/WeatherWidget',
   component: WeatherWidget,
-  parameters: {
-    layout: 'centered',
-  },
 } satisfies Meta<typeof WeatherWidget>
 
 export default meta
@@ -14,36 +11,51 @@ type Story = StoryObj<typeof meta>
 
 export const Default: Story = {
   args: {
-    temperature: 20,
-    conditions: 'Clear',
-    location: 'New York, NY',
+    data: {
+      temperature: 72,
+      condition: 'Partly Cloudy',
+      icon: '⛅',
+      precipitation: 10,
+      windSpeed: 5,
+      humidity: 45,
+    },
   },
 }
 
 export const Loading: Story = {
   args: {
-    isLoading: true,
+    loading: true,
   },
 }
 
 export const Error: Story = {
   args: {
-    error: 'Failed to load weather data',
+    error: 'Unable to fetch weather data',
   },
 }
 
 export const ExtremeCold: Story = {
   args: {
-    temperature: -10,
-    conditions: 'Snow',
-    location: 'Montreal, CA',
+    data: {
+      temperature: -10,
+      condition: 'Snow',
+      icon: '🌨️',
+      precipitation: 90,
+      windSpeed: 15,
+      humidity: 80,
+    },
   },
 }
 
 export const ExtremeHeat: Story = {
   args: {
-    temperature: 35,
-    conditions: 'Sunny',
-    location: 'Phoenix, AZ',
+    data: {
+      temperature: 95,
+      condition: 'Sunny',
+      icon: '☀️',
+      precipitation: 0,
+      windSpeed: 8,
+      humidity: 20,
+    },
   },
 } 

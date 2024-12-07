@@ -1,165 +1,89 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { User, Menu, X } from 'lucide-react';
-import { montserrat } from '@/app/fonts';
-import { usePathname } from 'next/navigation';
-
-const navigationItems = [
-  { name: 'Features', href: '/#features', scroll: true },
-  { name: 'Route Planner', href: '/route-planner' },
-  { name: 'POI Explorer', href: '/poi-explorer' },
-  { name: 'Activity Hub', href: '/activity-hub' },
-];
 
 interface NavigationBarProps {
-  className?: string;
+  user?: {
+    name: string;
+    image?: string;
+  };
+  onSignIn?: () => void;
+  onSignOut?: () => void;
 }
 
-export default function NavigationBar({ className = '' }: NavigationBarProps) {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const pathname = usePathname();
-  const isLandingPage = pathname === '/';
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string, scroll?: boolean) => {
-    if (scroll && isLandingPage) {
-      e.preventDefault();
-      const element = document.getElementById(href.replace('/#', ''));
-      element?.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
+export const NavigationBar: React.FC<NavigationBarProps> = ({
+  user,
+  onSignIn,
+  onSignOut,
+}) => {
   return (
-    <nav className={`
-      fixed top-0 left-0 right-0 z-50
-      transition-all duration-300 ease-in-out
-      ${montserrat.className}
-      ${isScrolled 
-        ? 'bg-stone-900/80 backdrop-blur-md border-b border-stone-800'
-        : isLandingPage 
-          ? 'bg-transparent'
-          : 'bg-stone-900'
-      }
-      ${className}
-    `}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="relative w-8 h-8">
-              <Image
-                src="/routopia-logo.png"
-                alt="Routopia"
-                fill
-                className="object-contain transition-transform duration-200 group-hover:scale-110"
-                priority
-              />
-            </div>
-            <span className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">
-              Routopia
-            </span>
-          </Link>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            {isLandingPage ? (
-              <Link
-                href="/login"
-                className="flex items-center gap-2 text-stone-300 hover:text-white transition-colors duration-200 font-medium"
-              >
-                <User className="w-4 h-4" />
-                Login
-              </Link>
-            ) : (
-              <>
-                {navigationItems.map((item) => (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    onClick={(e) => handleNavClick(e, item.href, item.scroll)}
-                    className="text-stone-300 hover:text-white transition-colors duration-200 font-medium"
-                  >
-                    {item.name}
-                  </Link>
-                ))}
-                <Link
-                  href="/login"
-                  className="flex items-center gap-2 text-stone-300 hover:text-white transition-colors duration-200 font-medium"
-                >
-                  <User className="w-4 h-4" />
-                  Login
-                </Link>
-              </>
-            )}
-          </div>
-
-          {/* Mobile menu button */}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 rounded-md text-stone-300 hover:text-white"
-          >
-            {isMobileMenuOpen ? (
-              <X className="h-6 w-6" />
-            ) : (
-              <Menu className="h-6 w-6" />
-            )}
-          </button>
-        </div>
+    <nav className="h-16 px-4 flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+      {/* Logo & Brand */}
+      <div className="flex items-center space-x-2">
+        <Link href="/" className="text-xl font-semibold text-brand-primary-500">
+          🗺️ Routopia
+        </Link>
       </div>
 
-      {/* Mobile menu */}
-      <div className={`
-        md:hidden
-        transition-all duration-300 ease-in-out
-        ${isMobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}
-        overflow-hidden
-        ${isScrolled ? 'bg-stone-900/80 backdrop-blur-md' : 'bg-stone-900'}
-      `}>
-        <div className="px-4 pt-2 pb-3 space-y-1">
-          {isLandingPage ? (
-            <Link
-              href="/login"
-              className="block px-3 py-2 rounded-md text-base font-medium text-stone-300 hover:text-white hover:bg-stone-800"
+      {/* Navigation Links */}
+      <div className="hidden md:flex items-center space-x-6">
+        <Link
+          href="/route-planner"
+          className="text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-colors"
+        >
+          Route Planner
+        </Link>
+        <Link
+          href="/activity-hub"
+          className="text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-colors"
+        >
+          Activity Hub
+        </Link>
+        <Link
+          href="/poi-explorer"
+          className="text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-colors"
+        >
+          POI Explorer
+        </Link>
+      </div>
+
+      {/* User Menu */}
+      <div className="flex items-center space-x-4">
+        {user ? (
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-neutral-600 dark:text-neutral-300">
+              {user.name}
+            </span>
+            {user.image ? (
+              <img
+                src={user.image}
+                alt={user.name}
+                className="w-8 h-8 rounded-full"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-brand-primary-100 dark:bg-brand-primary-900 flex items-center justify-center">
+                <span className="text-sm font-medium text-brand-primary-700 dark:text-brand-primary-300">
+                  {user.name[0]}
+                </span>
+              </div>
+            )}
+            <button
+              onClick={onSignOut}
+              className="text-sm text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-colors"
             >
-              Login
-            </Link>
-          ) : (
-            <>
-              {navigationItems.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={(e) => {
-                    handleNavClick(e, item.href, item.scroll);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="block px-3 py-2 rounded-md text-base font-medium text-stone-300 hover:text-white hover:bg-stone-800"
-                >
-                  {item.name}
-                </Link>
-              ))}
-              <Link
-                href="/login"
-                className="block px-3 py-2 rounded-md text-base font-medium text-stone-300 hover:text-white hover:bg-stone-800"
-              >
-                Login
-              </Link>
-            </>
-          )}
-        </div>
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onSignIn}
+            className="px-4 py-2 text-sm font-medium text-white bg-brand-primary-500 rounded-lg hover:bg-brand-primary-600 transition-colors"
+          >
+            Sign In
+          </button>
+        )}
       </div>
     </nav>
   );
-} 
+}; 

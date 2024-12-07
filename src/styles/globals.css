@@ -12,9 +12,6 @@
     --text-primary: theme('colors.text.light.primary');
     --text-secondary: theme('colors.text.light.secondary');
     --text-tertiary: theme('colors.text.light.tertiary');
-
-    --brand-primary: theme('colors.brand.primary.500');
-    --brand-secondary: theme('colors.brand.secondary.500');
   }
 
   [data-theme="dark"] {
@@ -68,8 +65,8 @@
            hover:from-brand-primary-400 hover:to-brand-secondary-400
            active:from-brand-primary-600 active:to-brand-secondary-600
            transform transition-all duration-200 
-           hover:scale-[1.02] hover:shadow-lg hover:shadow-brand-primary-500/25
-           focus:outline-none focus:ring-2 focus:ring-brand-primary-500/50;
+           hover:scale-[1.02] hover:shadow-lg
+           focus:outline-none focus:ring-2 focus:ring-neutral-500/50;
   }
 
   .btn-secondary {

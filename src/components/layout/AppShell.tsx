@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode, useEffect, useState } from 'react';
-import NavigationBar from './NavigationBar';
+import { NavigationBar } from './NavigationBar';
 import CommandPalette from './CommandPalette';
 
 interface AppShellProps {
