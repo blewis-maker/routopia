@@ -26,8 +26,14 @@ jobs:
       - name: Build Storybook
         run: npm run build-storybook
       
-      - name: Run visual tests in parallel
-        run: npm run test:visual:parallel
+      - name: Run Chromatic
+        uses: chromaui/action@v1
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          storybookBuildDir: storybook-static
+          exitZeroOnChanges: true
+      
+      - name: Run Percy
+        run: npx percy storybook ./storybook-static
         env:
           PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
-          CHROMATIC_PROJECT_TOKEN: chpt_adf0229281cc802
