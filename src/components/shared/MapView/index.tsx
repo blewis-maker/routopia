@@ -1,55 +1,39 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { mapboxService } from '@/services/mapbox/client';
-import type { Map as MapboxMap } from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import React from 'react';
+import type { Map } from 'mapbox-gl';
 
 interface MapViewProps {
   center?: [number, number];
   zoom?: number;
-  onMapLoad?: (map: MapboxMap) => void;
+  onMapLoad?: (map: Map) => void;
   className?: string;
+  markers?: Array<{
+    id: string;
+    position: [number, number];
+    label: string;
+  }>;
+  route?: {
+    id: string;
+    coordinates: Array<[number, number]>;
+  };
 }
 
-export function MapView({
+export const MapView: React.FC<MapViewProps> = ({
   center = [-74.5, 40],
   zoom = 9,
   onMapLoad,
-  className = '',
-}: MapViewProps) {
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<MapboxMap | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    if (!mapContainer.current || map.current) return;
-
-    map.current = mapboxService.createMap({
-      container: mapContainer.current,
-      center,
-      zoom,
-    });
-
-    map.current.on('load', () => {
-      setLoaded(true);
-      if (onMapLoad && map.current) {
-        onMapLoad(map.current);
-      }
-    });
-
-    return () => {
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
-    };
-  }, [center, zoom, onMapLoad]);
-
+  className,
+  markers,
+  route,
+}) => {
   return (
-    <div 
-      ref={mapContainer} 
-      className={`map-view w-full h-full min-h-[400px] ${className}`}
-    />
+    <div className={`h-full w-full ${className || ''}`}>
+      Map View Component (Mock)
+      {markers?.map(marker => (
+        <div key={marker.id}>Marker: {marker.label}</div>
+      ))}
+      {route && <div>Route with {route.coordinates.length} points</div>}
+    </div>
   );
-} 
+}; 

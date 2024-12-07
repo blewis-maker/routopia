@@ -6,11 +6,6 @@ const meta = {
   component: MapView,
   parameters: {
     layout: 'fullscreen',
-    chromatic: { delay: 1000 }, // Wait for map to load
-  },
-  args: {
-    center: [-74.5, 40],
-    zoom: 9,
   },
 } satisfies Meta<typeof MapView>
 
@@ -18,27 +13,34 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Default: Story = {
-  args: {},
+  args: {
+    center: [-74.5, 40],
+    zoom: 9,
+  },
 }
 
 export const WithMarkers: Story = {
   args: {
+    center: [-74.5, 40],
+    zoom: 9,
     markers: [
-      { lat: 40, lng: -74, label: 'Start' },
-      { lat: 40.1, lng: -74.2, label: 'End' },
+      { id: '1', position: [-74.5, 40], label: 'Point A' },
+      { id: '2', position: [-74.6, 40.1], label: 'Point B' },
     ],
   },
 }
 
 export const WithRoute: Story = {
   args: {
+    center: [-74.5, 40],
+    zoom: 9,
     route: {
+      id: '1',
       coordinates: [
-        [-74, 40],
-        [-74.1, 40.05],
-        [-74.2, 40.1],
+        [-74.5, 40],
+        [-74.6, 40.1],
+        [-74.7, 40.2],
       ],
-      color: '#FF0000',
     },
   },
 } 

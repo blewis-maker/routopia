@@ -5,31 +5,32 @@ const meta = {
   title: 'Components/Shared/AIChat',
   component: AIChat,
   parameters: {
-    layout: 'padded',
-  },
-  args: {
-    initialMessage: 'How can I help you plan your route today?',
-    suggestions: [
-      'Find scenic routes near me',
-      'Suggest a cycling route',
-      'Find coffee stops along my route',
-    ],
+    layout: 'centered',
   },
 } satisfies Meta<typeof AIChat>
 
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const Default: Story = {
-  args: {},
+export const Empty: Story = {
+  args: {
+    messages: [],
+  },
 }
 
-export const WithActiveConversation: Story = {
+export const WithMessages: Story = {
   args: {
     messages: [
-      { role: 'assistant', content: 'How can I help you plan your route today?' },
-      { role: 'user', content: 'I want to find a scenic route near New York' },
-      { role: 'assistant', content: 'I\'ve found several scenic routes near New York. Here are some options...' },
+      { role: 'user', content: 'Can you help me plan a route?' },
+      { role: 'assistant', content: 'Of course! Where would you like to start?' },
+      { role: 'user', content: 'I want to go from New York to Boston' },
+      { 
+        role: 'assistant', 
+        content: 'I can help you plan that route. The distance is about 215 miles. Would you prefer:' +
+                '\n1. The fastest route via I-95' +
+                '\n2. A scenic route along the coast' +
+                '\n3. A route with interesting stops along the way'
+      },
     ],
   },
 }
@@ -37,8 +38,7 @@ export const WithActiveConversation: Story = {
 export const Loading: Story = {
   args: {
     messages: [
-      { role: 'assistant', content: 'How can I help you plan your route today?' },
-      { role: 'user', content: 'I want to find a scenic route near New York' },
+      { role: 'user', content: 'What are some good stops along the way?' },
     ],
     isLoading: true,
   },
@@ -46,6 +46,9 @@ export const Loading: Story = {
 
 export const Error: Story = {
   args: {
+    messages: [
+      { role: 'user', content: 'What are some good stops along the way?' },
+    ],
     error: 'Failed to connect to AI service',
   },
 } 

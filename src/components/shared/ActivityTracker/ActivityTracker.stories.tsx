@@ -7,46 +7,45 @@ const meta = {
   parameters: {
     layout: 'centered',
   },
-  args: {
-    activities: [
-      {
-        id: '1',
-        type: 'cycling',
-        distance: 15.2,
-        duration: 3600,
-        date: new Date('2024-03-15'),
-        route: {
-          name: 'Central Park Loop',
-          startPoint: 'Central Park South',
-          endPoint: 'Central Park South',
-        },
-      },
-      {
-        id: '2',
-        type: 'running',
-        distance: 5.0,
-        duration: 1800,
-        date: new Date('2024-03-14'),
-        route: {
-          name: 'Riverside Run',
-          startPoint: 'Riverside Park',
-          endPoint: 'Riverside Park',
-        },
-      },
-    ],
-  },
 } satisfies Meta<typeof ActivityTracker>
 
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const Default: Story = {
-  args: {},
-}
-
 export const Empty: Story = {
   args: {
     activities: [],
+  },
+}
+
+export const WithActivities: Story = {
+  args: {
+    activities: [
+      {
+        id: '1',
+        type: 'route',
+        name: 'Morning Run',
+        distance: 5.2,
+        duration: 1800,
+        date: new Date('2023-12-07T08:00:00'),
+      },
+      {
+        id: '2',
+        type: 'cycling',
+        name: 'Evening Ride',
+        distance: 15.5,
+        duration: 3600,
+        date: new Date('2023-12-06T18:00:00'),
+      },
+      {
+        id: '3',
+        type: 'hiking',
+        name: 'Weekend Trail',
+        distance: 8.3,
+        duration: 7200,
+        date: new Date('2023-12-05T10:00:00'),
+      },
+    ],
   },
 }
 
@@ -56,25 +55,38 @@ export const Loading: Story = {
   },
 }
 
-export const WithFilters: Story = {
+export const Error: Story = {
   args: {
-    showFilters: true,
-    activityTypes: ['cycling', 'running', 'hiking'],
-    dateRange: {
-      start: new Date('2024-03-01'),
-      end: new Date('2024-03-15'),
-    },
+    error: 'Failed to load activities',
   },
 }
 
-export const WithStats: Story = {
+export const WithFilters: Story = {
   args: {
-    showStats: true,
-    stats: {
-      totalDistance: 150.5,
-      totalDuration: 36000,
-      averageSpeed: 15.2,
-      activityCount: 10,
+    activities: [
+      {
+        id: '1',
+        type: 'route',
+        name: 'Morning Run',
+        distance: 5.2,
+        duration: 1800,
+        date: new Date('2023-12-07T08:00:00'),
+      },
+      {
+        id: '2',
+        type: 'cycling',
+        name: 'Evening Ride',
+        distance: 15.5,
+        duration: 3600,
+        date: new Date('2023-12-06T18:00:00'),
+      },
+    ],
+    filters: {
+      type: ['route', 'cycling'],
+      dateRange: {
+        start: new Date('2023-12-01'),
+        end: new Date('2023-12-31'),
+      },
     },
   },
 } 

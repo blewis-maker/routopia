@@ -6,15 +6,66 @@
    - Development environment for UI components
    - Access at `http://localhost:6006`
    - Run with `npm run storybook`
+   - Build with `npm run build-storybook`
 
 2. **Percy**
    - Visual regression testing
-   - Integrated with CI pipeline
-   - Run with `npm run test:visual`
+   - Token: `web_e7ce4ce1584bdcf66e0850fa8925ef8e257ac5847361dfb81626c21c1162ad47`
+   - Run with `npm run test:percy`
 
-3. **Manual Testing Checklist**
-   - Run app locally with `npm run dev`
-   - Access at `http://localhost:3000`
+3. **Chromatic**
+   - Visual testing and component documentation
+   - Token: `chpt_adf0229281cc802`
+   - Run with `npm run test:chromatic`
+
+4. **Parallel Testing**
+   - Run both Percy and Chromatic simultaneously
+   - Command: `npm run test:visual:parallel`
+
+## Running Tests
+
+```bash
+# Development
+npm run storybook              # Start Storybook development server
+npm run build-storybook        # Build Storybook static files
+
+# Individual Tests
+npm run test:percy            # Run Percy tests
+npm run test:chromatic        # Run Chromatic tests
+
+# Parallel Testing
+npm run test:visual:parallel  # Run both Percy and Chromatic
+
+# Git Workflow
+git add .                     # Stage changes
+git commit -m "your message"  # Commit changes
+git push origin main         # Push to main branch
+```
+
+## CI/CD Integration
+
+Visual tests automatically run on:
+1. Push to `main` branch
+2. Pull requests targeting `main`
+3. Manual trigger through GitHub Actions
+
+### Environment Setup
+
+1. **Percy Configuration**
+   - Token added to GitHub Secrets
+   - Configured in `.env.local`
+   - Integrated with Storybook
+
+2. **Chromatic Configuration**
+   - Token added to GitHub Secrets
+   - Configured in `.env.local`
+   - Auto-accepts changes on `main`
+
+3. **Storybook Configuration**
+   - Tailwind CSS integration
+   - Theme switching support
+   - Responsive viewports
+   - Accessibility checks
 
 ## Testing Checklist
 
