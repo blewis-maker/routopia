@@ -36,13 +36,13 @@
   }
 
   body {
-    @apply bg-background-primary text-text-primary;
+    @apply bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-50;
     @apply font-sans text-base leading-normal;
   }
 
   /* Typography */
   h1, h2, h3, h4, h5, h6 {
-    @apply font-primary font-semibold tracking-tight;
+    @apply font-sans font-semibold tracking-tight;
   }
 
   h1 { @apply text-4xl sm:text-5xl md:text-6xl leading-tight; }
@@ -56,7 +56,7 @@
 
   /* Links */
   a {
-    @apply text-brand-primary hover:text-brand-primary-600 
+    @apply text-neutral-900 hover:text-neutral-700 dark:text-neutral-100 dark:hover:text-neutral-300
            transition-colors duration-200;
   }
 }
@@ -90,7 +90,6 @@
            focus:outline-none focus:ring-2 focus:ring-neutral-500/50;
   }
 
-  /* Card styles */
   .card {
     @apply bg-white dark:bg-neutral-800 
            rounded-xl shadow-sm border border-neutral-200 dark:border-neutral-700
@@ -98,13 +97,12 @@
            hover:shadow-md hover:border-neutral-300 dark:hover:border-neutral-600;
   }
 
-  /* Form elements */
   .input {
     @apply px-3 py-2 rounded-lg
            bg-white dark:bg-neutral-800
            border border-neutral-200 dark:border-neutral-700
-           focus:border-brand-primary-500 dark:focus:border-brand-primary-400
-           focus:ring-2 focus:ring-brand-primary-500/50
+           focus:border-neutral-500 dark:focus:border-neutral-400
+           focus:ring-2 focus:ring-neutral-500/50
            transition-all duration-200;
   }
 }

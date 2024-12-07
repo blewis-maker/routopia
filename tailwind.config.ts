@@ -13,30 +13,27 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ...tokens.colors.brand,
-        ...tokens.colors.neutral,
-        background: {
-          primary: 'var(--background-primary)',
-          secondary: 'var(--background-secondary)',
-          tertiary: 'var(--background-tertiary)',
-        },
-        text: {
-          primary: 'var(--text-primary)',
-          secondary: 'var(--text-secondary)',
-          tertiary: 'var(--text-tertiary)',
-        },
-        brand: {
-          primary: 'var(--brand-primary)',
-          secondary: 'var(--brand-secondary)',
-        },
+        'brand-primary': tokens.colors.brand.primary,
+        'brand-secondary': tokens.colors.brand.secondary,
+        neutral: tokens.colors.neutral,
       },
       fontFamily: {
-        primary: tokens.typography.fonts.primary,
-        sans: tokens.typography.fonts.secondary,
-        mono: tokens.typography.fonts.mono,
+        'primary': 'Inter var, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif',
+        'sans': 'Montserrat, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif',
+        'mono': 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace',
       },
-      fontSize: tokens.typography.scale,
-      fontWeight: tokens.typography.weight,
+      fontSize: Object.fromEntries(
+        Object.entries(tokens.typography.scale).map(([key, [size, config]]) => [
+          key,
+          [size, config]
+        ])
+      ),
+      fontWeight: Object.fromEntries(
+        Object.entries(tokens.typography.weight).map(([key, value]) => [
+          key,
+          String(value)
+        ])
+      ),
       lineHeight: tokens.typography.lineHeight,
       letterSpacing: tokens.typography.letterSpacing,
       borderRadius: {
