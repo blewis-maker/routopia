@@ -11,6 +11,21 @@
   @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
 }
 
+/* Logo Styles */
+.nav-bar__logo {
+  @apply relative;
+}
+
+.nav-bar__logo-image {
+  @apply drop-shadow-lg;
+  filter: drop-shadow(0 0 8px rgba(45, 212, 191, 0.3));
+}
+
+.nav-bar__logo-text {
+  @apply font-montserrat;
+  text-shadow: 0 0 20px rgba(45, 212, 191, 0.2);
+}
+
 /* Global Scrollbar Hiding */
 html, body {
   overflow-y: scroll;

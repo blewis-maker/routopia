@@ -1,4 +1,5 @@
 {
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
   "/(marketing)/page": "app/(marketing)/page.js"
 }

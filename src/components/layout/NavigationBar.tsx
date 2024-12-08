@@ -44,18 +44,18 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
         <div className="nav-bar__container">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
-            <Link href="/" className="nav-bar__logo group flex items-center gap-3">
-              <div className="relative w-8 h-8">
+            <Link href="/" className="nav-bar__logo group flex items-center gap-3 hover:opacity-80 transition-opacity duration-300">
+              <div className="relative w-8 h-8 transform group-hover:scale-110 transition-transform duration-300">
                 <Image
                   src={Logo}
                   alt="Routopia Logo"
                   width={36}
                   height={36}
-                  className="nav-bar__logo-image group-hover:scale-110 transition-transform duration-200"
+                  className="nav-bar__logo-image animate-float"
                   priority
                 />
               </div>
-              <span className="nav-bar__logo-text text-lg font-semibold bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">
+              <span className="nav-bar__logo-text text-lg font-semibold tracking-wide bg-gradient-to-r from-teal-300 via-teal-400 to-emerald-400 bg-clip-text text-transparent group-hover:from-teal-200 group-hover:to-emerald-300 transition-all duration-300">
                 Routopia
               </span>
             </Link>

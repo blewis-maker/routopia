@@ -35,46 +35,56 @@ export default function LandingPage() {
 
         {/* Hero Content */}
         <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 text-center">
-          <div className="max-w-4xl mx-auto space-y-8">
-            <div className="space-y-4">
+          <div className="max-w-5xl mx-auto space-y-12">
+            <div className={`space-y-8 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
               <Heading 
                 level={1}
-                className="font-montserrat text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight"
+                className="font-montserrat text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight flex flex-col items-center gap-4"
               >
-                <span className="text-gradient-brand inline-block transform hover:scale-105 transition-transform duration-300">Discover</span>{' '}
-                <span className="text-white">Your</span>{' '}
-                <span className="text-white">Perfect Route</span>
+                <span className="text-gradient-brand inline-block animate-text-glow hover:animate-text-pulse">
+                  Discover
+                </span>
+                <div className="flex flex-col items-center gap-4">
+                  <div className="animate-slide-up delay-200">
+                    <span className="text-white">Your Perfect</span>
+                  </div>
+                  <div className="animate-slide-up delay-300">
+                    <span className="text-white tracking-normal">Route</span>
+                  </div>
+                </div>
               </Heading>
 
               <Text 
                 variant="xl"
-                className="text-neutral-300 max-w-2xl mx-auto font-light leading-relaxed tracking-wide"
+                className="text-neutral-300 max-w-2xl mx-auto font-light leading-relaxed tracking-wide animate-fade-in delay-500 text-lg md:text-xl mt-8"
               >
-                Experience intelligent route planning powered by AI that adapts to your preferences,
-                <br className="hidden md:block" /> weather conditions, and points of interest.
+                Experience intelligent route planning powered by AI that adapts to your
+                <br className="hidden md:block" /> preferences, weather conditions, and points of interest.
               </Text>
             </div>
 
-            <div className="flex flex-col items-center space-y-8">
+            <div className={`flex flex-col items-center space-y-10 ${mounted ? 'animate-fade-in delay-700' : 'opacity-0'}`}>
               <button
                 onClick={() => setIsSignUpOpen(true)}
-                className="btn-primary px-8 py-4 text-lg rounded-xl bg-gradient-brand hover:opacity-90 transition-all duration-200 transform hover:scale-105 hover:shadow-lg hover:shadow-teal-500/20"
+                className="btn-primary px-10 py-5 text-lg rounded-xl bg-gradient-brand 
+                         transition-all duration-300 transform hover:scale-105 
+                         hover:shadow-xl hover:shadow-teal-500/20 animate-pulse-teal"
               >
                 Get Started
               </button>
 
-              <div className="flex items-center gap-4 text-sm text-neutral-400">
-                <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <div className="flex flex-wrap justify-center items-center gap-6 text-sm text-neutral-400">
+                <div className="flex items-center gap-2 animate-fade-in delay-800">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span>Free to start</span>
+                  <span className="whitespace-nowrap">Free to start</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <div className="flex items-center gap-2 animate-fade-in delay-900">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span>No credit card required</span>
+                  <span className="whitespace-nowrap">No credit card required</span>
                 </div>
               </div>
             </div>
@@ -83,13 +93,16 @@ export default function LandingPage() {
           {/* Learn More Arrow */}
           <button 
             onClick={scrollToLearnMore}
-            className="absolute bottom-12 left-1/2 -translate-x-1/2 text-neutral-400 hover:text-white transition-all duration-300 flex flex-col items-center gap-3 group cursor-pointer"
+            className={`absolute bottom-16 left-1/2 -translate-x-1/2 text-neutral-400 
+                     hover:text-white transition-all duration-300 flex flex-col items-center 
+                     gap-3 group cursor-pointer ${mounted ? 'animate-fade-in delay-1000' : 'opacity-0'}`}
             aria-label="Learn More"
           >
-            <Text variant="sm" className="tracking-wider uppercase opacity-80 group-hover:opacity-100 font-medium">
+            <Text variant="sm" className="tracking-wider uppercase opacity-80 group-hover:opacity-100 font-medium animate-float">
               Learn More
             </Text>
-            <div className="w-5 h-5 border-b-2 border-r-2 border-current transform rotate-45 transition-transform duration-300 group-hover:translate-y-1 animate-bounce-subtle" />
+            <div className="w-5 h-5 border-b-2 border-r-2 border-current transform rotate-45 
+                          transition-transform duration-300 group-hover:translate-y-1 animate-bounce-subtle" />
           </button>
         </div>
 
