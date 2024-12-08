@@ -1,0 +1,47 @@
+/* Dashboard Layout */
+.dashboard-layout {
+  @apply flex min-h-screen bg-neutral-50 dark:bg-neutral-900;
+}
+
+/* Sidebar */
+.dashboard-layout__sidebar {
+  @apply fixed top-16 left-0 bottom-0
+         w-64
+         bg-white dark:bg-neutral-900
+         border-r border-neutral-200 dark:border-neutral-800
+         overflow-y-auto;
+}
+
+/* Main Content */
+.dashboard-layout__main {
+  @apply flex-1 ml-64 pt-16
+         bg-neutral-50 dark:bg-neutral-900;
+}
+
+.dashboard-layout__content {
+  @apply p-6;
+}
+
+/* Dashboard Header */
+.dashboard-layout__header {
+  @apply mb-6 flex items-center justify-between;
+}
+
+.dashboard-layout__title {
+  @apply text-2xl font-semibold
+         text-neutral-900 dark:text-neutral-100;
+}
+
+/* Dashboard Grid */
+.dashboard-layout__grid {
+  @apply grid gap-6
+         grid-cols-1 md:grid-cols-2 lg:grid-cols-3;
+}
+
+/* Dashboard Card */
+.dashboard-layout__card {
+  @apply p-6 rounded-xl
+         bg-white dark:bg-neutral-800
+         border border-neutral-200 dark:border-neutral-700
+         shadow-sm;
+} 

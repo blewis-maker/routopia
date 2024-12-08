@@ -1,0 +1,55 @@
+/* Route Planner Layout */
+.route-planner-layout {
+  @apply flex h-screen bg-neutral-900;
+}
+
+/* Map Container */
+.route-planner-layout__map {
+  @apply flex-1 relative;
+}
+
+/* Sidebar */
+.route-planner-layout__sidebar {
+  @apply w-96 
+         bg-neutral-900
+         border-l border-neutral-800;
+}
+
+/* Controls */
+.route-planner-layout__controls {
+  @apply absolute bottom-4 left-4 z-10
+         flex gap-2;
+}
+
+.route-planner-layout__control-button {
+  @apply p-2 rounded-lg
+         bg-white/10 backdrop-blur-sm
+         hover:bg-white/20
+         transition-colors;
+}
+
+/* Tools Panel */
+.route-planner-layout__tools {
+  @apply absolute top-4 left-4 z-10
+         flex flex-col gap-2
+         p-2 rounded-lg
+         bg-white/10 backdrop-blur-sm;
+}
+
+/* Info Panel */
+.route-planner-layout__info {
+  @apply absolute top-4 right-4 z-10
+         p-4 rounded-lg
+         bg-white/10 backdrop-blur-sm;
+}
+
+/* Route Details */
+.route-planner-layout__details {
+  @apply p-4 h-full
+         flex flex-col;
+}
+
+.route-planner-layout__header {
+  @apply mb-4 pb-4
+         border-b border-neutral-800;
+} 

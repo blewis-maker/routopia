@@ -1,0 +1,44 @@
+/* Route Container */
+.route-container {
+  @apply relative w-full h-full;
+}
+
+/* Route Creator */
+.route-creator {
+  @apply flex flex-col h-full;
+}
+
+.route-creator__map {
+  @apply flex-1 relative;
+}
+
+.route-creator__controls {
+  @apply absolute bottom-4 left-4 z-10;
+}
+
+/* Route Drawing */
+.route-drawing {
+  @apply relative w-full h-full;
+}
+
+.route-drawing__toolbar {
+  @apply absolute top-4 left-4 z-10
+         flex gap-2 p-2
+         bg-white/10 backdrop-blur-sm
+         rounded-lg shadow-lg;
+}
+
+/* Route Collaboration */
+.route-collaboration {
+  @apply flex items-center gap-2 p-2
+         bg-white/10 backdrop-blur-sm
+         rounded-lg;
+}
+
+.route-collaboration__user {
+  @apply flex items-center gap-2;
+}
+
+.route-collaboration__avatar {
+  @apply w-8 h-8 rounded-full;
+} 

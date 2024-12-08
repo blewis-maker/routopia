@@ -1,27 +1,25 @@
-@layer base {
-  h1, .h1 {
-    @apply text-4xl font-bold font-montserrat;
-  }
-
-  h2, .h2 {
-    @apply text-3xl font-bold font-montserrat;
-  }
-
-  h3, .h3 {
-    @apply text-2xl font-semibold font-montserrat;
-  }
-
-  h4, .h4 {
-    @apply text-xl font-semibold font-montserrat;
-  }
-
-  p {
-    @apply text-base font-inter;
-  }
+/* Typography styles */
+h1, .h1 {
+  @apply text-4xl font-bold font-montserrat;
 }
 
-@layer utilities {
-  .text-gradient {
-    @apply text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400;
-  }
+h2, .h2 {
+  @apply text-3xl font-bold font-montserrat;
+}
+
+h3, .h3 {
+  @apply text-2xl font-semibold font-montserrat;
+}
+
+h4, .h4 {
+  @apply text-xl font-semibold font-montserrat;
+}
+
+p {
+  @apply text-base font-inter;
+}
+
+/* Text utilities */
+.text-gradient {
+  @apply text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400;
 }

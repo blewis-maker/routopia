@@ -1,0 +1,65 @@
+/* Main Navigation */
+.nav-bar {
+  @apply fixed top-0 left-0 right-0 z-40
+         h-16
+         bg-white/80 dark:bg-neutral-900/80
+         backdrop-blur-sm
+         border-b border-neutral-200 dark:border-neutral-800;
+}
+
+.nav-bar__container {
+  @apply h-full mx-auto px-4
+         flex items-center justify-between
+         max-w-7xl;
+}
+
+/* Logo */
+.nav-bar__logo {
+  @apply flex items-center gap-2
+         text-xl font-semibold;
+}
+
+/* Navigation Links */
+.nav-bar__links {
+  @apply hidden md:flex items-center gap-6;
+}
+
+.nav-bar__link {
+  @apply px-3 py-2
+         text-neutral-600 dark:text-neutral-400
+         hover:text-neutral-900 dark:hover:text-neutral-100
+         transition-colors;
+}
+
+.nav-bar__link--active {
+  @apply text-neutral-900 dark:text-neutral-100
+         font-medium;
+}
+
+/* Mobile Menu */
+.nav-bar__mobile-menu {
+  @apply md:hidden;
+}
+
+.nav-bar__menu-button {
+  @apply p-2 rounded-lg
+         hover:bg-neutral-100 dark:hover:bg-neutral-800
+         transition-colors;
+}
+
+/* User Menu */
+.nav-bar__user-menu {
+  @apply flex items-center gap-2;
+}
+
+.nav-bar__avatar {
+  @apply w-8 h-8 rounded-full
+         border-2 border-neutral-200 dark:border-neutral-700;
+}
+
+.nav-bar__user-button {
+  @apply flex items-center gap-2 p-2
+         rounded-lg
+         hover:bg-neutral-100 dark:hover:bg-neutral-800
+         transition-colors;
+} 

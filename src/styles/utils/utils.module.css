@@ -76,28 +76,27 @@
   .lg\:text-right { text-align: right; }
 }
 
-@layer utilities {
-  .container-padding {
-    @apply px-4 md:px-6 lg:px-8;
-  }
+/* Remove @layer and keep the utility classes directly */
+.container-padding {
+  @apply px-4 md:px-6 lg:px-8;
+}
 
-  .section-spacing {
-    @apply py-12 md:py-16 lg:py-24;
-  }
+.section-spacing {
+  @apply py-12 md:py-16 lg:py-24;
+}
 
-  .flex-center {
-    @apply flex items-center justify-center;
-  }
+.flex-center {
+  @apply flex items-center justify-center;
+}
 
-  .grid-responsive {
-    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
-  }
+.grid-responsive {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
+}
 
-  .card-shadow {
-    @apply shadow-lg shadow-stone-900/5;
-  }
+.card-shadow {
+  @apply shadow-lg shadow-stone-900/5;
+}
 
-  .glass-effect {
-    @apply bg-white/10 backdrop-blur-lg;
-  }
+.glass-effect {
+  @apply bg-white/10 backdrop-blur-lg;
 } 

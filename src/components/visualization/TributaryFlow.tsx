@@ -2,25 +2,8 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { cubicBezierPath, smoothPath } from './pathUtils';
 import type { Position } from 'geojson';
-
-interface RouteSegment {
-  type: 'LineString';
-  coordinates: Position[];
-  elevation?: number;
-  flowVolume?: number;
-}
-
-interface ConnectionPoint {
-  coordinates: [number, number];
-  suitability: number;
-  isActive?: boolean;
-}
-
-interface POICluster {
-  coordinates: [number, number];
-  density: number;
-  type: 'scenic' | 'activity' | 'rest';
-}
+import { useElevationFlow } from '../../hooks/useElevationFlow';
+import type { RouteSegment, POICluster, ConnectionPoint } from '../../types/route.types';
 
 interface TributaryFlowProps {
   mainRoute: RouteSegment;
@@ -65,6 +48,10 @@ export const TributaryFlow: React.FC<TributaryFlowProps> = ({
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [viewBox, setViewBox] = useState<string>('0 0 100 100');
+
+  // Calculate flow speeds based on elevation
+  const mainFlowSpeeds = useElevationFlow(mainRoute);
+  const tributaryFlowSpeeds = tributaries.map(trib => useElevationFlow(trib));
 
   // Calculate viewport bounds
   useEffect(() => {

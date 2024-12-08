@@ -1,0 +1,61 @@
+/* Weather Widget Container */
+.weather-widget {
+  @apply p-4 rounded-lg
+         bg-neutral-800/80 backdrop-blur-sm
+         border border-neutral-700;
+}
+
+/* Current Weather */
+.weather-widget__current {
+  @apply flex items-center justify-between
+         mb-4;
+}
+
+.weather-widget__temp {
+  @apply text-3xl font-semibold
+         text-neutral-100;
+}
+
+.weather-widget__icon {
+  @apply w-12 h-12
+         text-neutral-100;
+}
+
+/* Weather Details */
+.weather-widget__details {
+  @apply grid grid-cols-2 gap-4
+         text-sm text-neutral-300;
+}
+
+.weather-widget__detail {
+  @apply flex items-center gap-2;
+}
+
+/* Forecast */
+.weather-widget__forecast {
+  @apply mt-4 pt-4
+         border-t border-neutral-700;
+}
+
+.weather-widget__forecast-list {
+  @apply flex justify-between;
+}
+
+.weather-widget__forecast-item {
+  @apply flex flex-col items-center
+         text-sm text-neutral-300;
+}
+
+/* Loading State */
+.weather-widget__loading {
+  @apply flex items-center justify-center
+         h-32;
+}
+
+.weather-widget__spinner {
+  @apply w-6 h-6
+         border-2 border-neutral-600
+         border-t-teal-500
+         rounded-full
+         animate-spin;
+} 

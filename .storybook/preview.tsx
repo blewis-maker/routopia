@@ -3,6 +3,7 @@ import type { Preview } from '@storybook/react';
 import { initialize as initializeMSW, mswLoader } from 'msw-storybook-addon';
 import '../src/styles/globals.css';
 import { ThemeProvider } from '../src/styles/theme/themeProvider';
+import { NextRouterDecorator } from '../src/stories/decorators/NextRouterDecorator';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -32,6 +33,7 @@ const preview: Preview = {
     },
   },
   decorators: [
+    NextRouterDecorator,
     (Story) => (
       <ThemeProvider>
         <div className="min-h-screen bg-white dark:bg-neutral-950">

@@ -1,19 +1,17 @@
 .app-shell {
-  @apply min-h-screen bg-background-primary;
+  @apply min-h-screen bg-neutral-50 dark:bg-neutral-900;
   display: grid;
   grid-template-rows: auto 1fr;
 }
 
+.app-shell__header {
+  @apply sticky top-0 z-50;
+}
+
 .app-shell__main {
-  @apply relative;
-  min-height: calc(100vh - var(--nav-height));
+  @apply flex-1;
 }
 
-.app-shell__overlay {
-  @apply fixed bottom-4 right-4 z-50 space-y-2;
-}
-
-/* Dark mode adjustments */
-[data-theme="dark"] .app-shell {
-  @apply bg-background-primary;
+.app-shell__footer {
+  @apply mt-auto;
 } 

@@ -1,5 +1,6 @@
 import React from 'react';
-import type { RouteSegment, POICluster } from '@/types/route.types';
+import type { Position } from 'geojson';
+import type { RouteSegment, POICluster } from '../../../types/route.types';
 
 interface RouteSidebarProps {
   mainRoute: RouteSegment;

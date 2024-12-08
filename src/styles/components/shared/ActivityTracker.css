@@ -1,0 +1,65 @@
+/* Activity Tracker Container */
+.activity-tracker {
+  @apply p-4 rounded-lg
+         bg-neutral-800/80 backdrop-blur-sm
+         border border-neutral-700;
+}
+
+/* Stats Grid */
+.activity-tracker__stats {
+  @apply grid grid-cols-2 gap-4;
+}
+
+.activity-tracker__stat {
+  @apply flex flex-col p-3
+         rounded-lg
+         bg-neutral-700/50;
+}
+
+.activity-tracker__stat-label {
+  @apply text-sm text-neutral-400;
+}
+
+.activity-tracker__stat-value {
+  @apply text-xl font-semibold text-neutral-100
+         mt-1;
+}
+
+/* Progress Section */
+.activity-tracker__progress {
+  @apply mt-4 pt-4
+         border-t border-neutral-700;
+}
+
+.activity-tracker__progress-bar {
+  @apply w-full h-2 mt-2
+         bg-neutral-700
+         rounded-full
+         overflow-hidden;
+}
+
+.activity-tracker__progress-fill {
+  @apply h-full
+         bg-teal-500
+         rounded-full
+         transition-all duration-300;
+}
+
+/* Activity List */
+.activity-tracker__list {
+  @apply mt-4 space-y-2;
+}
+
+.activity-tracker__item {
+  @apply flex items-center justify-between
+         p-2 rounded-lg
+         bg-neutral-700/30
+         text-sm text-neutral-300;
+}
+
+/* Empty State */
+.activity-tracker__empty {
+  @apply flex flex-col items-center justify-center
+         py-8 text-center
+         text-neutral-400;
+} 

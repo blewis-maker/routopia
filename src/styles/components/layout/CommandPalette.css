@@ -1,0 +1,32 @@
+.command-palette {
+  @apply fixed inset-0 z-50
+         flex items-center justify-center
+         bg-black/50 backdrop-blur-sm;
+}
+
+.command-palette__container {
+  @apply w-full max-w-2xl mx-4
+         bg-white dark:bg-neutral-900
+         rounded-xl shadow-2xl
+         border border-neutral-200 dark:border-neutral-800;
+}
+
+.command-palette__input {
+  @apply w-full p-4
+         text-lg
+         bg-transparent
+         border-b border-neutral-200 dark:border-neutral-800
+         focus:outline-none;
+}
+
+.command-palette__results {
+  @apply max-h-[60vh] overflow-y-auto
+         p-2;
+}
+
+.command-palette__item {
+  @apply flex items-center gap-3 p-3
+         rounded-lg
+         hover:bg-neutral-100 dark:hover:bg-neutral-800
+         cursor-pointer;
+} 

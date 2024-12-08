@@ -11,10 +11,19 @@ import { useMCPClient } from '@/hooks/useMCPClient';
 
 interface RouteCreatorProps {
   sessionId: string;
+  mode?: 'main' | 'edit';
+  selectedTributaryId?: string;
+  onModeChange?: (mode: 'main' | 'edit') => void;
+  onTributaryConnect?: (tributaryId: string) => void;
 }
 
-export const RouteCreator: React.FC<RouteCreatorProps> = ({ sessionId }) => {
-  const [selectedTributaryId, setSelectedTributaryId] = React.useState<string | undefined>();
+export const RouteCreator: React.FC<RouteCreatorProps> = ({
+  sessionId,
+  mode = 'main',
+  selectedTributaryId,
+  onModeChange,
+  onTributaryConnect,
+}) => {
   const [selectedPOIId, setSelectedPOIId] = React.useState<string | undefined>();
   const [isLoading, setIsLoading] = React.useState(true);
 
@@ -29,6 +38,16 @@ export const RouteCreator: React.FC<RouteCreatorProps> = ({ sessionId }) => {
     updateCursor,
     selectTributary,
   } = useRouteCollaboration(sessionId);
+
+  // Ensure we have default values for the route state
+  const defaultRouteState = {
+    mainRoute: { coordinates: [], type: 'LineString' as const },
+    tributaries: [],
+    pois: [],
+    activeUsers: []
+  };
+
+  const currentState = routeState || defaultRouteState;
 
   // Handle map interactions
   const handleTributaryHover = (tributaryId: string | null) => {
@@ -50,27 +69,40 @@ export const RouteCreator: React.FC<RouteCreatorProps> = ({ sessionId }) => {
     updateCursor(point);
   };
 
-  // Convert route state to component props
-  const mapRoute = routeState.mainRoute.coordinates.length > 0 ? {
+  React.useEffect(() => {
+    if (routeState) {
+      setIsLoading(false);
+    }
+  }, [routeState]);
+
+  // Convert route state to component props with safe access
+  const mapRoute = routeState?.mainRoute?.coordinates?.length > 0 ? {
     coordinates: routeState.mainRoute.coordinates,
     color: '#2563EB', // Primary blue for main river
     metadata: routeState.mainRoute.metadata
   } : undefined;
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-stone-900">
+        <div className="text-white">Loading route data...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen">
       {/* Main Map Area */}
       <div className="relative flex-1">
         <MapView
-          center={[-74.6, 40.1]} // Default center, should come from user preferences
-          zoom={11}
-          route={mapRoute}
-          tributaries={routeState.tributaries}
-          markers={routeState.pois.map(poi => ({
+          center={[-105.2705, 40.0150]} // Center on Boulder
+          zoom={13}
+          route={currentState.mainRoute}
+          tributaries={currentState.tributaries}
+          markers={(currentState.pois || []).map(poi => ({
             id: poi.id,
             position: poi.position,
-            label: poi.metadata?.name || '',
-            type: poi.metadata?.type || 'default'
+            type: poi.type
           }))}
           interactive={true}
           loading={isLoading}
@@ -123,7 +155,7 @@ export const RouteCreator: React.FC<RouteCreatorProps> = ({ sessionId }) => {
 
         {/* Active Users */}
         <div className="absolute bottom-4 left-4 z-10 flex space-x-2">
-          {routeState.activeUsers.map(user => (
+          {(routeState?.activeUsers || []).map(user => (
             <div
               key={user.id}
               className="bg-white rounded-full p-2 shadow-lg text-sm flex items-center space-x-2"
@@ -138,20 +170,9 @@ export const RouteCreator: React.FC<RouteCreatorProps> = ({ sessionId }) => {
       {/* Right Sidebar */}
       <div className="w-96 border-l border-gray-200">
         <RouteSidebar
-          routeName="Mountain Valley Explorer"
-          routeDescription="A diverse route combining scenic views, cultural sites, and outdoor activities"
-          mainRoute={{
-            coordinates: routeState.mainRoute.coordinates,
-            metadata: {
-              type: 'CAR',
-              distance: 15.2,
-              duration: 25,
-              trafficLevel: 'moderate',
-              safety: 'high'
-            }
-          }}
-          tributaries={routeState.tributaries}
-          selectedTributaryId={selectedTributaryId}
+          mainRoute={currentState.mainRoute}
+          tributaries={currentState.tributaries}
+          poiClusters={currentState.pois}
           onTributarySelect={handleTributaryClick}
         />
       </div>

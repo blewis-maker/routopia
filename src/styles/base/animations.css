@@ -1,19 +1,17 @@
-@layer utilities {
-  .animate-fade-in {
-    animation: fadeIn 0.5s ease-out forwards;
-  }
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
 
-  .animate-slide-up {
-    animation: slideUp 0.5s ease-out forwards;
-  }
+.animate-slide-up {
+  animation: slideUp 0.5s ease-out forwards;
+}
 
-  .animate-bounce-slow {
-    animation: bounce 2s infinite;
-  }
+.animate-bounce-slow {
+  animation: bounce 2s infinite;
+}
 
-  .animate-gradient-text {
-    animation: gradientText 4s ease infinite;
-  }
+.animate-gradient-text {
+  animation: gradientText 4s ease infinite;
 }
 
 @keyframes fadeIn {
