@@ -1,7 +1,7 @@
 {
   "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
   "/(marketing)/page": "app/(marketing)/page.js",
+  "/(protected)/poi-explorer/page": "app/(protected)/poi-explorer/page.js",
   "/(protected)/route-planner/page": "app/(protected)/route-planner/page.js",
-  "/(protected)/activity-hub/page": "app/(protected)/activity-hub/page.js",
-  "/(protected)/poi-explorer/page": "app/(protected)/poi-explorer/page.js"
+  "/(protected)/activity-hub/page": "app/(protected)/activity-hub/page.js"
 }

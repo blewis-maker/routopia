@@ -5,15 +5,19 @@ const routeAI = new RouteAIService();
 
 export async function POST(request: Request) {
   try {
-    const { message, preferences } = await request.json();
+    const { poiId, mainRoute, preferences } = await request.json();
 
-    const response = await routeAI.processUserMessage(message, preferences);
+    const tributaryRoutes = await routeAI.generateTributaryRoutes(
+      poiId,
+      mainRoute,
+      preferences
+    );
 
-    return NextResponse.json(response);
+    return NextResponse.json({ routes: tributaryRoutes });
   } catch (error) {
-    console.error('Chat API error:', error);
+    console.error('Tributary routes API error:', error);
     return NextResponse.json(
-      { error: 'Failed to process chat message' },
+      { error: 'Failed to generate tributary routes' },
       { status: 500 }
     );
   }
