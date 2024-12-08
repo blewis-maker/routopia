@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useDebounce } from '@/hooks/useDebounce';
 import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
 
-interface SearchResult {
+export interface SearchResult {
   place_id: string;
   place_name: string;
   coordinates: [number, number];
@@ -13,62 +13,76 @@ interface SearchBoxProps {
   onSelect: (result: SearchResult) => void;
   placeholder?: string;
   useCurrentLocation?: boolean;
+  initialValue?: string;
+  className?: string;
 }
 
-export function SearchBox({ onSelect, placeholder = 'Search locations...', useCurrentLocation = false }: SearchBoxProps) {
-  const [query, setQuery] = useState('');
+export function SearchBox({ 
+  onSelect, 
+  placeholder = 'Search locations...', 
+  useCurrentLocation = false,
+  initialValue = '',
+  className = ''
+}: SearchBoxProps) {
+  const [query, setQuery] = useState(initialValue);
+  const [isOpen, setIsOpen] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
   const debouncedQuery = useDebounce(query, 300);
+  const geocoder = useRef<google.maps.Geocoder | null>(null);
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
-  const searchBoxRef = useRef<HTMLDivElement>(null);
 
+  // Initialize Google services
   useEffect(() => {
-    const initGoogleServices = async () => {
+    const initServices = async () => {
       try {
         await GoogleMapsLoader.getInstance().load();
-        autocompleteService.current = new google.maps.places.AutocompleteService();
         
-        // Create a dummy div for PlacesService (required by Google Maps)
-        const dummyDiv = document.createElement('div');
-        placesService.current = new google.maps.places.PlacesService(dummyDiv);
+        if (!geocoder.current) {
+          geocoder.current = new google.maps.Geocoder();
+        }
+        if (!autocompleteService.current) {
+          autocompleteService.current = new google.maps.places.AutocompleteService();
+        }
+        if (!placesService.current) {
+          // Create a dummy div for PlacesService (required by Google Maps)
+          const dummyDiv = document.createElement('div');
+          placesService.current = new google.maps.places.PlacesService(dummyDiv);
+        }
       } catch (error) {
         console.error('Failed to initialize Google services:', error);
       }
     };
 
-    initGoogleServices();
+    initServices();
   }, []);
 
+  // Update query when initialValue changes
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (searchBoxRef.current && !searchBoxRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
+    if (initialValue) {
+      setQuery(initialValue);
+    }
+  }, [initialValue]);
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
+  // Handle search
   useEffect(() => {
     const searchPlaces = async () => {
       if (!debouncedQuery || !autocompleteService.current) return;
 
       setIsLoading(true);
       try {
-        const response = await new Promise<google.maps.places.AutocompletePrediction[]>((resolve, reject) => {
+        const predictions = await new Promise<google.maps.places.AutocompletePrediction[]>((resolve, reject) => {
           autocompleteService.current!.getPlacePredictions(
             {
               input: debouncedQuery,
               componentRestrictions: { country: 'us' },
               types: ['geocode', 'establishment']
             },
-            (predictions, status) => {
-              if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
-                resolve(predictions);
+            (results, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+                resolve(results);
               } else {
                 reject(status);
               }
@@ -77,7 +91,7 @@ export function SearchBox({ onSelect, placeholder = 'Search locations...', useCu
         });
 
         const searchResults = await Promise.all(
-          response.map(async (prediction) => {
+          predictions.map(async (prediction) => {
             const details = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
               placesService.current!.getDetails(
                 {
@@ -119,27 +133,41 @@ export function SearchBox({ onSelect, placeholder = 'Search locations...', useCu
     searchPlaces();
   }, [debouncedQuery]);
 
-  const handleCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          onSelect({
-            place_id: 'current_location',
-            place_name: 'Current Location',
-            coordinates: [position.coords.longitude, position.coords.latitude]
-          });
-          setQuery('');
-          setIsOpen(false);
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
-        }
-      );
+  const handleCurrentLocation = async () => {
+    if (!geocoder.current) return;
+
+    setIsLoading(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject);
+      });
+
+      const { latitude: lat, longitude: lng } = position.coords;
+      
+      // Reverse geocode the coordinates
+      const result = await geocoder.current.geocode({
+        location: { lat, lng }
+      });
+
+      if (result.results[0]) {
+        const address = result.results[0].formatted_address;
+        setQuery(address);
+        onSelect({
+          place_id: 'current_location',
+          place_name: address,
+          coordinates: [lng, lat]
+        });
+      }
+    } catch (error) {
+      console.error('Error getting current location:', error);
+    } finally {
+      setIsLoading(false);
+      setIsOpen(false);
     }
   };
 
   return (
-    <div ref={searchBoxRef} className="relative">
+    <div ref={searchBoxRef} className={`relative ${className}`}>
       <div className="relative">
         <input
           type="text"
@@ -156,7 +184,7 @@ export function SearchBox({ onSelect, placeholder = 'Search locations...', useCu
         )}
       </div>
 
-      {useCurrentLocation && (
+      {useCurrentLocation && !isLoading && (
         <button
           onClick={handleCurrentLocation}
           className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 hover:text-emerald-400"

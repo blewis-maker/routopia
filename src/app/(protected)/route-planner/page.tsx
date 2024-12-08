@@ -11,6 +11,7 @@ import ChatWindow from '@/components/chat/ChatWindow';
 import Image from 'next/image';
 import { Coordinates } from '@/services/maps/MapServiceInterface';
 import { useTheme } from 'next-themes';
+import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
 
 interface WeatherInfo {
   location: string;
@@ -25,7 +26,8 @@ export default function RoutePlannerPage() {
   const [weatherInfo, setWeatherInfo] = useState<WeatherInfo | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([-105.0749801, 40.5852602]); // Default to Berthoud, CO
   const [mapZoom, setMapZoom] = useState(12);
-  
+  const geocoder = useRef<google.maps.Geocoder | null>(null);
+
   const [preferences, setPreferences] = useState<RoutePreferences>({
     activityType: ActivityType.WALK,
     weights: {
@@ -46,6 +48,62 @@ export default function RoutePlannerPage() {
   }]);
 
   const { theme } = useTheme();
+
+  // Initialize geocoder
+  useEffect(() => {
+    const initGoogleServices = async () => {
+      try {
+        await GoogleMapsLoader.getInstance().load();
+        if (!geocoder.current) {
+          geocoder.current = new google.maps.Geocoder();
+        }
+      } catch (error) {
+        console.error('Failed to initialize Google services:', error);
+      }
+    };
+
+    initGoogleServices();
+  }, []);
+
+  // Get initial user location
+  useEffect(() => {
+    const getUserLocation = async () => {
+      if (!geocoder.current) return;
+
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
+
+        const { latitude: lat, longitude: lng } = position.coords;
+        
+        // Reverse geocode the coordinates
+        const result = await geocoder.current.geocode({
+          location: { lat, lng }
+        });
+
+        if (result.results[0]) {
+          const address = result.results[0].formatted_address;
+          
+          // Update state as if user selected this location
+          setUserLocation({
+            coordinates: [lng, lat],
+            address
+          });
+          setMapCenter([lng, lat]);
+          setMapZoom(14);
+          setWeatherInfo({
+            location: address,
+            coordinates: [lng, lat]
+          });
+        }
+      } catch (error) {
+        console.error('Error getting location:', error);
+      }
+    };
+
+    getUserLocation();
+  }, [geocoder.current]);
 
   // Auto-scroll chat to bottom when new messages arrive
   useEffect(() => {
@@ -193,14 +251,14 @@ export default function RoutePlannerPage() {
             }}
             placeholder="Set your starting point..."
             useCurrentLocation={true}
+            initialValue={userLocation?.address || ''}
           />
         </div>
 
         {/* Weather Overlay */}
         {weatherInfo && (
-          <div className="absolute top-4 right-4 z-10">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
             <div className="bg-stone-900/90 rounded-lg backdrop-blur shadow-lg">
-              <div className="text-sm text-stone-400 px-4 pt-2">{weatherInfo.location}</div>
               <WeatherWidget 
                 coordinates={{
                   lat: weatherInfo.coordinates[1],
