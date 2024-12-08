@@ -1,6 +1,4 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
   "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
-  "/(marketing)/page": "app/(marketing)/page.js",
   "/(protected)/route-planner/page": "app/(protected)/route-planner/page.js"
 }

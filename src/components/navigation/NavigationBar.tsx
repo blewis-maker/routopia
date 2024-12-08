@@ -70,18 +70,6 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                   >
                     Route Planner
                   </Link>
-                  <Link 
-                    href="/activity-hub"
-                    className="text-stone-300 hover:text-white transition-colors duration-200 font-medium"
-                  >
-                    Activity Hub
-                  </Link>
-                  <Link 
-                    href="/poi-explorer"
-                    className="text-stone-300 hover:text-white transition-colors duration-200 font-medium"
-                  >
-                    POI Explorer
-                  </Link>
                 </>
               )}
               {user ? (
@@ -154,18 +142,6 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                   className="block px-3 py-2 rounded-md text-base font-medium text-stone-300 hover:text-white hover:bg-stone-800"
                 >
                   Route Planner
-                </Link>
-                <Link
-                  href="/activity-hub"
-                  className="block px-3 py-2 rounded-md text-base font-medium text-stone-300 hover:text-white hover:bg-stone-800"
-                >
-                  Activity Hub
-                </Link>
-                <Link
-                  href="/poi-explorer"
-                  className="block px-3 py-2 rounded-md text-base font-medium text-stone-300 hover:text-white hover:bg-stone-800"
-                >
-                  POI Explorer
                 </Link>
               </>
             )}

@@ -1,104 +1,191 @@
 import { useState, useEffect, useRef } from 'react';
-import mapboxgl from 'mapbox-gl';
+import { useDebounce } from '@/hooks/useDebounce';
+import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
 
 interface SearchResult {
-  coordinates: [number, number];
+  place_id: string;
   place_name: string;
+  coordinates: [number, number];
+  description?: string;
 }
 
 interface SearchBoxProps {
-  initialValue?: string;
   onSelect: (result: SearchResult) => void;
   placeholder?: string;
+  useCurrentLocation?: boolean;
 }
 
-export function SearchBox({ initialValue = '', onSelect, placeholder }: SearchBoxProps) {
-  const [query, setQuery] = useState(initialValue);
+export function SearchBox({ onSelect, placeholder = 'Search locations...', useCurrentLocation = false }: SearchBoxProps) {
+  const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const [isOpen, setIsOpen] = useState(false);
+  const debouncedQuery = useDebounce(query, 300);
+  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesService = useRef<google.maps.places.PlacesService | null>(null);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+    const initGoogleServices = async () => {
+      try {
+        await GoogleMapsLoader.getInstance().load();
+        autocompleteService.current = new google.maps.places.AutocompleteService();
+        
+        // Create a dummy div for PlacesService (required by Google Maps)
+        const dummyDiv = document.createElement('div');
+        placesService.current = new google.maps.places.PlacesService(dummyDiv);
+      } catch (error) {
+        console.error('Failed to initialize Google services:', error);
       }
     };
+
+    initGoogleServices();
   }, []);
 
-  const searchPlaces = async (searchQuery: string) => {
-    if (!searchQuery.trim()) {
-      setResults([]);
-      return;
-    }
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
 
-    setIsLoading(true);
-    try {
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?` +
-        `access_token=${mapboxgl.accessToken}&` +
-        'types=address,poi,place&' +
-        'limit=5'
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const searchPlaces = async () => {
+      if (!debouncedQuery || !autocompleteService.current) return;
+
+      setIsLoading(true);
+      try {
+        const response = await new Promise<google.maps.places.AutocompletePrediction[]>((resolve, reject) => {
+          autocompleteService.current!.getPlacePredictions(
+            {
+              input: debouncedQuery,
+              componentRestrictions: { country: 'us' },
+              types: ['geocode', 'establishment']
+            },
+            (predictions, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+                resolve(predictions);
+              } else {
+                reject(status);
+              }
+            }
+          );
+        });
+
+        const searchResults = await Promise.all(
+          response.map(async (prediction) => {
+            const details = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
+              placesService.current!.getDetails(
+                {
+                  placeId: prediction.place_id,
+                  fields: ['geometry', 'formatted_address', 'name']
+                },
+                (place, status) => {
+                  if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+                    resolve(place);
+                  } else {
+                    reject(status);
+                  }
+                }
+              );
+            });
+
+            return {
+              place_id: prediction.place_id,
+              place_name: details.name || prediction.description,
+              coordinates: [
+                details.geometry?.location?.lng() || 0,
+                details.geometry?.location?.lat() || 0
+              ],
+              description: details.formatted_address
+            };
+          })
+        );
+
+        setResults(searchResults);
+        setIsOpen(true);
+      } catch (error) {
+        console.error('Search error:', error);
+        setResults([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    searchPlaces();
+  }, [debouncedQuery]);
+
+  const handleCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          onSelect({
+            place_id: 'current_location',
+            place_name: 'Current Location',
+            coordinates: [position.coords.longitude, position.coords.latitude]
+          });
+          setQuery('');
+          setIsOpen(false);
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+        }
       );
-      
-      const data = await response.json();
-      
-      setResults(data.features.map((feature: any) => ({
-        coordinates: feature.center,
-        place_name: feature.place_name
-      })));
-    } catch (error) {
-      console.error('Search error:', error);
-      setResults([]);
-    } finally {
-      setIsLoading(false);
     }
-  };
-
-  const handleSearch = (value: string) => {
-    setQuery(value);
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    
-    timeoutRef.current = setTimeout(() => {
-      searchPlaces(value);
-    }, 300);
   };
 
   return (
-    <div className="relative">
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => handleSearch(e.target.value)}
-        onFocus={() => setShowResults(true)}
-        placeholder={placeholder}
-        className="w-full px-4 py-2 bg-stone-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
-      />
-      
-      {showResults && results.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-stone-800 rounded-md shadow-lg max-h-60 overflow-auto">
-          {results.map((result, index) => (
+    <div ref={searchBoxRef} className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={placeholder}
+          className="w-full px-4 py-2 bg-stone-800 text-white rounded-lg border border-stone-700 focus:outline-none focus:border-emerald-500"
+          onFocus={() => setIsOpen(true)}
+        />
+        {isLoading && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-emerald-500 border-t-transparent"></div>
+          </div>
+        )}
+      </div>
+
+      {useCurrentLocation && (
+        <button
+          onClick={handleCurrentLocation}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 hover:text-emerald-400"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      )}
+
+      {isOpen && results.length > 0 && (
+        <div className="absolute w-full mt-2 bg-stone-800 rounded-lg shadow-lg border border-stone-700 z-50">
+          {results.map((result) => (
             <button
-              key={index}
-              className="w-full px-4 py-2 text-left text-stone-300 hover:bg-stone-700 focus:outline-none"
+              key={result.place_id}
+              className="w-full px-4 py-2 text-left hover:bg-stone-700 first:rounded-t-lg last:rounded-b-lg"
               onClick={() => {
-                setQuery(result.place_name);
                 onSelect(result);
-                setShowResults(false);
+                setQuery('');
+                setIsOpen(false);
               }}
             >
-              {result.place_name}
+              <div className="text-white">{result.place_name}</div>
+              {result.description && (
+                <div className="text-sm text-stone-400">{result.description}</div>
+              )}
             </button>
           ))}
-        </div>
-      )}
-      
-      {isLoading && (
-        <div className="absolute right-3 top-2.5">
-          <div className="animate-spin h-5 w-5 border-2 border-emerald-500 rounded-full border-t-transparent"></div>
         </div>
       )}
     </div>

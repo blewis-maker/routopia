@@ -131,17 +131,20 @@ export default function RoutePlannerPage() {
   };
 
   return (
-    <div className="grid grid-cols-[400px_1fr] h-screen">
+    <div className="grid grid-cols-[400px_1fr] h-screen overflow-hidden">
       {/* Left Panel - Chat Interface */}
       <div className="flex flex-col h-full bg-stone-900 border-r border-stone-800">
         <div className="p-4 border-b border-stone-800">
-          <Image
-            src="/routopia-logo.png"
-            alt="Routopia"
-            width={120}
-            height={30}
-            className="mb-2"
-          />
+          <div className="flex items-center mb-4">
+            <Image
+              src="/routopia-logo.svg"
+              alt="Routopia"
+              width={120}
+              height={30}
+              className="w-auto h-8"
+              priority
+            />
+          </div>
         </div>
         
         <div 
@@ -161,7 +164,7 @@ export default function RoutePlannerPage() {
         <div className="absolute top-4 left-4 z-10 w-96">
           <SearchBox 
             onSelect={(result) => {
-              if ('coordinates' in result && 'place_name' in result) {
+              if ('coordinates' in result) {
                 const [lng, lat] = result.coordinates;
                 setUserLocation({
                   coordinates: [lng, lat],
@@ -176,21 +179,25 @@ export default function RoutePlannerPage() {
               }
             }}
             placeholder="Set your starting point..."
+            useCurrentLocation={true}
           />
         </div>
 
-        <MapView
-          center={mapCenter}
-          zoom={mapZoom}
-          route={mainRoute}
-          onMapClick={handleMapClick}
-          showWeather={!!weatherInfo}
-          showElevation={!!mainRoute}
-        />
+        <div className="w-full h-full">
+          <MapView
+            center={mapCenter}
+            zoom={mapZoom}
+            route={mainRoute}
+            onMapClick={handleMapClick}
+            showWeather={!!weatherInfo}
+            showElevation={!!mainRoute}
+            showUserLocation={true}
+          />
+        </div>
 
         {/* Weather Overlay */}
         {weatherInfo && (
-          <div className="absolute top-4 right-4 transition-all duration-300 ease-in-out">
+          <div className="absolute top-4 right-4 z-10 transition-all duration-300 ease-in-out">
             <div className="bg-stone-900/90 rounded-lg p-2 backdrop-blur">
               <div className="text-sm text-stone-400 mb-1">{weatherInfo.location}</div>
               <WeatherWidget 
@@ -205,7 +212,7 @@ export default function RoutePlannerPage() {
 
         {/* Route Information Overlay */}
         {mainRoute && (
-          <div className="absolute bottom-4 left-4 right-4 bg-stone-900/90 rounded-lg backdrop-blur">
+          <div className="absolute bottom-4 left-4 right-4 z-10 bg-stone-900/90 rounded-lg backdrop-blur">
             <div className="p-4">
               <h3 className="text-lg font-semibold text-white mb-2">Current Route</h3>
               <div className="text-stone-300">
