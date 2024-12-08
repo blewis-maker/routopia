@@ -40,23 +40,12 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
       
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <Dialog.Panel className="mx-auto max-w-[360px] rounded-2xl bg-stone-900/90 backdrop-blur-sm p-6 w-full shadow-xl border border-stone-800">
-          <div className="flex flex-col items-center justify-center mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="relative w-7 h-7">
-                <Image
-                  src={Logo}
-                  alt="Routopia Logo"
-                  width={28}
-                  height={28}
-                  className="object-contain animate-float"
-                  priority
-                />
-              </div>
-              <span className="text-lg font-semibold text-gradient-brand">Routopia</span>
-            </div>
-
-            <p className="text-center text-stone-300 text-sm font-light px-4">
-              Plan your next adventure with AI-powered inspiration. Join our community of explorers.
+          <div className="flex flex-col items-center mb-8">
+            <h2 className="text-[22px] font-semibold text-white text-center mb-1.5 tracking-wide">
+              AI-Powered Inspiration
+            </h2>
+            <p className="text-center text-[15px] text-stone-400 font-light tracking-wide">
+              for Your Next Adventure
             </p>
           </div>
 
