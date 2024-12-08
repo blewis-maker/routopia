@@ -195,8 +195,8 @@ export default function RoutePlannerPage() {
         {/* Weather Overlay */}
         {weatherInfo && (
           <div className="absolute top-4 right-4 z-10">
-            <div className="bg-stone-900/90 rounded-lg p-2 backdrop-blur shadow-lg">
-              <div className="text-sm text-stone-400 mb-1">{weatherInfo.location}</div>
+            <div className="bg-stone-900/90 rounded-lg backdrop-blur shadow-lg">
+              <div className="text-sm text-stone-400 px-4 pt-2">{weatherInfo.location}</div>
               <WeatherWidget 
                 coordinates={{
                   lat: weatherInfo.coordinates[1],

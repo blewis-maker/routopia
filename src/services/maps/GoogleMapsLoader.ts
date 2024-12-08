@@ -14,7 +14,8 @@ class GoogleMapsLoader {
     this.loader = new Loader({
       apiKey: googleMapsKey,
       version: 'weekly',
-      libraries: ['places', 'visualization', 'geometry', 'elevation']
+      libraries: ['places', 'visualization', 'geometry'],
+      id: '__googleMapsScriptId'
     });
   }
 
@@ -30,11 +31,6 @@ class GoogleMapsLoader {
       this.loadPromise = this.loader.load();
     }
     return this.loadPromise;
-  }
-
-  public async importLibrary(name: string): Promise<any> {
-    await this.load();
-    return this.loader.importLibrary(name);
   }
 }
 

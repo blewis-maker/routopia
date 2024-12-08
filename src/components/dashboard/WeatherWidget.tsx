@@ -110,8 +110,11 @@ export function WeatherWidget({ coordinates }: WeatherWidgetProps) {
     return null;
   }
 
+  // Convert Celsius to Fahrenheit
+  const tempF = Math.round((weather.temperature * 9/5) + 32);
+
   return (
-    <div className="bg-stone-800/90 rounded-lg p-4 backdrop-blur">
+    <div className="bg-stone-800/90 rounded-lg p-4 backdrop-blur shadow-lg">
       <div className="flex items-center space-x-4">
         <img
           src={`https://openweathermap.org/img/w/${weather.icon}.png`}
@@ -121,7 +124,7 @@ export function WeatherWidget({ coordinates }: WeatherWidgetProps) {
         />
         <div>
           <div className="text-2xl font-bold text-white">
-            {Math.round(weather.temperature)}°C
+            {tempF}°F
           </div>
           <div className="text-stone-400 text-sm capitalize">
             {weather.conditions}
@@ -131,7 +134,7 @@ export function WeatherWidget({ coordinates }: WeatherWidgetProps) {
       <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-stone-400">
         <div>
           <span className="font-medium">Wind:</span>{' '}
-          {Math.round(weather.windSpeed)} m/s
+          {Math.round(weather.windSpeed * 2.237)} mph
         </div>
         <div>
           <span className="font-medium">Humidity:</span> {weather.humidity}%

@@ -166,7 +166,7 @@ export function MapView({
 
         // Get user location if enabled
         if (showUserLocation && navigator.geolocation && isMounted) {
-          const watchId = navigator.geolocation.watchPosition(
+          navigator.geolocation.getCurrentPosition(
             (position) => {
               if (!isMounted || !mapInstance) return;
               
@@ -176,21 +176,16 @@ export function MapView({
               };
               
               setUserLocation(location);
+              mapInstance.setCenter(location);
+              mapInstance.setZoom(14);
 
-              // Center map on first position fix
-              if (!userLocation) {
-                mapInstance.setCenter(location);
-                mapInstance.setZoom(14);
-              }
-
-              // Create or update marker with animation
+              // Create user location marker
               if (userMarkerRef.current) {
                 userMarkerRef.current.setPosition(location);
               } else {
                 const marker = new google.maps.Marker({
                   position: location,
                   map: mapInstance,
-                  animation: google.maps.Animation.DROP,
                   icon: {
                     path: google.maps.SymbolPath.CIRCLE,
                     fillColor: '#10B981',
@@ -206,26 +201,27 @@ export function MapView({
             (error) => {
               if (isMounted) {
                 console.warn('Geolocation error:', error);
-                // Fallback to default center if geolocation fails
                 mapInstance?.setCenter({ lat: center[1], lng: center[0] });
                 mapInstance?.setZoom(zoom);
               }
             },
             {
               enableHighAccuracy: true,
-              timeout: 5000,
+              timeout: 10000,
               maximumAge: 0
             }
           );
-
-          // Cleanup watch position
-          return () => {
-            navigator.geolocation.clearWatch(watchId);
-          };
         }
+
+        // Initialize weather layer if enabled
+        if (showWeather && isMounted) {
+          const weatherLayer = new WeatherLayer();
+          weatherLayer.showWeatherOverlay(mapInstance, { lat: center[1], lng: center[0] });
+        }
+
       } catch (error) {
         if (isMounted) {
-          console.error('Map initialization error:', error);
+          console.warn('Map initialization error:', error);
         }
       }
     };
@@ -241,7 +237,7 @@ export function MapView({
         userMarkerRef.current.setMap(null);
       }
     };
-  }, [center, zoom, onMapClick, showUserLocation]);
+  }, [center, zoom, onMapClick, showUserLocation, showWeather]);
 
   // Update map center and zoom when props change
   useEffect(() => {
