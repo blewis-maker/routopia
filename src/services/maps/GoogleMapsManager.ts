@@ -1,5 +1,13 @@
 import { Loader } from '@googlemaps/js-api-loader';
-import { MapServiceInterface, Coordinates, MapBounds, RouteOptions, RouteVisualization, TrafficData } from './MapServiceInterface';
+import { 
+  Coordinates, 
+  MapBounds, 
+  TrafficOptions, 
+  RouteOptions, 
+  RouteVisualization,
+  TrafficData,
+  MapServiceInterface 
+} from './MapServiceInterface';
 import { mapUtils } from '@/lib/utils';
 import { ACTIVITY_COLORS, getActivityStyle, getTrafficStyle } from '@/lib/utils/mapStyles';
 import { RouteVisualizationData, ActivityType, TrafficSegment } from '@/types/maps';
@@ -17,7 +25,7 @@ export class GoogleMapsManager implements MapServiceInterface {
   constructor() {
     const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
     if (!googleMapsKey) {
-      throw new Error('Google Maps API key not configured');
+      throw new Error('Google Maps API key not found');
     }
 
     this.loader = new Loader({
@@ -27,26 +35,31 @@ export class GoogleMapsManager implements MapServiceInterface {
     });
   }
 
-  async initialize(containerId: string): Promise<void> {
-    try {
-      await this.loader.load();
-      const container = document.getElementById(containerId);
-      if (!container) throw new Error('Map container not found');
+  async initialize(containerId: string, options?: {
+    style?: string;
+    center?: Coordinates;
+    zoom?: number;
+    attributionControl?: boolean;
+    preserveDrawingBuffer?: boolean;
+  }): Promise<void> {
+    await this.loader.load();
+    const container = document.getElementById(containerId);
+    if (!container) throw new Error('Map container not found');
 
-      this.map = new google.maps.Map(container, {
-        center: { lat: 40.5852602, lng: -105.0749801 }, // Berthoud, CO
-        zoom: 12,
-        styles: [
-          // Add your dark theme styles here
-          { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-          { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-          { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-          // ... add more styles as needed
-        ]
-      });
-    } catch (error) {
-      console.error('Failed to initialize Google Maps:', error);
-      throw error;
+    const defaultCenter = { lat: 40.5852602, lng: -105.0749801 }; // Default center
+    
+    this.map = new google.maps.Map(container, {
+      center: options?.center || defaultCenter,
+      zoom: options?.zoom || 12,
+      mapTypeControl: true,
+      streetViewControl: true,
+      fullscreenControl: true
+    });
+
+    // Initialize services
+    if (this.map) {
+      this.directionsService = new google.maps.DirectionsService();
+      this.placesService = new google.maps.places.PlacesService(this.map);
     }
   }
 
