@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Route, RoutePreferences } from '@/types/route/types';
-import { POIRecommendation } from '@/types/poi';
 import { Location } from '@/types';
 import { ActivityType } from '@/types/activity';
 import ChatWindow from '@/components/chat/ChatWindow';
@@ -23,6 +22,7 @@ export default function RoutePlannerTestPage() {
 
   const [testRoute, setTestRoute] = useState<Route | null>(null);
   const [loading, setLoading] = useState(false);
+  const [currentLocation] = useState({ lat: 40.0150, lng: -105.2705 }); // Boulder, CO
 
   const handleMessage = async (message: string) => {
     try {
@@ -35,7 +35,7 @@ export default function RoutePlannerTestPage() {
         body: JSON.stringify({
           message,
           preferences: {
-            activityType: 'WALK',
+            activityType: ActivityType.WALK,
             weights: {
               distance: 1,
               duration: 1,
@@ -91,7 +91,7 @@ export default function RoutePlannerTestPage() {
       </div>
 
       <div className="space-y-4">
-        <WeatherWidget />
+        <WeatherWidget coordinates={currentLocation} />
         
         {testRoute && (
           <RouteProgress

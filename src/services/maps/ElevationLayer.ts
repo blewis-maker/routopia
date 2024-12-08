@@ -1,6 +1,6 @@
 import mapboxgl from 'mapbox-gl';
 import { Coordinates } from './MapServiceInterface';
-import { Loader } from '@googlemaps/js-api-loader';
+import GoogleMapsLoader from './GoogleMapsLoader';
 
 export interface ElevationData {
   points: Array<{
@@ -14,25 +14,11 @@ export interface ElevationData {
 }
 
 export class ElevationLayer {
-  private loader: Loader;
   private sourceId = 'elevation-data';
   private layerId = 'elevation-layer';
 
-  constructor() {
-    const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
-    if (!googleMapsKey) {
-      throw new Error('Google Maps API key not found');
-    }
-
-    this.loader = new Loader({
-      apiKey: googleMapsKey,
-      version: 'weekly',
-      libraries: ['elevation']
-    });
-  }
-
   async getElevationData(path: Coordinates[]): Promise<ElevationData> {
-    await this.loader.load();
+    await GoogleMapsLoader.getInstance().load();
     return this.getGoogleElevation(path);
   }
 
@@ -128,7 +114,7 @@ export class ElevationLayer {
   }
 
   private async visualizeGoogleElevation(map: google.maps.Map, data: ElevationData): Promise<void> {
-    await this.loader.importLibrary('visualization');
+    await GoogleMapsLoader.getInstance().importLibrary('visualization');
     
     const chartData = new google.visualization.DataTable();
     chartData.addColumn('number', 'Distance');

@@ -9,6 +9,7 @@ import { WeatherWidget } from '@/components/dashboard/WeatherWidget';
 import { SearchBox } from '@/components/navigation/SearchBox';
 import ChatWindow from '@/components/chat/ChatWindow';
 import Image from 'next/image';
+import { Coordinates } from '@/services/maps/MapServiceInterface';
 
 interface WeatherInfo {
   location: string;
@@ -21,9 +22,11 @@ export default function RoutePlannerPage() {
   const [tributaryRoutes, setTributaryRoutes] = useState<Route[]>([]);
   const [userLocation, setUserLocation] = useState<Location | null>(null);
   const [weatherInfo, setWeatherInfo] = useState<WeatherInfo | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([-105.0749801, 40.5852602]); // Default to Berthoud, CO
+  const [mapZoom, setMapZoom] = useState(12);
   
   const [preferences, setPreferences] = useState<RoutePreferences>({
-    activityType: 'WALK',
+    activityType: ActivityType.WALK,
     weights: {
       distance: 1,
       duration: 1,
@@ -71,10 +74,16 @@ export default function RoutePlannerPage() {
 
       if (data.route) {
         setMainRoute(data.route);
+        // Update map center to route start
+        const startPoint = data.route.segments[0].startPoint;
+        setMapCenter([startPoint[0], startPoint[1]]);
+        setMapZoom(13);
+        
+        // Update weather info for route end point
         const endPoint = data.route.segments[data.route.segments.length - 1].endPoint;
         setWeatherInfo({
           location: data.route.name,
-          coordinates: [endPoint.longitude, endPoint.latitude]
+          coordinates: [endPoint[0], endPoint[1]]
         });
       }
 
@@ -84,6 +93,40 @@ export default function RoutePlannerPage() {
         type: 'assistant',
         content: 'Sorry, I encountered an error processing your request.'
       }]);
+    }
+  };
+
+  const handleMapClick = async (coordinates: Coordinates) => {
+    if (!userLocation) {
+      // If no starting point is set, use clicked location as start
+      setUserLocation({
+        coordinates: [coordinates.lng, coordinates.lat],
+        address: 'Selected Location'
+      });
+    } else {
+      // If starting point exists, generate route to clicked location
+      try {
+        const response = await fetch('/api/routes/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            start: userLocation.coordinates,
+            end: [coordinates.lng, coordinates.lat],
+            preferences
+          })
+        });
+
+        const data = await response.json();
+        if (data.route) {
+          setMainRoute(data.route);
+          setWeatherInfo({
+            location: data.route.name,
+            coordinates: [coordinates.lng, coordinates.lat]
+          });
+        }
+      } catch (error) {
+        console.error('Route generation error:', error);
+      }
     }
   };
 
@@ -106,10 +149,8 @@ export default function RoutePlannerPage() {
           className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-stone-700 scrollbar-track-transparent"
         >
           <ChatWindow
+            messages={messages}
             onSendMessage={handleChatMessage}
-            onDestinationChange={(destination) => {
-              console.log('Destination changed:', destination);
-            }}
           />
         </div>
       </div>
@@ -121,13 +162,16 @@ export default function RoutePlannerPage() {
           <SearchBox 
             onSelect={(result) => {
               if ('coordinates' in result && 'place_name' in result) {
+                const [lng, lat] = result.coordinates;
                 setUserLocation({
-                  coordinates: result.coordinates,
+                  coordinates: [lng, lat],
                   address: result.place_name
                 });
+                setMapCenter([lng, lat]);
+                setMapZoom(14);
                 setWeatherInfo({
                   location: result.place_name,
-                  coordinates: result.coordinates
+                  coordinates: [lng, lat]
                 });
               }
             }}
@@ -136,8 +180,12 @@ export default function RoutePlannerPage() {
         </div>
 
         <MapView
-          center={[-104.9903, 39.7392]}
-          zoom={12}
+          center={mapCenter}
+          zoom={mapZoom}
+          route={mainRoute}
+          onMapClick={handleMapClick}
+          showWeather={!!weatherInfo}
+          showElevation={!!mainRoute}
         />
 
         {/* Weather Overlay */}
@@ -145,7 +193,12 @@ export default function RoutePlannerPage() {
           <div className="absolute top-4 right-4 transition-all duration-300 ease-in-out">
             <div className="bg-stone-900/90 rounded-lg p-2 backdrop-blur">
               <div className="text-sm text-stone-400 mb-1">{weatherInfo.location}</div>
-              <WeatherWidget />
+              <WeatherWidget 
+                coordinates={{
+                  lat: weatherInfo.coordinates[1],
+                  lng: weatherInfo.coordinates[0]
+                }}
+              />
             </div>
           </div>
         )}

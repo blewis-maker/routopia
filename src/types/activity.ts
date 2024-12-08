@@ -1,11 +1,10 @@
 export enum ActivityType {
-  BIKE = 'BIKE',
-  RUN = 'RUN',
   WALK = 'WALK',
-  HIKE = 'HIKE',
+  RUN = 'RUN',
+  BIKE = 'BIKE',
   SKI = 'SKI',
-  SWIM = 'SWIM',
   CAR = 'CAR',
+  PUBLIC_TRANSPORT = 'PUBLIC_TRANSPORT'
 }
 
 export type ActivityStats = {
@@ -34,17 +33,26 @@ export type ActivityMetrics = {
   power?: number;
 };
 
-export type ActivityPreferences = {
-  preferredUnits: 'metric' | 'imperial';
-  defaultActivityType: ActivityType;
-  showHeartRate: boolean;
-  showPower: boolean;
-  showCadence: boolean;
-  showElevation: boolean;
-  showWeather: boolean;
-  autoStart: boolean;
-  autoPause: boolean;
-};
+export interface ActivityPreferences {
+  type: ActivityType;
+  intensity?: 'low' | 'medium' | 'high';
+  duration?: number; // in minutes
+  distance?: number; // in meters
+  elevation?: {
+    maxGain?: number;
+    maxLoss?: number;
+  };
+  terrain?: {
+    difficulty?: 'easy' | 'moderate' | 'difficult';
+    surface?: string[];
+  };
+  weather?: {
+    minTemp?: number;
+    maxTemp?: number;
+    avoidPrecipitation?: boolean;
+    windThreshold?: number;
+  };
+}
 
 export type ActivityFilters = {
   type?: ActivityType;

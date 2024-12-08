@@ -1,99 +1,87 @@
-import { Cloud, Sun, Wind, Droplets, CloudRain } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { WeatherData } from '@/services/maps/WeatherLayer';
+import { Coordinates } from '@/services/maps/MapServiceInterface';
 
-interface WeatherData {
-  current: {
-    temp: number;
-    condition: string;
-    icon: React.ElementType;
-    wind: string;
-    humidity: string;
-  };
-  forecast: {
-    day: string;
-    temp: number;
-    condition: string;
-    icon: React.ElementType;
-  }[];
+interface WeatherWidgetProps {
+  coordinates: Coordinates;
 }
 
-// Mock weather data - replace with actual API call
-const weatherData: WeatherData = {
-  current: {
-    temp: 22,
-    condition: 'Partly Cloudy',
-    icon: Cloud,
-    wind: '12 km/h',
-    humidity: '65%',
-  },
-  forecast: [
-    {
-      day: 'Tomorrow',
-      temp: 24,
-      condition: 'Sunny',
-      icon: Sun,
-    },
-    {
-      day: 'Wed',
-      temp: 20,
-      condition: 'Rainy',
-      icon: CloudRain,
-    },
-    {
-      day: 'Thu',
-      temp: 21,
-      condition: 'Cloudy',
-      icon: Cloud,
-    },
-  ],
-};
+export function WeatherWidget({ coordinates }: WeatherWidgetProps) {
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export function WeatherWidget() {
+  useEffect(() => {
+    const fetchWeather = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(
+          `/api/weather?lat=${coordinates.lat}&lng=${coordinates.lng}`
+        );
+        if (!response.ok) {
+          throw new Error('Failed to fetch weather data');
+        }
+        const data = await response.json();
+        setWeather(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load weather');
+        console.error('Weather fetch error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (coordinates) {
+      fetchWeather();
+    }
+  }, [coordinates]);
+
+  if (isLoading) {
+    return (
+      <div className="animate-pulse bg-stone-800 rounded-lg p-4">
+        <div className="h-6 w-24 bg-stone-700 rounded mb-2"></div>
+        <div className="h-4 w-16 bg-stone-700 rounded"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-900/50 text-red-200 rounded-lg p-4">
+        <p className="text-sm">{error}</p>
+      </div>
+    );
+  }
+
+  if (!weather) {
+    return null;
+  }
+
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Weather</h2>
-      
-      {/* Current Weather */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <weatherData.current.icon className="h-12 w-12 text-gray-600" />
-          <div className="ml-4">
-            <div className="text-3xl font-bold text-gray-900">
-              {weatherData.current.temp}°C
-            </div>
-            <div className="text-gray-500">{weatherData.current.condition}</div>
+    <div className="bg-stone-800/90 rounded-lg p-4 backdrop-blur">
+      <div className="flex items-center space-x-4">
+        <img
+          src={`https://openweathermap.org/img/w/${weather.icon}.png`}
+          alt={weather.conditions}
+          className="w-12 h-12"
+        />
+        <div>
+          <div className="text-2xl font-bold text-white">
+            {Math.round(weather.temperature)}°C
           </div>
-        </div>
-        <div className="text-right">
-          <div className="flex items-center text-gray-500 mb-1">
-            <Wind className="h-4 w-4 mr-1" />
-            {weatherData.current.wind}
-          </div>
-          <div className="flex items-center text-gray-500">
-            <Droplets className="h-4 w-4 mr-1" />
-            {weatherData.current.humidity}
+          <div className="text-stone-400 text-sm capitalize">
+            {weather.conditions}
           </div>
         </div>
       </div>
-
-      {/* Forecast */}
-      <div className="border-t pt-4">
-        <h3 className="text-sm font-medium text-gray-900 mb-3">3-Day Forecast</h3>
-        <div className="grid grid-cols-3 gap-4">
-          {weatherData.forecast.map((day) => (
-            <div
-              key={day.day}
-              className="text-center p-2 bg-gray-50 rounded-lg"
-            >
-              <div className="text-sm font-medium text-gray-900 mb-1">
-                {day.day}
-              </div>
-              <day.icon className="h-6 w-6 mx-auto text-gray-600 mb-1" />
-              <div className="text-sm font-medium text-gray-900">
-                {day.temp}°C
-              </div>
-              <div className="text-xs text-gray-500">{day.condition}</div>
-            </div>
-          ))}
+      <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-stone-400">
+        <div>
+          <span className="font-medium">Wind:</span>{' '}
+          {Math.round(weather.windSpeed)} m/s
+        </div>
+        <div>
+          <span className="font-medium">Humidity:</span> {weather.humidity}%
         </div>
       </div>
     </div>

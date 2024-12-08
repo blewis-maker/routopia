@@ -1,6 +1,6 @@
 import mapboxgl from 'mapbox-gl';
 import { Coordinates } from './MapServiceInterface';
-import { Loader } from '@googlemaps/js-api-loader';
+import GoogleMapsLoader from './GoogleMapsLoader';
 
 export interface WeatherData {
   temperature: number;
@@ -13,25 +13,14 @@ export interface WeatherData {
 }
 
 export class WeatherLayer {
-  private loader: Loader;
   private weatherApiKey: string;
 
   constructor() {
-    const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
-    const weatherApiKey = process.env.NEXT_PUBLIC_WEATHER_API_KEY;
-
-    if (!googleMapsKey) {
-      throw new Error('Google Maps API key not found');
-    }
+    const weatherApiKey = process.env.NEXT_PUBLIC_OPENWEATHERMAP_API_KEY;
     if (!weatherApiKey) {
-      throw new Error('Weather API key not found');
+      throw new Error('OpenWeatherMap API key not found');
     }
-
     this.weatherApiKey = weatherApiKey;
-    this.loader = new Loader({
-      apiKey: googleMapsKey,
-      version: 'weekly'
-    });
   }
 
   async getWeatherData(location: Coordinates): Promise<WeatherData> {
@@ -56,7 +45,7 @@ export class WeatherLayer {
   }
 
   async showWeatherOverlay(map: mapboxgl.Map | google.maps.Map, location: Coordinates): Promise<void> {
-    await this.loader.load();
+    await GoogleMapsLoader.getInstance().load();
     const weatherData = await this.getWeatherData(location);
     
     if ('addControl' in map) {
@@ -82,11 +71,15 @@ export class WeatherLayer {
     
     overlay.onAdd = () => {
       const panes = overlay.getPanes();
-      panes.overlayLayer.appendChild(el);
+      if (panes && panes.overlayLayer) {
+        panes.overlayLayer.appendChild(el);
+      }
     };
     
     overlay.draw = () => {
       const projection = overlay.getProjection();
+      if (!projection) return;
+
       const position = projection.fromLatLngToDivPixel(
         new google.maps.LatLng(location.lat, location.lng)
       );

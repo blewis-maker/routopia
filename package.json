@@ -47,6 +47,7 @@
     "@tailwindcss/forms": "^0.5.9",
     "@tailwindcss/typography": "^0.5.15",
     "@types/bcryptjs": "^2.4.6",
+    "@types/google.maps": "^3.58.1",
     "@types/ioredis": "^4.28.10",
     "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.11.10",

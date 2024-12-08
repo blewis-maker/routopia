@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MapPin, Route, Activity } from 'lucide-react';
+import { Route } from 'lucide-react';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -12,17 +12,7 @@ export function Sidebar() {
       label: 'Route Planner',
       href: '/route-planner',
       icon: Route,
-    },
-    {
-      label: 'Activity Hub',
-      href: '/activity-hub',
-      icon: Activity,
-    },
-    {
-      label: 'POI Explorer',
-      href: '/poi-explorer',
-      icon: MapPin,
-    },
+    }
   ];
 
   return (
