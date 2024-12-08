@@ -44,7 +44,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
         <div className="nav-bar__container">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
-            <Link href="/" className="nav-bar__logo group">
+            <Link href="/" className="nav-bar__logo group flex items-center gap-3">
               <div className="relative w-8 h-8">
                 <Image
                   src={Logo}
@@ -55,11 +55,9 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                   priority
                 />
               </div>
-              {!isLandingPage && (
-                <span className="nav-bar__logo-text">
-                  Routopia
-                </span>
-              )}
+              <span className="nav-bar__logo-text text-lg font-semibold bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">
+                Routopia
+              </span>
             </Link>
 
             {/* Desktop Navigation */}

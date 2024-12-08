@@ -11,4 +11,40 @@
   @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
 }
 
+/* Global Scrollbar Hiding */
+html, body {
+  overflow-y: scroll;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0 !important;
+  display: none !important;
+}
+
+/* Hide scrollbars for all elements */
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+*::-webkit-scrollbar {
+  width: 0 !important;
+  display: none !important;
+}
+
+/* Ensure main content area also has scrollbar hidden */
+main {
+  overflow-y: scroll;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+main::-webkit-scrollbar {
+  width: 0 !important;
+  display: none !important;
+}
+
 /* Rest of NavigationBar styles... */ 
