@@ -51,13 +51,15 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                   alt="Routopia Logo"
                   width={36}
                   height={36}
-                  className="nav-bar__logo-image group-hover:scale-110"
+                  className="nav-bar__logo-image group-hover:scale-110 transition-transform duration-200"
                   priority
                 />
               </div>
-              <span className="nav-bar__logo-text">
-                Routopia
-              </span>
+              {!isLandingPage && (
+                <span className="nav-bar__logo-text">
+                  Routopia
+                </span>
+              )}
             </Link>
 
             {/* Desktop Navigation */}

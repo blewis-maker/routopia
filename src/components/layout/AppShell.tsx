@@ -25,19 +25,17 @@ export default function AppShell({
     return () => clearTimeout(timer);
   }, []);
 
-  const shellClassName = `app-shell ${
-    variant === 'marketing' ? 'app-shell--marketing' : ''
-  } ${mounted ? 'opacity-100' : 'opacity-0'}`;
-
   return (
-    <div className={shellClassName}>
+    <div className={`app-shell scrollbar-none ${
+      variant === 'marketing' ? 'app-shell--marketing' : ''
+    } ${mounted ? 'opacity-100' : 'opacity-0'}`}>
       <NavigationBar 
         className={mounted ? 'opacity-100' : 'opacity-0'}
         isLandingPage={variant === 'marketing'}
         user={session?.user}
       />
       
-      <main className={`app-shell__main ${variant === 'marketing' ? '' : 'pt-16'}`}>
+      <main className={`app-shell__main scrollbar-none ${variant === 'marketing' ? '' : 'pt-16'}`}>
         {children}
       </main>
 

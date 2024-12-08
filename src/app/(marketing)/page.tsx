@@ -25,16 +25,16 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="relative">
+    <div className="relative scrollbar-none">
       {/* Hero Section */}
-      <div className={`relative min-h-screen transition-all duration-700 ease-out ${
+      <div className={`relative min-h-screen transition-all duration-700 ease-out scrollbar-none ${
         mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
       }`}>
         {/* Video Background */}
         <VideoBackground videoUrl="/hero-bg.mp4" />
 
         {/* Hero Content */}
-        <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 text-center">
+        <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 text-center scrollbar-none">
           <div className="max-w-3xl mx-auto">
             <Heading 
               level={1}
@@ -59,13 +59,16 @@ export default function LandingPage() {
             </button>
           </div>
 
-          {/* Learn More Arrow - Updated animation */}
+          {/* Learn More Arrow */}
           <button 
             onClick={scrollToLearnMore}
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 text-neutral-400 hover:text-neutral-200 transition-all duration-300 flex flex-col items-center gap-3 group"
+            className="absolute bottom-8 left-1/2 -translate-x-1/2 text-neutral-400 hover:text-white transition-all duration-300 flex flex-col items-center gap-2 group cursor-pointer"
+            aria-label="Learn More"
           >
-            <Text variant="sm" className="tracking-wider uppercase">Learn More</Text>
-            <div className="w-6 h-6 border-b-2 border-r-2 border-current rotate-45 animate-bounce-slow group-hover:border-white" />
+            <Text variant="sm" className="tracking-wider uppercase opacity-80 group-hover:opacity-100">
+              Learn More
+            </Text>
+            <div className="w-5 h-5 border-b-2 border-r-2 border-current transform rotate-45 transition-transform duration-300 group-hover:translate-y-1" />
           </button>
         </div>
 

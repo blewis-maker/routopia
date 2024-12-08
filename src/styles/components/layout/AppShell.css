@@ -18,10 +18,22 @@
 /* Marketing page specific styles */
 .app-shell--marketing {
   @apply bg-stone-950;
+  min-height: 100vh;
 }
 
 .app-shell--marketing .app-shell__main {
-  @apply relative overflow-hidden;
+  @apply relative;
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
+/* Hide scrollbar while keeping functionality */
+.app-shell--marketing .app-shell__main {
+  scrollbar-width: none;
+}
+
+.app-shell--marketing .app-shell__main::-webkit-scrollbar {
+  display: none;
 }
 
 /* Add gradient overlay for marketing pages */
