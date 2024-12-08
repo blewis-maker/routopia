@@ -100,7 +100,7 @@ export function SearchBox({ onSelect, placeholder = 'Search locations...', useCu
               coordinates: [
                 details.geometry?.location?.lng() || 0,
                 details.geometry?.location?.lat() || 0
-              ],
+              ] as [number, number],
               description: details.formatted_address
             };
           })

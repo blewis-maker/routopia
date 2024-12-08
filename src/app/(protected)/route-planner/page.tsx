@@ -131,25 +131,24 @@ export default function RoutePlannerPage() {
   };
 
   return (
-    <div className="grid grid-cols-[400px_1fr] h-screen overflow-hidden">
+    <div className="grid grid-cols-[minmax(350px,_400px)_1fr] h-full w-full overflow-hidden">
       {/* Left Panel - Chat Interface */}
-      <div className="flex flex-col h-full bg-stone-900 border-r border-stone-800">
-        <div className="p-4 border-b border-stone-800">
-          <div className="flex items-center mb-4">
-            <Image
-              src="/routopia-logo.svg"
-              alt="Routopia"
-              width={120}
-              height={30}
-              className="w-auto h-8"
-              priority
-            />
-          </div>
+      <div className="flex flex-col h-full bg-stone-900 border-r border-stone-800 overflow-hidden">
+        <div className="flex-none flex items-center gap-2 p-4 border-b border-stone-800">
+          <Image
+            src="/routopia-logo.svg"
+            alt="Routopia"
+            width={32}
+            height={32}
+            className="w-8 h-8"
+            priority
+          />
+          <h1 className="text-lg font-semibold text-white">Route Planner</h1>
         </div>
         
         <div 
           ref={chatContainerRef}
-          className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-stone-700 scrollbar-track-transparent"
+          className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-stone-700 scrollbar-track-transparent"
         >
           <ChatWindow
             messages={messages}
@@ -159,9 +158,19 @@ export default function RoutePlannerPage() {
       </div>
 
       {/* Right Panel - Map & Controls */}
-      <div className="relative h-full">
+      <div className="relative h-full w-full overflow-hidden">
+        <MapView
+          center={mapCenter}
+          zoom={mapZoom}
+          route={mainRoute}
+          onMapClick={handleMapClick}
+          showWeather={!!weatherInfo}
+          showElevation={!!mainRoute}
+          showUserLocation={true}
+        />
+
         {/* Search Box Overlay */}
-        <div className="absolute top-4 left-4 z-10 w-96">
+        <div className="absolute top-4 left-4 z-10 w-96 max-w-[calc(100%-2rem)]">
           <SearchBox 
             onSelect={(result) => {
               if ('coordinates' in result) {
@@ -183,22 +192,10 @@ export default function RoutePlannerPage() {
           />
         </div>
 
-        <div className="w-full h-full">
-          <MapView
-            center={mapCenter}
-            zoom={mapZoom}
-            route={mainRoute}
-            onMapClick={handleMapClick}
-            showWeather={!!weatherInfo}
-            showElevation={!!mainRoute}
-            showUserLocation={true}
-          />
-        </div>
-
         {/* Weather Overlay */}
         {weatherInfo && (
-          <div className="absolute top-4 right-4 z-10 transition-all duration-300 ease-in-out">
-            <div className="bg-stone-900/90 rounded-lg p-2 backdrop-blur">
+          <div className="absolute top-4 right-4 z-10">
+            <div className="bg-stone-900/90 rounded-lg p-2 backdrop-blur shadow-lg">
               <div className="text-sm text-stone-400 mb-1">{weatherInfo.location}</div>
               <WeatherWidget 
                 coordinates={{
@@ -212,8 +209,8 @@ export default function RoutePlannerPage() {
 
         {/* Route Information Overlay */}
         {mainRoute && (
-          <div className="absolute bottom-4 left-4 right-4 z-10 bg-stone-900/90 rounded-lg backdrop-blur">
-            <div className="p-4">
+          <div className="absolute bottom-4 left-4 right-4 z-10">
+            <div className="bg-stone-900/90 rounded-lg p-4 backdrop-blur shadow-lg">
               <h3 className="text-lg font-semibold text-white mb-2">Current Route</h3>
               <div className="text-stone-300">
                 <p>Distance: {Math.round(mainRoute.totalMetrics?.distance || 0)}km</p>

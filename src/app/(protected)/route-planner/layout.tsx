@@ -8,7 +8,7 @@ export default function RoutePlannerLayout({
 }) {
   return (
     <AppShell>
-      <div className="route-planner-layout">
+      <div className="fixed inset-0 top-16 overflow-hidden">
         {children}
       </div>
     </AppShell>

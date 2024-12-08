@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { GoogleMapsManager } from '@/services/maps/GoogleMapsManager';
 import { ElevationLayer } from '@/services/maps/ElevationLayer';
 import { WeatherLayer } from '@/services/maps/WeatherLayer';
-import { MapServiceInterface, Coordinates, RouteVisualization, RouteOptions } from '@/services/maps/MapServiceInterface';
+import { MapServiceInterface, Coordinates } from '@/services/maps/MapServiceInterface';
 import { Route } from '@/types/route/types';
 import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
 
@@ -111,38 +111,25 @@ export function MapView({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const userMarkerRef = useRef<google.maps.Marker | null>(null);
-  const [mapService, setMapService] = useState<MapServiceInterface | null>(null);
+  const [mapService, setMapService] = useState<GoogleMapsManager | null>(null);
   const [weatherLayer] = useState(() => new WeatherLayer());
   const [elevationLayer] = useState(() => new ElevationLayer());
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
 
-  // Get user's location
-  useEffect(() => {
-    if (showUserLocation && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
-        }
-      );
-    }
-  }, [showUserLocation]);
-
   // Initialize map
   useEffect(() => {
-    if (!mapContainerRef.current) return;
+    let isMounted = true;
+    let mapInstance: google.maps.Map | null = null;
 
     const initMap = async () => {
+      if (!mapContainerRef.current || !isMounted) return;
+
       try {
-        // Initialize Google Maps
+        // Load Google Maps
         await GoogleMapsLoader.getInstance().load();
-        
-        const mapInstance = new google.maps.Map(mapContainerRef.current, {
+
+        // Create map instance with default center
+        mapInstance = new google.maps.Map(mapContainerRef.current, {
           center: { lat: center[1], lng: center[0] },
           zoom: zoom,
           styles: DARK_MODE_STYLES,
@@ -155,13 +142,18 @@ export function MapView({
           fullscreenControl: false
         });
 
+        if (!isMounted) return;
+
         mapInstanceRef.current = mapInstance;
-        
-        // Initialize map service
-        const service = new GoogleMapsManager(mapInstance);
-        
+
+        // Initialize service
+        const service = new GoogleMapsManager();
+        if (isMounted) {
+          setMapService(service);
+        }
+
         // Add click handler
-        if (onMapClick) {
+        if (onMapClick && isMounted) {
           mapInstance.addListener('click', (e: google.maps.MapMouseEvent) => {
             if (e.latLng) {
               onMapClick({
@@ -172,93 +164,92 @@ export function MapView({
           });
         }
 
-        setMapService(service);
+        // Get user location if enabled
+        if (showUserLocation && navigator.geolocation && isMounted) {
+          const watchId = navigator.geolocation.watchPosition(
+            (position) => {
+              if (!isMounted || !mapInstance) return;
+              
+              const location = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+              };
+              
+              setUserLocation(location);
+
+              // Center map on first position fix
+              if (!userLocation) {
+                mapInstance.setCenter(location);
+                mapInstance.setZoom(14);
+              }
+
+              // Create or update marker with animation
+              if (userMarkerRef.current) {
+                userMarkerRef.current.setPosition(location);
+              } else {
+                const marker = new google.maps.Marker({
+                  position: location,
+                  map: mapInstance,
+                  animation: google.maps.Animation.DROP,
+                  icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    fillColor: '#10B981',
+                    fillOpacity: 1,
+                    strokeColor: '#FFFFFF',
+                    strokeWeight: 2,
+                    scale: 8
+                  }
+                });
+                userMarkerRef.current = marker;
+              }
+            },
+            (error) => {
+              if (isMounted) {
+                console.warn('Geolocation error:', error);
+                // Fallback to default center if geolocation fails
+                mapInstance?.setCenter({ lat: center[1], lng: center[0] });
+                mapInstance?.setZoom(zoom);
+              }
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 5000,
+              maximumAge: 0
+            }
+          );
+
+          // Cleanup watch position
+          return () => {
+            navigator.geolocation.clearWatch(watchId);
+          };
+        }
       } catch (error) {
-        console.error('Failed to initialize map:', error);
+        if (isMounted) {
+          console.error('Map initialization error:', error);
+        }
       }
     };
 
     initMap();
 
     return () => {
+      isMounted = false;
       if (mapInstanceRef.current) {
-        // Clean up event listeners and markers
         google.maps.event.clearInstanceListeners(mapInstanceRef.current);
-        if (userMarkerRef.current) {
-          userMarkerRef.current.setMap(null);
-        }
       }
-    };
-  }, []);
-
-  // Update map center and zoom when props change
-  useEffect(() => {
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.setCenter({ lat: center[1], lng: center[0] });
-      mapInstanceRef.current.setZoom(zoom);
-    }
-  }, [center, zoom]);
-
-  // Add user location marker
-  useEffect(() => {
-    if (!mapInstanceRef.current || !userLocation) return;
-
-    // Remove existing marker
-    if (userMarkerRef.current) {
-      userMarkerRef.current.setMap(null);
-    }
-
-    // Create new marker
-    userMarkerRef.current = new google.maps.Marker({
-      position: { lat: userLocation.lat, lng: userLocation.lng },
-      map: mapInstanceRef.current,
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 8,
-        fillColor: '#10B981',
-        fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 2,
-      },
-      title: 'Your Location'
-    });
-
-    // Add pulse effect
-    const pulseEffect = new google.maps.Marker({
-      position: { lat: userLocation.lat, lng: userLocation.lng },
-      map: mapInstanceRef.current,
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 16,
-        fillColor: '#10B981',
-        fillOpacity: 0.2,
-        strokeColor: '#10B981',
-        strokeWeight: 1,
-        strokeOpacity: 0.4,
-      },
-      optimized: false,
-    });
-
-    // Animate pulse
-    let scale = 16;
-    const animate = () => {
-      scale = scale > 30 ? 16 : scale + 0.5;
-      if (pulseEffect.getIcon()) {
-        const icon = { ...pulseEffect.getIcon() as google.maps.Symbol };
-        icon.scale = scale;
-        pulseEffect.setIcon(icon);
-      }
-      requestAnimationFrame(animate);
-    };
-    animate();
-
-    return () => {
       if (userMarkerRef.current) {
         userMarkerRef.current.setMap(null);
       }
-      pulseEffect.setMap(null);
     };
-  }, [userLocation]);
+  }, [center, zoom, onMapClick, showUserLocation]);
+
+  // Update map center and zoom when props change
+  useEffect(() => {
+    if (mapInstanceRef.current && !userLocation) {
+      mapInstanceRef.current.setCenter({ lat: center[1], lng: center[0] });
+      mapInstanceRef.current.setZoom(zoom);
+    }
+  }, [center, zoom, userLocation]);
 
   // Handle route visualization
   useEffect(() => {
@@ -266,34 +257,7 @@ export function MapView({
 
     const visualizeRoute = async () => {
       try {
-        const routeVisualization: RouteVisualization = {
-          mainRoute: {
-            coordinates: route.segments.map(segment => ({
-              lat: segment.startPoint.latitude,
-              lng: segment.startPoint.longitude
-            }))
-          },
-          waypoints: {
-            start: {
-              lat: route.segments[0].startPoint.latitude,
-              lng: route.segments[0].startPoint.longitude
-            },
-            end: {
-              lat: route.segments[route.segments.length - 1].endPoint.latitude,
-              lng: route.segments[route.segments.length - 1].endPoint.longitude
-            },
-            via: []
-          }
-        };
-
-        const options: RouteOptions = {
-          activityType: route.preferences.activityType.toLowerCase() as 'car' | 'bike' | 'ski',
-          showTraffic: true,
-          showAlternatives: true,
-          isInteractive: true
-        };
-
-        await mapService.drawRoute(routeVisualization, options);
+        if (!mapInstanceRef.current) return;
 
         // Show weather at route end point if enabled
         if (showWeather) {
@@ -307,7 +271,10 @@ export function MapView({
         // Show elevation profile if enabled
         if (showElevation) {
           const elevationData = await elevationLayer.getElevationData(
-            routeVisualization.mainRoute.coordinates
+            route.segments.map(segment => ({
+              lat: segment.startPoint.latitude,
+              lng: segment.startPoint.longitude
+            }))
           );
           await elevationLayer.visualizeElevation(mapInstanceRef.current, elevationData);
         }
@@ -324,6 +291,7 @@ export function MapView({
       <div
         ref={mapContainerRef}
         className="w-full h-full"
+        id="map-container"
       />
       {showElevation && route && (
         <div
