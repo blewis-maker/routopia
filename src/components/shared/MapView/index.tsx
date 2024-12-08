@@ -64,6 +64,7 @@ interface MapViewProps {
   onTributaryClick?: (tributaryId: string) => void;
   onMarkerClick?: (markerId: string) => void;
   onRouteClick?: (point: [number, number]) => void;
+  children?: React.ReactNode;
 }
 
 export type { Tributary, POIMarker };
@@ -80,14 +81,17 @@ export const MapView: React.FC<MapViewProps> = ({
   onTributaryClick,
   onMarkerClick,
   onRouteClick,
+  children,
 }) => {
   const mapContainer = React.useRef<HTMLDivElement>(null);
   const map = React.useRef<mapboxgl.Map | null>(null);
+  const markersRef = React.useRef<mapboxgl.Marker[]>([]);
   const hoveredTributaryId = React.useRef<string | null>(null);
   const [styleLoaded, setStyleLoaded] = React.useState(false);
 
+  // Initialize map
   React.useEffect(() => {
-    if (!mapContainer.current) return;
+    if (!mapContainer.current || map.current) return;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -97,19 +101,27 @@ export const MapView: React.FC<MapViewProps> = ({
       interactive: !loading,
     });
 
-    // Add navigation controls
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-    // Listen for style load
     map.current.on('style.load', () => {
       setStyleLoaded(true);
     });
 
+    // Cleanup function
     return () => {
-      map.current?.remove();
+      // Remove all markers
+      markersRef.current.forEach(marker => marker.remove());
+      markersRef.current = [];
+      
+      // Remove map
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
     };
   }, []);
 
+  // Update center when it changes
   React.useEffect(() => {
     if (!map.current) return;
     map.current.setCenter(center);
@@ -118,10 +130,10 @@ export const MapView: React.FC<MapViewProps> = ({
   // Handle markers
   React.useEffect(() => {
     if (!map.current || !styleLoaded) return;
-    
+
     // Remove existing markers
-    const existingMarkers = document.getElementsByClassName('mapboxgl-marker');
-    Array.from(existingMarkers).forEach(marker => marker.remove());
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
 
     // Add new markers
     markers.forEach(marker => {
@@ -145,10 +157,18 @@ export const MapView: React.FC<MapViewProps> = ({
         el.addEventListener('click', () => onMarkerClick(marker.id));
       }
 
-      new mapboxgl.Marker(el)
+      const mapboxMarker = new mapboxgl.Marker(el)
         .setLngLat(marker.position)
         .addTo(map.current!);
+
+      markersRef.current.push(mapboxMarker);
     });
+
+    // Cleanup function
+    return () => {
+      markersRef.current.forEach(marker => marker.remove());
+      markersRef.current = [];
+    };
   }, [markers, interactive, onMarkerClick, styleLoaded]);
 
   // Handle main route
@@ -313,6 +333,7 @@ export const MapView: React.FC<MapViewProps> = ({
   return (
     <div className="relative w-full h-full">
       <div ref={mapContainer} className="w-full h-full rounded-lg overflow-hidden" />
+      {children}
       {loading && (
         <div className="absolute inset-0 bg-gray-900/50 flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white" />
