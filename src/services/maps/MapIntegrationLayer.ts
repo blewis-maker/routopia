@@ -70,8 +70,8 @@ export class MapIntegrationLayer {
     this.providers.set('mapbox', new MapboxManager());
     this.providers.set('google', new GoogleMapsManager());
     
-    // Default to Mapbox
-    this.activeProvider = this.providers.get('mapbox')!;
+    // Default to Google Maps
+    this.activeProvider = this.providers.get('google')!;
     
     // Initialize RouteProcessor with same provider
     this.routeProcessor = new RouteProcessor(
@@ -89,31 +89,42 @@ export class MapIntegrationLayer {
       throw new Error(`Container '${this.containerId}' not found`);
     }
 
-    // Initialize with dark style
-    await this.activeProvider.initialize(this.containerId, {
-      style: 'mapbox://styles/mapbox/dark-v11',
-      center: [-74.5, 40], // Default center
-      zoom: 9,
-      attributionControl: false,
-      preserveDrawingBuffer: true
-    });
+    // Initialize with provider-specific dark style
+    if (this.getActiveProviderName() === 'mapbox') {
+      await this.activeProvider.initialize(this.containerId, {
+        style: 'mapbox://styles/mapbox/dark-v11',
+        center: { lat: 40.5852602, lng: -105.0749801 },
+        zoom: 9,
+        attributionControl: false,
+        preserveDrawingBuffer: true
+      });
+    } else {
+      // Google Maps initialization
+      await this.activeProvider.initialize(this.containerId, {
+        center: { lat: 40.5852602, lng: -105.0749801 },
+        zoom: 9,
+        darkMode: true
+      });
+    }
 
     // Add controls after initialization
-    this.activeProvider.addControls({
-      navigation: true,
-      geolocate: true,
-      scale: true
-    });
+    if (typeof this.activeProvider.addControls === 'function') {
+      this.activeProvider.addControls({
+        navigation: true,
+        geolocate: true,
+        scale: true
+      });
+    }
 
     // Restore state if exists
     if (this.state.center) {
-      this.setCenter(this.state.center);
+      this.activeProvider.setCenter?.(this.state.center);
     }
     if (this.state.zoom) {
-      this.setZoom(this.state.zoom);
+      this.activeProvider.setZoom?.(this.state.zoom);
     }
     // Restore markers and routes
-    this.restoreState();
+    await this.restoreState();
   }
 
   async switchProvider(provider: MapProvider): Promise<void> {

@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { getServerSession } from 'next-auth';
 import { SessionProvider } from 'next-auth/react';
 import { headers } from 'next/headers';
+import { ThemeProvider } from 'next-themes'
 
 export const viewport: Viewport = {
   themeColor: '#0F172A',
@@ -64,7 +65,7 @@ export default async function RootLayout({
   const session = await getServerSession(authOptions);
 
   return (
-    <html lang="en" className={`${montserrat.variable} ${inter.variable}`}>
+    <html lang="en" className={`${montserrat.variable} ${inter.variable}`} suppressHydrationWarning>
       <head>
         <link 
           rel="preload" 
@@ -73,9 +74,16 @@ export default async function RootLayout({
         />
       </head>
       <body className="antialiased bg-background-primary text-text-primary">
-        <Providers session={session}>
-          {children}
-        </Providers>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem={true}
+          disableTransitionOnChange
+        >
+          <Providers session={session}>
+            {children}
+          </Providers>
+        </ThemeProvider>
       </body>
     </html>
   );

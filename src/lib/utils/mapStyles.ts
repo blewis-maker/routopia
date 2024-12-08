@@ -32,3 +32,71 @@ export const getTrafficStyle = (congestion: 'low' | 'moderate' | 'heavy'): MapSt
   width: 4,
   opacity: 0.8
 });
+
+// Map styles for light and dark modes
+export const mapStyles = {
+  light: [
+    {
+      featureType: 'all',
+      elementType: 'geometry',
+      stylers: [{ color: '#f5f5f5' }]
+    },
+    {
+      featureType: 'road',
+      elementType: 'geometry',
+      stylers: [{ color: '#ffffff' }]
+    },
+    {
+      featureType: 'water',
+      elementType: 'geometry',
+      stylers: [{ color: '#c9c9c9' }]
+    },
+    {
+      featureType: 'poi',
+      elementType: 'geometry',
+      stylers: [{ color: '#e8e8e8' }]
+    },
+    {
+      featureType: 'transit',
+      elementType: 'geometry',
+      stylers: [{ color: '#e8e8e8' }]
+    }
+  ],
+  dark: [
+    {
+      featureType: 'all',
+      elementType: 'geometry',
+      stylers: [{ color: '#1c1917' }]
+    },
+    {
+      featureType: 'road',
+      elementType: 'geometry',
+      stylers: [{ color: '#292524' }]
+    },
+    {
+      featureType: 'road',
+      elementType: 'labels.text.fill',
+      stylers: [{ color: '#a8a29e' }]
+    },
+    {
+      featureType: 'water',
+      elementType: 'geometry',
+      stylers: [{ color: '#0c0a09' }]
+    },
+    {
+      featureType: 'poi',
+      elementType: 'geometry',
+      stylers: [{ color: '#292524' }]
+    },
+    {
+      featureType: 'transit',
+      elementType: 'geometry',
+      stylers: [{ color: '#292524' }]
+    },
+    {
+      featureType: 'landscape',
+      elementType: 'labels.text.fill',
+      stylers: [{ color: '#a8a29e' }]
+    }
+  ]
+};

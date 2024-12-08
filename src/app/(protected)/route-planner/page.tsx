@@ -10,6 +10,7 @@ import { SearchBox } from '@/components/navigation/SearchBox';
 import ChatWindow from '@/components/chat/ChatWindow';
 import Image from 'next/image';
 import { Coordinates } from '@/services/maps/MapServiceInterface';
+import { useTheme } from 'next-themes';
 
 interface WeatherInfo {
   location: string;
@@ -43,6 +44,8 @@ export default function RoutePlannerPage() {
     type: 'assistant',
     content: "I'm here to help you plan routes in Colorado. Where would you like to go?"
   }]);
+
+  const { theme } = useTheme();
 
   // Auto-scroll chat to bottom when new messages arrive
   useEffect(() => {
@@ -167,6 +170,7 @@ export default function RoutePlannerPage() {
           showWeather={!!weatherInfo}
           showElevation={!!mainRoute}
           showUserLocation={true}
+          darkMode={theme === 'dark'}
         />
 
         {/* Search Box Overlay */}

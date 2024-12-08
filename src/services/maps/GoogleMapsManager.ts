@@ -9,58 +9,241 @@ import {
   MapServiceInterface 
 } from './MapServiceInterface';
 import { mapUtils } from '@/lib/utils';
-import { ACTIVITY_COLORS, getActivityStyle, getTrafficStyle } from '@/lib/utils/mapStyles';
+import { ACTIVITY_COLORS, getActivityStyle, getTrafficStyle, mapStyles } from '@/lib/utils/mapStyles';
 import { RouteVisualizationData, ActivityType, TrafficSegment } from '@/types/maps';
+import GoogleMapsLoader from './GoogleMapsLoader';
 
 export class GoogleMapsManager implements MapServiceInterface {
   private map: google.maps.Map | null = null;
   private markers: Map<string, google.maps.Marker> = new Map();
   private currentRoute: google.maps.Polyline | null = null;
-  private loader: Loader;
   private trafficLayer: google.maps.TrafficLayer | null = null;
   private trafficIncidentsLayer: google.maps.visualization.HeatmapLayer | null = null;
   private directionsService: google.maps.DirectionsService | null = null;
   private placesService: google.maps.places.PlacesService | null = null;
+  private userLocationMarker: google.maps.Marker | null = null;
 
   constructor() {
-    const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
-    if (!googleMapsKey) {
-      throw new Error('Google Maps API key not found');
-    }
-
-    this.loader = new Loader({
-      apiKey: googleMapsKey,
-      version: 'weekly',
-      libraries: ['places', 'visualization', 'geometry']
-    });
+    // Remove the loader initialization as we'll use GoogleMapsLoader
   }
 
-  async initialize(containerId: string, options?: {
+  async initialize(containerId: string, options?: { 
     style?: string;
     center?: Coordinates;
     zoom?: number;
-    attributionControl?: boolean;
-    preserveDrawingBuffer?: boolean;
+    darkMode?: boolean;
   }): Promise<void> {
-    await this.loader.load();
-    const container = document.getElementById(containerId);
-    if (!container) throw new Error('Map container not found');
+    console.log('Initializing map with options:', options);
+    const google = await GoogleMapsLoader.getInstance().load();
 
-    const defaultCenter = { lat: 40.5852602, lng: -105.0749801 }; // Default center
-    
-    this.map = new google.maps.Map(container, {
-      center: options?.center || defaultCenter,
-      zoom: options?.zoom || 12,
-      mapTypeControl: true,
-      streetViewControl: true,
-      fullscreenControl: true
-    });
+    const element = document.getElementById(containerId);
+    if (!element) throw new Error('Container element not found');
+
+    const mapOptions: google.maps.MapOptions = {
+      center: options?.center ?? { lat: 40.5852602, lng: -105.0749801 },
+      zoom: options?.zoom ?? 12,
+      styles: [
+        { elementType: "geometry", stylers: [{ color: "#1a1a1a" }] },
+        { elementType: "labels.text.stroke", stylers: [{ color: "#1a1a1a" }] },
+        { elementType: "labels.text.fill", stylers: [{ color: "#a8a29e" }] },
+        {
+          featureType: "administrative.locality",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#14b8a6" }],
+        },
+        {
+          featureType: "poi",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#a8a29e" }],
+        },
+        {
+          featureType: "poi.park",
+          elementType: "geometry",
+          stylers: [{ color: "#115e59" }],
+        },
+        {
+          featureType: "poi.park",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#2dd4bf" }],
+        },
+        {
+          featureType: "road",
+          elementType: "geometry",
+          stylers: [{ color: "#262626" }],
+        },
+        {
+          featureType: "road",
+          elementType: "geometry.stroke",
+          stylers: [{ color: "#1a1a1a" }],
+        },
+        {
+          featureType: "road",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#d4d4d4" }],
+        },
+        {
+          featureType: "road.highway",
+          elementType: "geometry",
+          stylers: [{ color: "#404040" }],
+        },
+        {
+          featureType: "road.highway",
+          elementType: "geometry.stroke",
+          stylers: [{ color: "#1f2937" }],
+        },
+        {
+          featureType: "road.highway",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#f5f5f5" }],
+        },
+        {
+          featureType: "transit",
+          elementType: "geometry",
+          stylers: [{ color: "#262626" }],
+        },
+        {
+          featureType: "transit.station",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#14b8a6" }],
+        },
+        {
+          featureType: "water",
+          elementType: "geometry",
+          stylers: [{ color: "#083344" }],
+        },
+        {
+          featureType: "water",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#0ea5e9" }],
+        },
+        {
+          featureType: "water",
+          elementType: "labels.text.stroke",
+          stylers: [{ color: "#1a1a1a" }],
+        },
+      ],
+      disableDefaultUI: true,
+      zoomControl: true,
+      mapTypeControl: false,
+      scaleControl: true,
+      streetViewControl: false,
+      rotateControl: false,
+      fullscreenControl: false
+    };
+
+    this.map = new google.maps.Map(element, mapOptions);
 
     // Initialize services
     if (this.map) {
       this.directionsService = new google.maps.DirectionsService();
       this.placesService = new google.maps.places.PlacesService(this.map);
     }
+  }
+
+  getMap(): google.maps.Map | null {
+    return this.map;
+  }
+
+  addClickListener(callback: (coords: Coordinates) => void): void {
+    if (!this.map) return;
+    this.map.addListener('click', (e: google.maps.MapMouseEvent) => {
+      if (e.latLng) {
+        callback({
+          lat: e.latLng.lat(),
+          lng: e.latLng.lng()
+        });
+      }
+    });
+  }
+
+  async addUserLocationMarker(location: Coordinates): Promise<void> {
+    if (!this.map) return;
+
+    // Remove existing marker if any
+    if (this.userLocationMarker) {
+      this.userLocationMarker.setMap(null);
+    }
+
+    // Create marker with a small transparent icon
+    const marker = new google.maps.Marker({
+      position: location,
+      map: this.map,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 0,
+        fillOpacity: 0,
+        strokeOpacity: 0
+      }
+    });
+
+    // Create the pulse effect overlay
+    const overlay = new google.maps.OverlayView();
+    
+    overlay.onAdd = function() {
+      const div = document.createElement('div');
+      div.style.position = 'absolute';
+      div.style.width = '18px';
+      div.style.height = '18px';
+      div.innerHTML = `
+        <div style="
+          position: relative;
+          width: 100%;
+          height: 100%;
+        ">
+          <div style="
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: #10b981;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+          "></div>
+          <div style="
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: rgba(16, 185, 129, 0.4);
+            border-radius: 50%;
+            animation: pulse 2s ease-out infinite;
+          "></div>
+        </div>
+      `;
+
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes pulse {
+          0% { transform: scale(1); opacity: 1; }
+          100% { transform: scale(3); opacity: 0; }
+        }
+      `;
+      document.head.appendChild(style);
+
+      this.div = div;
+      const panes = this.getPanes();
+      panes.overlayImage.appendChild(div);
+    };
+
+    overlay.draw = function() {
+      const overlayProjection = this.getProjection();
+      const position = overlayProjection.fromLatLngToDivPixel(location);
+      
+      const div = this.div;
+      if (div && position) {
+        div.style.left = (position.x - 9) + 'px';
+        div.style.top = (position.y - 9) + 'px';
+      }
+    };
+
+    overlay.onRemove = function() {
+      if (this.div) {
+        this.div.parentNode?.removeChild(this.div);
+        delete this.div;
+      }
+    };
+
+    overlay.setMap(this.map);
+    this.userLocationMarker = marker;
   }
 
   setCenter(coordinates: Coordinates): void {
@@ -73,15 +256,41 @@ export class GoogleMapsManager implements MapServiceInterface {
     this.map.setZoom(level);
   }
 
-  async addMarker(coordinates: Coordinates, options?: { type?: 'start' | 'end' | 'waypoint' }): Promise<string> {
+  async addMarker(
+    coordinates: Coordinates, 
+    options?: { 
+      type?: 'start' | 'end' | 'waypoint';
+      draggable?: boolean;
+      icon?: string;
+      onClick?: () => void;
+      onDragEnd?: (coords: Coordinates) => void;
+    }
+  ): string {
     if (!this.map) throw new Error('Map not initialized');
 
     const markerId = `marker-${Date.now()}`;
     const marker = new google.maps.Marker({
       position: coordinates,
       map: this.map,
-      icon: this.getMarkerIcon(options?.type)
+      icon: this.getMarkerIcon(options?.type),
+      draggable: options?.draggable
     });
+
+    if (options?.onClick) {
+      marker.addListener('click', options.onClick);
+    }
+
+    if (options?.onDragEnd) {
+      marker.addListener('dragend', () => {
+        const position = marker.getPosition();
+        if (position) {
+          options.onDragEnd?.({
+            lat: position.lat(),
+            lng: position.lng()
+          });
+        }
+      });
+    }
 
     this.markers.set(markerId, marker);
     return markerId;
@@ -184,34 +393,26 @@ export class GoogleMapsManager implements MapServiceInterface {
     }
   }
 
-  async getTrafficData(): Promise<{
-    congestionLevel: 'low' | 'medium' | 'high';
-    incidents: Array<{
-      type: string;
-      description: string;
-      location: Coordinates;
-    }>;
-  }> {
+  async getTrafficData(bounds: MapBounds): Promise<TrafficData> {
     if (!this.map) throw new Error('Map not initialized');
 
     try {
-      // Get traffic data from Google Maps Roads API
-      const bounds = this.map.getBounds();
-      if (!bounds) throw new Error('Map bounds not available');
-
       const response = await fetch(
         `https://roads.googleapis.com/v1/snapToRoads?path=${bounds.getNorthEast().lat()},${bounds.getNorthEast().lng()}|${bounds.getSouthWest().lat()},${bounds.getSouthWest().lng()}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`
       );
 
       const data = await response.json();
-
-      // Process and analyze traffic data
       const congestionLevel = this.analyzeCongestionLevel(data);
       const incidents = await this.fetchTrafficIncidents(bounds);
 
       return {
         congestionLevel,
-        incidents
+        incidents: incidents.map(incident => ({
+          ...incident,
+          severity: this.determineSeverity(incident),
+          startTime: new Date(),
+          endTime: new Date(Date.now() + 3600000) // 1 hour from now
+        }))
       };
     } catch (error) {
       console.error('Failed to fetch traffic data:', error);
@@ -222,10 +423,16 @@ export class GoogleMapsManager implements MapServiceInterface {
     }
   }
 
+  private determineSeverity(incident: any): 'low' | 'moderate' | 'heavy' {
+    // Add logic to determine severity based on incident type/data
+    return 'moderate';
+  }
+
   private async fetchTrafficIncidents(bounds: google.maps.LatLngBounds): Promise<Array<{
     type: string;
     description: string;
     location: Coordinates;
+    severity: 'low' | 'moderate' | 'heavy';
   }>> {
     // Use Google Maps JavaScript API to get traffic incidents
     const service = new google.maps.TrafficService();
@@ -246,20 +453,28 @@ export class GoogleMapsManager implements MapServiceInterface {
           location: {
             lat: incident.location.lat(),
             lng: incident.location.lng()
-          }
+          },
+          severity: this.determineSeverity(incident)
         })));
       });
     });
   }
 
-  private analyzeCongestionLevel(data: any): 'low' | 'medium' | 'high' {
-    // Analyze traffic data to determine congestion level
-    const speeds = data.snappedPoints?.map((point: any) => point.placeId) || [];
+  private analyzeCongestionLevel(data: {
+    snappedPoints?: Array<{
+      placeId: number;
+      location: {
+        latitude: number;
+        longitude: number;
+      };
+    }>;
+  }): 'low' | 'moderate' | 'heavy' {
+    const speeds = data.snappedPoints?.map(point => point.placeId) || [];
     const avgSpeed = speeds.reduce((sum: number, speed: number) => sum + speed, 0) / speeds.length;
 
     if (avgSpeed > 45) return 'low';
-    if (avgSpeed > 25) return 'medium';
-    return 'high';
+    if (avgSpeed > 25) return 'moderate';
+    return 'heavy';
   }
 
   private visualizeIncidents(trafficData: { incidents: Array<{ location: Coordinates }> }): void {
@@ -490,5 +705,18 @@ export class GoogleMapsManager implements MapServiceInterface {
 
     // Process and return traffic segments
     return this.processTrafficResponse(result);
+  }
+
+  cleanup(): void {
+    if (this.map) {
+      google.maps.event.clearInstanceListeners(this.map);
+    }
+    if (this.userLocationMarker) {
+      this.userLocationMarker.setMap(null);
+    }
+    this.markers.forEach(marker => {
+      marker.setMap(null);
+    });
+    this.markers.clear();
   }
 } 

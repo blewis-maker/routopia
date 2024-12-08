@@ -3,7 +3,7 @@ import { Loader } from '@googlemaps/js-api-loader';
 class GoogleMapsLoader {
   private static instance: GoogleMapsLoader;
   private loader: Loader;
-  private loadPromise: Promise<void> | null = null;
+  private loadPromise: Promise<typeof google> | null = null;
 
   private constructor() {
     const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
@@ -14,8 +14,7 @@ class GoogleMapsLoader {
     this.loader = new Loader({
       apiKey: googleMapsKey,
       version: 'weekly',
-      libraries: ['places', 'visualization', 'geometry'],
-      id: '__googleMapsScriptId'
+      libraries: ['places', 'visualization', 'geometry']
     });
   }
 
@@ -26,7 +25,7 @@ class GoogleMapsLoader {
     return GoogleMapsLoader.instance;
   }
 
-  public async load(): Promise<void> {
+  public async load(): Promise<typeof google> {
     if (!this.loadPromise) {
       this.loadPromise = this.loader.load();
     }
