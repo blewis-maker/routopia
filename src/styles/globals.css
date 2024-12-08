@@ -102,6 +102,47 @@
            focus:ring-2 focus:ring-neutral-500/50
            transition-all duration-200;
   }
+
+  /* Dashboard Layout Components */
+  .dashboard-layout {
+    @apply min-h-screen bg-stone-950;
+  }
+
+  .dashboard-layout__container {
+    @apply flex pt-16;
+  }
+
+  .dashboard-layout__sidebar {
+    @apply fixed top-16 left-0 bottom-0
+           w-64 bg-stone-900
+           border-r border-stone-800;
+  }
+
+  .dashboard-layout__main {
+    @apply flex-1 ml-64 p-6;
+  }
+
+  /* Dashboard Page Components */
+  .dashboard {
+    @apply flex gap-6;
+  }
+
+  .dashboard__main {
+    @apply flex-1;
+  }
+
+  .dashboard__sidebar {
+    @apply w-80 space-y-6;
+  }
+
+  /* Dashboard Cards */
+  .dashboard-card {
+    @apply p-6 rounded-xl 
+           bg-stone-900/50 backdrop-blur-sm
+           border border-stone-800
+           hover:bg-stone-900/70 
+           transition-colors duration-200;
+  }
 }
 
 @layer utilities {

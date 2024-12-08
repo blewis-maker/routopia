@@ -51,6 +51,14 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith('/route-planner') || 
+          url.startsWith('/activity-hub') || 
+          url.startsWith('/poi-explorer')) {
+        return url;
+      }
+      return `${baseUrl}/route-planner`;
+    },
   },
   pages: {
     signIn: '/',

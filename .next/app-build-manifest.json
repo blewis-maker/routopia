@@ -1,25 +1,26 @@
 {
   "pages": {
-    "/api/auth/[...nextauth]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/[...nextauth]/route.js"
-    ],
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/(marketing)/layout": [
+    "/(protected)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(marketing)/layout.js"
+      "static/chunks/app/(protected)/layout.js"
     ],
-    "/(marketing)/page": [
+    "/(protected)/route-planner/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(marketing)/page.js"
+      "static/chunks/app/(protected)/route-planner/layout.js"
+    ],
+    "/(protected)/route-planner/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/(protected)/route-planner/page.css",
+      "static/chunks/app/(protected)/route-planner/page.js"
     ],
     "/_not-found/page": [
       "static/chunks/webpack.js",
