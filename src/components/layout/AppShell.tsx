@@ -8,9 +8,13 @@ import { useSession } from 'next-auth/react';
 
 interface AppShellProps {
   children: ReactNode;
+  variant?: 'default' | 'marketing';
 }
 
-export default function AppShell({ children }: AppShellProps) {
+export default function AppShell({ 
+  children, 
+  variant = 'default' 
+}: AppShellProps) {
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
   const isLandingPage = pathname === '/';
@@ -21,17 +25,19 @@ export default function AppShell({ children }: AppShellProps) {
     return () => clearTimeout(timer);
   }, []);
 
+  const shellClassName = `app-shell ${
+    variant === 'marketing' ? 'app-shell--marketing' : ''
+  } ${mounted ? 'opacity-100' : 'opacity-0'}`;
+
   return (
-    <div className={`app-shell ${isLandingPage ? 'app-shell--marketing' : ''} ${
-      mounted ? 'opacity-100' : 'opacity-0'
-    }`}>
+    <div className={shellClassName}>
       <NavigationBar 
         className={mounted ? 'opacity-100' : 'opacity-0'}
-        isLandingPage={isLandingPage}
+        isLandingPage={variant === 'marketing'}
         user={session?.user}
       />
       
-      <main className={`app-shell__main ${isLandingPage ? '' : 'pt-16'}`}>
+      <main className={`app-shell__main ${variant === 'marketing' ? '' : 'pt-16'}`}>
         {children}
       </main>
 

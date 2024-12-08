@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { RoutePlannerPage } from '@/app/(dashboard)/route-planner/page'
+import { RoutePlannerPage } from '@/app/(protected)/route-planner/page'
 import { routeService } from '@/services/api/routes'
 import { weatherService } from '@/services/weather/client'
 

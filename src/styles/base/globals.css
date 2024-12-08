@@ -1,29 +1,48 @@
+/* Tailwind Directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import 'mapbox-gl/dist/mapbox-gl.css';
+
+/* Theme Imports */
+@import '../theme/variables.css';
+
+/* Base Styles */
+@import './typography.css';
+@import './animations.css';
+
+/* Utils */
+@import '../utils/effects.css';
+
+/* Component Styles */
 @import '../components/layout/NavigationBar.css';
 @import '../components/layout/AppShell.css';
 
+/* External CSS */
+@import 'mapbox-gl/dist/mapbox-gl.css';
+
+/* Base Layer */
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 20 14.3% 4.1%;
+  html {
+    @apply antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+    scroll-behavior: smooth;
   }
 
   body {
     @apply bg-stone-950 text-stone-50;
   }
+
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  ::-webkit-scrollbar {
+    display: none;
+  }
 }
 
-.mapboxgl-map {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 100% !important;
-  height: 100% !important;
-}
-
+/* Map Styles */
+.mapboxgl-map,
 .mapboxgl-canvas {
   position: absolute;
   top: 0;
@@ -39,15 +58,6 @@
   animation: bounce 1.5s ease-in-out infinite;
 }
 
-.custom-marker img {
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
 .marker-pulse {
   width: 24px;
   height: 24px;
@@ -58,244 +68,4 @@
   left: 50%;
   transform: translate(-50%, -50%);
   animation: pulse 2s ease-out infinite;
-}
-
-@keyframes bounce {
-  0%, 100% {
-    transform: translate(-50%, -50%);
-  }
-  50% {
-    transform: translate(-50%, -65%);
-  }
-}
-
-@keyframes pulse {
-  0% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(3);
-    opacity: 0;
-  }
-}
-
-@keyframes pulse-teal {
-  0% {
-    box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(20, 184, 166, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(20, 184, 166, 0);
-  }
-}
-
-.animate-pulse-teal:hover {
-  animation: pulse-teal 2s infinite;
-}
-
-@keyframes bounce-subtle {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-.animate-bounce-subtle:hover {
-  animation: bounce-subtle 1s ease-in-out infinite;
-}
-
-@keyframes text-pulse {
-  0% {
-    text-shadow: 0 0 0 rgba(20, 184, 166, 0);
-  }
-  50% {
-    text-shadow: 0 0 15px rgba(45, 212, 191, 0.8),  /* teal-400 */
-                 0 0 30px rgba(20, 184, 166, 0.6),   /* teal-500 */
-                 0 0 45px rgba(13, 148, 136, 0.4);   /* teal-600 */
-  }
-  100% {
-    text-shadow: 0 0 0 rgba(20, 184, 166, 0);
-  }
-}
-
-.animate-text-pulse:hover {
-  animation: text-pulse 2s infinite;
-}
-
-@keyframes logo-pulse {
-  0% {
-    filter: drop-shadow(0 0 0 rgba(20, 184, 166, 0));
-  }
-  50% {
-    filter: drop-shadow(0 0 2px rgba(45, 212, 191, 0.6))
-           drop-shadow(0 0 4px rgba(20, 184, 166, 0.4))
-           drop-shadow(0 0 8px rgba(13, 148, 136, 0.2));
-  }
-  100% {
-    filter: drop-shadow(0 0 0 rgba(20, 184, 166, 0));
-  }
-}
-
-@keyframes logo-pulse-large {
-  0% {
-    filter: drop-shadow(0 0 0 rgba(20, 184, 166, 0));
-  }
-  50% {
-    filter: drop-shadow(0 0 4px rgba(45, 212, 191, 0.8))
-           drop-shadow(0 0 8px rgba(20, 184, 166, 0.6))
-           drop-shadow(0 0 16px rgba(13, 148, 136, 0.4));
-  }
-  100% {
-    filter: drop-shadow(0 0 0 rgba(20, 184, 166, 0));
-  }
-}
-
-.animate-logo-active {
-  animation: bounce-subtle 1s ease-in-out infinite, logo-pulse 2s infinite;
-}
-
-.animate-logo-active-large {
-  animation: bounce-subtle 1s ease-in-out infinite, logo-pulse-large 2s infinite;
-}
-
-@keyframes text-glow {
-  0%, 100% {
-    filter: drop-shadow(0 0 0 rgba(45, 212, 191, 0));
-  }
-  50% {
-    filter: drop-shadow(0 0 2px rgba(45, 212, 191, 0.6))
-           drop-shadow(0 0 4px rgba(16, 185, 129, 0.4));
-  }
-}
-
-.animate-text-glow:hover {
-  animation: text-glow 2s ease-in-out infinite;
-}
-
-.animate-logo-hover:hover {
-  animation: bounce-subtle 1s ease-in-out infinite, text-glow 2s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-@keyframes shine {
-  0% { background-position: 200% center; }
-  100% { background-position: -200% center; }
-}
-
-@keyframes scale {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
-
-.animate-float {
-  animation: float 3s ease-in-out infinite;
-}
-
-.animate-shine {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.1),
-    transparent
-  );
-  background-size: 200% 100%;
-  animation: shine 3s linear infinite;
-}
-
-.animate-scale {
-  animation: scale 2s ease-in-out infinite;
-}
-
-/* Responsive Typography */
-@screen sm {
-  .text-responsive {
-    font-size: clamp(1rem, 2vw + 0.5rem, 1.25rem);
-  }
-}
-
-/* Glass Effect */
-.glass-effect {
-  @apply backdrop-blur-md bg-stone-900/80 border border-stone-700;
-}
-
-/* Hover Effects */
-.hover-lift {
-  @apply transition-transform duration-300 hover:-translate-y-1;
-}
-
-.hover-glow {
-  @apply transition-shadow duration-300 hover:shadow-lg hover:shadow-teal-500/20;
-}
-
-/* Hide scrollbar for Chrome, Safari and Opera */
-::-webkit-scrollbar {
-  display: none;
-}
-
-/* Hide scrollbar for IE, Edge and Firefox */
-html {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
-}
-
-/* Smooth scroll behavior */
-html {
-  scroll-behavior: smooth;
-}
-
-.marketing-gradient {
-  @apply bg-gradient-to-r from-teal-400 to-emerald-400;
-}
-
-.marketing-text-gradient {
-  @apply text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400;
-}
-
-.glass-nav {
-  @apply bg-stone-900/80 backdrop-blur-md border-b border-stone-800;
-}
-
-.transparent-nav {
-  @apply bg-transparent;
-}
-
-@layer utilities {
-  .marketing-gradient {
-    @apply bg-gradient-to-r from-teal-400 to-emerald-400;
-  }
-
-  .marketing-text-gradient {
-    @apply text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400;
-  }
-
-  .glass-effect {
-    @apply bg-stone-900/80 backdrop-blur-md border-b border-stone-800;
-  }
-}
-
-/* Add these utility classes if not already present */
-.btn-primary {
-  @apply px-6 py-3 rounded-lg
-         bg-gradient-to-r from-teal-400 to-emerald-400
-         text-white font-semibold
-         hover:from-teal-500 hover:to-emerald-500
-         transition-all duration-300
-         shadow-lg hover:shadow-teal-500/25;
-}
-
-.glass-effect {
-  @apply backdrop-blur-md bg-stone-900/80 border-b border-stone-800;
-}
-
-.marketing-text-gradient {
-  @apply text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400;
 }

@@ -27,8 +27,8 @@ export default function LandingPage() {
   return (
     <div className="relative">
       {/* Hero Section */}
-      <div className={`relative min-h-screen transition-opacity duration-500 ${
-        mounted ? 'opacity-100' : 'opacity-0'
+      <div className={`relative min-h-screen transition-all duration-700 ease-out ${
+        mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
       }`}>
         {/* Video Background */}
         <VideoBackground videoUrl="/hero-bg.mp4" />
@@ -38,37 +38,37 @@ export default function LandingPage() {
           <div className="max-w-3xl mx-auto">
             <Heading 
               level={1}
-              className="mb-6 font-montserrat marketing-text-gradient"
+              className="mb-6 font-montserrat text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight"
             >
-              Discover Your Perfect Route
+              <span className="text-gradient-brand">Discover</span>{' '}
+              <span className="text-white">Your Perfect Route</span>
             </Heading>
 
             <Text 
               variant="xl"
-              className="mb-8 text-neutral-300 max-w-2xl mx-auto"
+              className="mb-12 text-neutral-300 max-w-2xl mx-auto font-light leading-relaxed"
             >
               AI-powered route planning that adapts to your preferences, weather conditions, and points of interest.
             </Text>
 
             <button
               onClick={() => setIsSignUpOpen(true)}
-              className="btn-primary"
+              className="btn-primary px-8 py-4 text-lg rounded-xl bg-gradient-brand hover:opacity-90 transition-all duration-200"
             >
               Get Started
             </button>
           </div>
 
-          {/* Learn More Arrow */}
+          {/* Learn More Arrow - Updated animation */}
           <button 
             onClick={scrollToLearnMore}
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 text-neutral-400 hover:text-neutral-200 transition-colors flex flex-col items-center gap-2"
+            className="absolute bottom-8 left-1/2 -translate-x-1/2 text-neutral-400 hover:text-neutral-200 transition-all duration-300 flex flex-col items-center gap-3 group"
           >
-            <Text variant="sm">Learn More</Text>
-            <div className="w-6 h-6 border-b-2 border-r-2 border-current rotate-45 animate-bounce-slow" />
+            <Text variant="sm" className="tracking-wider uppercase">Learn More</Text>
+            <div className="w-6 h-6 border-b-2 border-r-2 border-current rotate-45 animate-bounce-slow group-hover:border-white" />
           </button>
         </div>
 
-        {/* Sign Up Modal */}
         <SignUpModal 
           isOpen={isSignUpOpen}
           onClose={() => setIsSignUpOpen(false)}

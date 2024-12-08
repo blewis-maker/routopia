@@ -20,6 +20,21 @@
   }
 }
 
+@layer components {
+  .btn-primary {
+    @apply px-6 py-3 rounded-lg
+           bg-gradient-to-r from-teal-400 to-emerald-400
+           text-white font-semibold
+           hover:from-teal-500 hover:to-emerald-500
+           transition-all duration-300
+           shadow-lg hover:shadow-teal-500/25;
+  }
+
+  .glass-effect {
+    @apply backdrop-blur-md bg-stone-900/80 border-b border-stone-800;
+  }
+}
+
 @layer utilities {
   .bg-gradient-brand {
     @apply bg-gradient-to-r from-teal-400 to-emerald-400;
@@ -27,5 +42,9 @@
 
   .text-gradient-brand {
     @apply text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400;
+  }
+
+  .marketing-text-gradient {
+    @apply text-transparent bg-clip-text bg-gradient-brand;
   }
 } 

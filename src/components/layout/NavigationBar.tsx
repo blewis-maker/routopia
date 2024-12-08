@@ -7,6 +7,7 @@ import { User, Menu, X } from 'lucide-react';
 import SignUpModal from '@/components/SignUpModal';
 import { useTheme } from '@/styles/theme';
 import { signIn, signOut } from 'next-auth/react';
+import Logo from '@/assets/icons/routopia-logo.png';
 
 interface NavigationBarProps {
   user?: {
@@ -46,9 +47,10 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
             <Link href="/" className="nav-bar__logo group">
               <div className="relative w-8 h-8">
                 <Image
-                  src="/routopia-logo.png"
-                  alt="Routopia"
-                  fill
+                  src={Logo}
+                  alt="Routopia Logo"
+                  width={36}
+                  height={36}
                   className="nav-bar__logo-image group-hover:scale-110"
                   priority
                 />

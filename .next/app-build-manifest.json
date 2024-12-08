@@ -6,21 +6,15 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/(protected)/layout": [
+    "/(marketing)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(protected)/layout.js"
+      "static/chunks/app/(marketing)/layout.js"
     ],
-    "/(protected)/route-planner/layout": [
+    "/(marketing)/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(protected)/route-planner/layout.js"
-    ],
-    "/(protected)/route-planner/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/(protected)/route-planner/page.css",
-      "static/chunks/app/(protected)/route-planner/page.js"
+      "static/chunks/app/(marketing)/page.js"
     ],
     "/_not-found/page": [
       "static/chunks/webpack.js",

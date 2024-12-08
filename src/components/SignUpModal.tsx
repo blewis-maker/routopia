@@ -4,6 +4,9 @@ import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import { X } from 'lucide-react';
+import GoogleIcon from '@/assets/icons/social/google.svg';
+import AppleIcon from '@/assets/icons/social/apple.svg';
+import Image from 'next/image';
 
 interface SignUpModalProps {
   isOpen: boolean;
@@ -60,14 +63,26 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
             disabled={isLoading}
             className="w-full flex items-center justify-center gap-2 bg-white text-stone-900 rounded-lg p-3 font-medium hover:bg-stone-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <img src="/google.svg" alt="Google" className="w-5 h-5" />
+            <Image 
+              src={GoogleIcon} 
+              alt="Google" 
+              width={20} 
+              height={20} 
+              className="w-5 h-5" 
+            />
             Continue with Google
           </button>
 
           <button
             className="w-full mt-3 flex items-center justify-center gap-2 bg-black text-white border border-stone-700 rounded-lg p-3 font-medium hover:bg-stone-800 transition-colors"
           >
-            <img src="/apple.svg" alt="Apple" className="w-5 h-5" />
+            <Image 
+              src={AppleIcon} 
+              alt="Apple" 
+              width={20} 
+              height={20} 
+              className="w-5 h-5" 
+            />
             Continue with Apple
           </button>
 

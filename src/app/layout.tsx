@@ -1,13 +1,11 @@
-import '@/styles/base/globals.css';
-import '@/styles/base/typography.css';
-import '@/styles/components/layout/AppShell.css';
-import '@/styles/components/layout/NavigationBar.css';
+import '@/styles/main.css';
 import { Providers } from '@/app/providers';
 import { Metadata, Viewport } from 'next';
 import { montserrat, inter } from './fonts';
 import { authOptions } from '@/lib/auth';
 import { getServerSession } from 'next-auth';
 import { SessionProvider } from 'next-auth/react';
+import { headers } from 'next/headers';
 
 export const viewport: Viewport = {
   themeColor: '#0F172A',
@@ -22,29 +20,34 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/favicon-16x16.png',
+        url: '/icons/favicon-16x16.png',
         sizes: '16x16',
         type: 'image/png',
       },
       {
-        url: '/favicon-32x32.png',
+        url: '/icons/favicon-32x32.png',
         sizes: '32x32',
         type: 'image/png',
       },
       {
-        url: '/icon-192.png',
+        url: '/icons/icon-144x144.png',
+        sizes: '144x144',
+        type: 'image/png',
+      },
+      {
+        url: '/icons/icon-192.png',
         sizes: '192x192',
         type: 'image/png',
       },
       {
-        url: '/icon-512.png',
+        url: '/icons/icon-512.png',
         sizes: '512x512',
         type: 'image/png',
       },
     ],
     apple: [
       {
-        url: '/apple-touch-icon.png',
+        url: '/icons/apple-touch-icon.png',
         sizes: '180x180',
         type: 'image/png',
       },
@@ -62,6 +65,13 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className={`${montserrat.variable} ${inter.variable}`}>
+      <head>
+        <link 
+          rel="preload" 
+          href="/_next/static/css/app/layout.css" 
+          as="style"
+        />
+      </head>
       <body className="antialiased bg-background-primary text-text-primary">
         <Providers session={session}>
           {children}

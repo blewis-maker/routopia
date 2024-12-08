@@ -1,0 +1,33 @@
+/* Theme Variables */
+:root {
+  --color-primary: theme('colors.teal.400');
+  --color-primary-dark: theme('colors.teal.500');
+  --color-primary-light: theme('colors.teal.300');
+  
+  --color-secondary: theme('colors.emerald.400');
+  --color-secondary-dark: theme('colors.emerald.500');
+  --color-secondary-light: theme('colors.emerald.300');
+}
+
+.dark {
+  --color-primary: theme('colors.teal.500');
+  --color-primary-dark: theme('colors.teal.600');
+  --color-primary-light: theme('colors.teal.400');
+  
+  --color-secondary: theme('colors.emerald.500');
+  --color-secondary-dark: theme('colors.emerald.600');
+  --color-secondary-light: theme('colors.emerald.400');
+}
+
+/* Brand Gradients */
+.bg-gradient-brand {
+  @apply bg-gradient-to-r from-teal-400 to-emerald-400;
+}
+
+.text-gradient-brand {
+  @apply text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400;
+}
+
+.marketing-text-gradient {
+  @apply text-transparent bg-clip-text bg-gradient-brand;
+} 

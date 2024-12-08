@@ -1,0 +1,41 @@
+/* Base Tailwind and Layer Directives */
+@import './base/tailwind.css';
+
+/* Regular CSS Imports */
+@import './base/typography.css';
+@import './base/animations.css';
+@import './utils/effects.css';
+@import './components/layout/NavigationBar.css';
+@import './components/layout/AppShell.css';
+
+/* Map Styles */
+.mapboxgl-map,
+.mapboxgl-canvas {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.custom-marker {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  animation: bounce 1.5s ease-in-out infinite;
+}
+
+.marker-pulse {
+  width: 24px;
+  height: 24px;
+  background: rgba(45, 212, 191, 0.4);
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: pulse 2s ease-out infinite;
+}
+
+/* External CSS - Must come last */
+@import 'mapbox-gl/dist/mapbox-gl.css';

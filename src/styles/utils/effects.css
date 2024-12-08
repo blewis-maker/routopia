@@ -1,0 +1,21 @@
+/* Glass Effects */
+.glass-effect {
+  @apply backdrop-blur-md bg-stone-900/80 border border-stone-700;
+}
+
+.glass-nav {
+  @apply bg-stone-900/80 backdrop-blur-md border-b border-stone-800;
+}
+
+.transparent-nav {
+  @apply bg-transparent;
+}
+
+/* Hover Effects */
+.hover-lift {
+  @apply transition-transform duration-300 hover:-translate-y-1;
+}
+
+.hover-glow {
+  @apply transition-shadow duration-300 hover:shadow-lg hover:shadow-teal-500/20;
+} 
