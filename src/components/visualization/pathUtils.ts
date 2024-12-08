@@ -12,8 +12,12 @@ interface FlowPoint {
 export const smoothPath = (points: Position[], smoothness: number = 0.5): string => {
   if (points.length < 2) return '';
   
-  // Convert to 2D points for easier handling
-  const path2D = points.map(p => ({ x: p[0], y: p[1] }));
+  // Convert to 2D points for easier handling and add default flow
+  const path2D = points.map(p => ({ 
+    x: p[0], 
+    y: p[1],
+    flow: 1.0 // Default flow intensity
+  }));
   
   // Calculate control points for natural river bends
   const controlPoints = generateRiverControlPoints(path2D, smoothness);

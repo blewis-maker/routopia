@@ -37,6 +37,7 @@ const config: StorybookConfig = {
       ENABLE_EMAIL_VERIFICATION: process.env.ENABLE_EMAIL_VERIFICATION,
       ENABLE_PASSWORD_RESET: process.env.ENABLE_PASSWORD_RESET,
       NODE_ENV: process.env.NODE_ENV || 'development',
+      STORYBOOK_MAPBOX_TOKEN: process.env.STORYBOOK_MAPBOX_TOKEN,
     }
   },
   core: {
