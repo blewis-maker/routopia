@@ -20,6 +20,43 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/auth/[...nextauth]/route.js"
+    ],
+    "/(protected)/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(protected)/layout.js"
+    ],
+    "/(protected)/route-planner/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(protected)/route-planner/layout.js"
+    ],
+    "/(protected)/route-planner/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/(protected)/route-planner/page.css",
+      "static/chunks/app/(protected)/route-planner/page.js"
+    ],
+    "/(protected)/activity-hub/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(protected)/activity-hub/layout.js"
+    ],
+    "/(protected)/activity-hub/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(protected)/activity-hub/page.js"
+    ],
+    "/(protected)/poi-explorer/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(protected)/poi-explorer/layout.js"
+    ],
+    "/(protected)/poi-explorer/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/(protected)/poi-explorer/page.css",
+      "static/chunks/app/(protected)/poi-explorer/page.js"
     ]
   }
 }

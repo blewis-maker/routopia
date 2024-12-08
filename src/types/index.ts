@@ -23,7 +23,8 @@ export interface MapState {
 
 export interface SearchResult {
   id: string;
-  place_name: string;
+  name: string;
   coordinates: [number, number];
-  type: 'address' | 'poi' | 'place';
+  type?: string;
+  distance?: number;
 } 

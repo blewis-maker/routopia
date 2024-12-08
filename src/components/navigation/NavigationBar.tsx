@@ -70,13 +70,13 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                   >
                     Route Planner
                   </Link>
-                  <Link
+                  <Link 
                     href="/activity-hub"
                     className="text-stone-300 hover:text-white transition-colors duration-200 font-medium"
                   >
                     Activity Hub
                   </Link>
-                  <Link
+                  <Link 
                     href="/poi-explorer"
                     className="text-stone-300 hover:text-white transition-colors duration-200 font-medium"
                   >
@@ -197,5 +197,5 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
         onClose={() => setIsSignUpOpen(false)}
       />
     </>
-  ); 
+  );
 };

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { NavigationBar } from './NavigationBar';
+import { NavigationBar } from '../navigation/NavigationBar';
 
 const meta: Meta<typeof NavigationBar> = {
   title: 'Layout/NavigationBar',

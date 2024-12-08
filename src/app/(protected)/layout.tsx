@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import DashboardLayoutClient from '@/components/layout/DashboardLayoutClient';
+import { DashboardLayoutClient } from '@/components/layout/DashboardLayoutClient';
 
 export default async function ProtectedLayout({
   children,
@@ -15,7 +15,7 @@ export default async function ProtectedLayout({
   }
 
   return (
-    <DashboardLayoutClient user={session.user}>
+    <DashboardLayoutClient>
       {children}
     </DashboardLayoutClient>
   );

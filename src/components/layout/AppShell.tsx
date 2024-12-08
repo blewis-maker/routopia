@@ -1,45 +1,35 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
-import { NavigationBar } from './NavigationBar';
-import CommandPalette from './CommandPalette';
+import { ReactNode } from 'react';
+import { NavigationBar } from '@/components/navigation/NavigationBar';
+import { CommandPalette } from '@/components/navigation/CommandPalette';
 import { useSession } from 'next-auth/react';
+
+type AppShellVariant = 'default' | 'marketing';
 
 interface AppShellProps {
   children: ReactNode;
-  variant?: 'default' | 'marketing';
+  variant?: AppShellVariant;
 }
 
-export default function AppShell({ 
-  children, 
-  variant = 'default' 
-}: AppShellProps) {
-  const [mounted, setMounted] = useState(false);
-  const pathname = usePathname();
-  const isLandingPage = pathname === '/';
+const AppShell = ({ children, variant = 'default' }: AppShellProps) => {
   const { data: session } = useSession();
-
-  useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 100);
-    return () => clearTimeout(timer);
-  }, []);
+  const isLandingPage = variant === 'marketing';
 
   return (
-    <div className={`app-shell scrollbar-none ${
-      variant === 'marketing' ? 'app-shell--marketing' : ''
-    } ${mounted ? 'opacity-100' : 'opacity-0'}`}>
+    <div className={`app-shell ${isLandingPage ? 'app-shell--marketing' : ''}`}>
       <NavigationBar 
-        className={mounted ? 'opacity-100' : 'opacity-0'}
-        isLandingPage={variant === 'marketing'}
         user={session?.user}
+        isLandingPage={isLandingPage}
       />
-      
-      <main className={`app-shell__main scrollbar-none ${variant === 'marketing' ? '' : 'pt-16'}`}>
+      <main className={`app-shell__main ${!isLandingPage ? 'pt-16' : ''}`}>
         {children}
       </main>
-
-      {mounted && <CommandPalette />}
+      {session && <CommandPalette />}
     </div>
   );
-} 
+};
+
+AppShell.displayName = 'AppShell';
+
+export default AppShell; 

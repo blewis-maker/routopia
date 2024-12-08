@@ -7,8 +7,10 @@ export default function RoutePlannerLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="route-planner-layout">
-      {children}
-    </div>
+    <AppShell>
+      <div className="route-planner-layout">
+        {children}
+      </div>
+    </AppShell>
   );
 } 

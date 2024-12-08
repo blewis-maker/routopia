@@ -39,7 +39,7 @@ const commands: CommandItem[] = [
   },
 ];
 
-export default function CommandPalette() {
+export function CommandPalette() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const router = useRouter();

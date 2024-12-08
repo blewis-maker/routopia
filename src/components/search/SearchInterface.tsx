@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useSpring, animated } from '@react-spring/web';
-import { useDebounce } from '@/hooks/useDebounce';
+import { useDebounceCallback } from '@/hooks/useDebounce';
 import type { SearchResult } from '@/types/search';
 
 interface Props {
@@ -24,7 +24,7 @@ export const SearchInterface: React.FC<Props> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const debouncedSearch = useDebounce(async (searchQuery: string) => {
+  const debouncedSearch = useDebounceCallback(async (searchQuery: string) => {
     if (searchQuery.length < 2) {
       setResults([]);
       return;
