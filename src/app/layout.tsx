@@ -1,10 +1,13 @@
-import '@/styles';
+import '@/styles/base/globals.css';
+import '@/styles/base/typography.css';
+import '@/styles/components/layout/AppShell.css';
+import '@/styles/components/layout/NavigationBar.css';
 import { Providers } from '@/app/providers';
 import { Metadata, Viewport } from 'next';
 import { montserrat, inter } from './fonts';
+import { authOptions } from '@/lib/auth';
 import { getServerSession } from 'next-auth';
-import { authOptions } from './api/auth/[...nextauth]/route';
-import AppShell from '@/components/layout/AppShell';
+import { SessionProvider } from 'next-auth/react';
 
 export const viewport: Viewport = {
   themeColor: '#0F172A',
@@ -60,8 +63,8 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${montserrat.variable} ${inter.variable}`}>
       <body className="antialiased bg-background-primary text-text-primary">
-        <Providers>
-          <AppShell>{children}</AppShell>
+        <Providers session={session}>
+          {children}
         </Providers>
       </body>
     </html>

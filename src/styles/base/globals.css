@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 @import 'mapbox-gl/dist/mapbox-gl.css';
+@import '../components/layout/NavigationBar.css';
+@import '../components/layout/AppShell.css';
 
 @layer base {
   :root {
@@ -248,4 +250,52 @@ html {
 /* Smooth scroll behavior */
 html {
   scroll-behavior: smooth;
+}
+
+.marketing-gradient {
+  @apply bg-gradient-to-r from-teal-400 to-emerald-400;
+}
+
+.marketing-text-gradient {
+  @apply text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400;
+}
+
+.glass-nav {
+  @apply bg-stone-900/80 backdrop-blur-md border-b border-stone-800;
+}
+
+.transparent-nav {
+  @apply bg-transparent;
+}
+
+@layer utilities {
+  .marketing-gradient {
+    @apply bg-gradient-to-r from-teal-400 to-emerald-400;
+  }
+
+  .marketing-text-gradient {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400;
+  }
+
+  .glass-effect {
+    @apply bg-stone-900/80 backdrop-blur-md border-b border-stone-800;
+  }
+}
+
+/* Add these utility classes if not already present */
+.btn-primary {
+  @apply px-6 py-3 rounded-lg
+         bg-gradient-to-r from-teal-400 to-emerald-400
+         text-white font-semibold
+         hover:from-teal-500 hover:to-emerald-500
+         transition-all duration-300
+         shadow-lg hover:shadow-teal-500/25;
+}
+
+.glass-effect {
+  @apply backdrop-blur-md bg-stone-900/80 border-b border-stone-800;
+}
+
+.marketing-text-gradient {
+  @apply text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400;
 }
