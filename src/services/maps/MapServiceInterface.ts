@@ -16,16 +16,15 @@ export interface TrafficOptions {
   showAlternatives: boolean;
 }
 
+// Visual activity types (what users see)
+export type UIActivityType = 'drive' | 'bike' | 'run' | 'ski' | 'adventure';
+
+// Actual activity types (what Google Maps uses)
+export type GoogleActivityType = 'car' | 'bike' | 'walk';
+
 export interface RouteOptions {
-  activityType: 'car' | 'bike' | 'walk';
-  showTraffic?: boolean;
-  showAlternatives?: boolean;
-  isInteractive?: boolean;
-  style?: {
-    color?: string;
-    width?: number;
-    opacity?: number;
-  };
+  activityType?: GoogleActivityType;
+  alternatives?: boolean;
 }
 
 export interface RouteVisualization {

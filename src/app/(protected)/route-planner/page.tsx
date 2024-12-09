@@ -19,6 +19,7 @@ import { Route } from '@/types/route/types';
 import { AIChat } from '@/components/chat/AIChat';
 import { ChatMessage } from '@/types/chat/types';
 import { ChatSuggestion } from '@/types/chat/types';
+import { GoogleActivityType, UIActivityType } from '@/services/maps/MapServiceInterface';
 
 interface WeatherInfo {
   location: string;
@@ -56,6 +57,22 @@ const formatDistance = (meters: number): string => {
   }
 };
 
+const mapActivityTypeToGoogle = (type: UIActivityType): GoogleActivityType => {
+  switch (type) {
+    case 'drive':
+      return 'car';
+    case 'bike':
+      return 'bike';
+    case 'run':
+      return 'walk';
+    // For now, map unsupported types to car
+    case 'ski':
+    case 'adventure':
+    default:
+      return 'car';
+  }
+};
+
 export default function RoutePlannerPage() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [userLocation, setUserLocation] = useState<Location | null>(null);
@@ -76,12 +93,11 @@ export default function RoutePlannerPage() {
   const [routeType, setRouteType] = useState<'drive' | 'bike' | 'run' | 'ski' | 'adventure'>('drive');
 
   const handleChatMessage = async (message: string) => {
-    let controller: AbortController | null = new AbortController();
+    const abortController = new AbortController();
     
     try {
       setIsGenerating(true);
       setMessages(prev => [...prev, { type: 'user', content: message }]);
-      setMessages(prev => [...prev, { type: 'assistant', content: '...' }]);
 
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -99,70 +115,56 @@ export default function RoutePlannerPage() {
             } : null
           }
         }),
-        signal: controller.signal
+        signal: abortController.signal
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to process request');
 
-      // Remove typing indicator
-      setMessages(prev => {
-        const newMessages = prev.filter(msg => msg.content !== '...');
-        return [...newMessages, { 
-          type: 'assistant', 
-          content: data.message
-        }];
-      });
+      setMessages(prev => [...prev, { 
+        type: 'assistant', 
+        content: data.message
+      }]);
 
       // If we have a suggestion, update the destination and generate route
       if (data.suggestion) {
-        // Create a destination object that matches the search box format
-        const destinationInfo = {
-          coordinates: [data.suggestion.location.lng, data.suggestion.location.lat],
-          formatted_address: data.suggestion.name,
-          place_name: data.suggestion.name,
-          place_id: `suggestion-${Date.now()}` // Add a unique ID
-        };
-
         try {
-          // Update the destination using the search box handler
-          await handleDestinationSelect(destinationInfo);
-          
-          // After destination is set, add to route
-          await handleAddToRoute(data.suggestion);
+          // First update the destination location state
+          setDestinationLocation({
+            coordinates: [data.suggestion.location.lng, data.suggestion.location.lat],
+            address: data.suggestion.name
+          });
+
+          // Then generate the route
+          if (userLocation) {
+            await generateRoute(
+              userLocation.coordinates,
+              [data.suggestion.location.lng, data.suggestion.location.lat]
+            );
+          }
+
         } catch (error) {
-          console.error('Failed to update destination:', error);
+          console.error('Failed to handle suggestion:', error);
           setMessages(prev => [...prev, {
             type: 'assistant',
-            content: 'I found a location but had trouble setting it as the destination. Please try again.'
+            content: 'I found a location but had trouble setting up the route. Please try again.'
           }]);
         }
       }
 
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        setMessages(prev => prev.filter(msg => msg.content !== '...'));
-      } else {
-        console.error('Chat error:', error);
-        setMessages(prev => {
-          const newMessages = prev.filter(msg => msg.content !== '...');
-          return [...newMessages, {
-            type: 'assistant',
-            content: error instanceof Error ? 
-              `I apologize, but I encountered an error: ${error.message}` : 
-              'I apologize, but I encountered an unexpected error.'
-          }];
-        });
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
       }
+      console.error('Chat error:', error);
+      setMessages(prev => [...prev, {
+        type: 'assistant',
+        content: error instanceof Error ? 
+          `I apologize, but I encountered an error: ${error.message}` : 
+          'I apologize, but I encountered an unexpected error.'
+      }]);
     } finally {
       setIsGenerating(false);
-      controller = null;
-    }
-  };
-
-  const handleCancelGeneration = () => {
-    if (controller) {
-      controller.abort();
     }
   };
 
@@ -179,62 +181,66 @@ export default function RoutePlannerPage() {
 
   // Generate route function
   const generateRoute = async (start: [number, number], end: [number, number]) => {
+    if (!mapServiceRef.current) {
+      console.error('Map service not initialized');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      if (!mapServiceRef.current) {
-        console.error('Map service not initialized');
-        return;
-      }
+      // Clear existing routes and markers
+      mapServiceRef.current.clearRoute();
 
       const startCoords = { lat: start[1], lng: start[0] };
       const endCoords = { lat: end[1], lng: end[0] };
+      
+      const googleActivityType = mapActivityTypeToGoogle(routeType);
       
       const routeVisualization = await mapServiceRef.current.generateRoute(
         startCoords,
         endCoords,
         {
-          activityType: 'car',
+          activityType: googleActivityType,
           alternatives: true
         }
       );
 
+      if (!routeVisualization || !routeVisualization.mainRoute) {
+        throw new Error('Failed to generate route visualization');
+      }
+
       await mapServiceRef.current.drawRoute(routeVisualization, {
-        activityType: 'car',
-        showTraffic: true,
-        showAlternatives: true,
-        isInteractive: true
+        activityType: googleActivityType,
+        alternatives: true
       });
 
-      // Set mainRoute state with route information
-      if (routeVisualization.mainRoute) {
-        const route: Route = {
-          id: 'generated-route',
-          name: `Route to ${destinationLocation?.address || 'destination'}`,
-          segments: [{
-            startPoint: {
-              latitude: start[1],
-              longitude: start[0]
-            },
-            endPoint: {
-              latitude: end[1],
-              longitude: end[0]
-            },
-            distance: routeVisualization.mainRoute.distance || 0,
-            duration: routeVisualization.mainRoute.duration || 0
-          }],
-          totalMetrics: {
-            distance: routeVisualization.mainRoute.distance || 0,
-            duration: routeVisualization.mainRoute.duration || 0
+      // Update mainRoute state
+      const route: Route = {
+        id: 'generated-route',
+        name: `Route to ${destinationLocation?.address || 'destination'}`,
+        segments: [{
+          startPoint: {
+            latitude: start[1],
+            longitude: start[0]
           },
-          ...(routeVisualization.alternatives && {
-            alternatives: routeVisualization.alternatives
-          })
-        };
-        setMainRoute(route);
-      }
+          endPoint: {
+            latitude: end[1],
+            longitude: end[0]
+          },
+          distance: routeVisualization.mainRoute.distance || 0,
+          duration: routeVisualization.mainRoute.duration || 0
+        }],
+        totalMetrics: {
+          distance: routeVisualization.mainRoute.distance || 0,
+          duration: routeVisualization.mainRoute.duration || 0
+        },
+        alternatives: routeVisualization.alternatives || []
+      };
+      setMainRoute(route);
 
     } catch (error) {
       console.error('Failed to generate route:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -493,7 +499,6 @@ export default function RoutePlannerPage() {
 
       // Clear existing routes and markers
       mapServiceRef.current.clearRoute();
-      mapServiceRef.current.clearDirectionsRenderer();
 
       // Create a destination object that matches the search box format
       const destinationInfo = {
@@ -510,26 +515,20 @@ export default function RoutePlannerPage() {
         throw new Error('Failed to update destination');
       }
 
-      // Generate route from current location to suggestion
+      const googleActivityType = mapActivityTypeToGoogle(routeType);
+      
       const routeVisualization = await mapServiceRef.current.generateRoute(
         { lat: userLocation.coordinates[1], lng: userLocation.coordinates[0] },
         suggestion.location,
         {
-          activityType: 'car',
+          activityType: googleActivityType,
           alternatives: true
         }
       );
 
-      if (!routeVisualization || !routeVisualization.mainRoute) {
-        throw new Error('Failed to generate route visualization');
-      }
-
-      // Draw the route
       await mapServiceRef.current.drawRoute(routeVisualization, {
-        activityType: 'car',
-        showTraffic: true,
-        showAlternatives: true,
-        isInteractive: true
+        activityType: googleActivityType,
+        alternatives: true
       });
 
       // Update mainRoute state
@@ -589,6 +588,7 @@ export default function RoutePlannerPage() {
               weatherData={weatherData}
               onViewSuggestion={handleViewOnMap}
               onAddToRoute={handleAddToRoute}
+              isGenerating={isGenerating}
             />
           </div>
         </div>

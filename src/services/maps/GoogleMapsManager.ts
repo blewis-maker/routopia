@@ -608,46 +608,34 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   public clearRoute(): void {
-    // Clear directions renderer
-    this.clearDirectionsRenderer();
-
-    // Clear alternative routes renderers
-    this.alternativeRenderers.forEach(renderer => {
-      if (renderer) renderer.setMap(null);
-    });
-    this.alternativeRenderers = [];
-
-    // Clear end marker and its overlay
-    if (this.currentMarkers.end) {
-      this.currentMarkers.end.setMap(null);
-      this.currentMarkers.end = null;
-    }
-
-    // Clear all overlays except start marker's
-    this.currentMarkers.overlays.forEach(overlay => {
-      if (overlay) overlay.setMap(null);
-    });
-    this.currentMarkers.overlays.clear();
-
-    // Clear any polylines
+    // Clear existing route
     if (this.currentRoute) {
       this.currentRoute.setMap(null);
       this.currentRoute = null;
     }
 
-    // Re-add start marker's pulse if it exists
-    if (this.currentMarkers.start) {
-      const position = this.currentMarkers.start.getPosition();
-      if (position) {
-        const overlay = this.createPulsingMarker(
-          { lat: position.lat(), lng: position.lng() },
-          '#10b981'
-        );
-        this.currentMarkers.overlays.add(overlay);
-      }
-    }
+    // Clear alternative routes
+    this.alternativeRoutes.forEach(route => route.setMap(null));
+    this.alternativeRoutes = [];
 
-    this.clearSuggestions();
+    // Clear markers
+    this.currentMarkers.start?.setMap(null);
+    this.currentMarkers.end?.setMap(null);
+    this.currentMarkers.start = null;
+    this.currentMarkers.end = null;
+
+    // Clear overlays
+    this.currentMarkers.overlays.forEach(overlay => overlay.setMap(null));
+    this.currentMarkers.overlays.clear();
+
+    // Clear suggestion markers
+    this.clearSuggestionMarkers();
+
+    // Clear directions renderer
+    if (this.directionsRenderer) {
+      this.directionsRenderer.setMap(null);
+      this.directionsRenderer = null;
+    }
   }
 
   public async setTrafficLayer(visible: boolean): Promise<void> {
@@ -1412,8 +1400,10 @@ export class GoogleMapsManager implements MapServiceInterface {
     }
   }
 
-  private clearSuggestionMarkers() {
+  private clearSuggestionMarkers(): void {
     this.suggestionMarkers.forEach(marker => marker.setMap(null));
     this.suggestionMarkers.clear();
+    this.suggestionOverlays.forEach(overlay => overlay.setMap(null));
+    this.suggestionOverlays.clear();
   }
 } 

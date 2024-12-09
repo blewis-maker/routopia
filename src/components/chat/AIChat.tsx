@@ -14,6 +14,7 @@ interface AIChatProps {
   } | null;
   onViewSuggestion: (suggestion: ChatSuggestion) => void;
   onAddToRoute: (suggestion: ChatSuggestion) => void;
+  isGenerating: boolean;
 }
 
 export function AIChat({
@@ -23,12 +24,12 @@ export function AIChat({
   destinationLocation,
   weatherData,
   onViewSuggestion,
-  onAddToRoute
+  onAddToRoute,
+  isGenerating
 }: AIChatProps) {
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [routeType, setRouteType] = useState<'drive' | 'bike' | 'run' | 'ski' | 'adventure'>('drive');
+  const [routeType, setRouteType] = useState<'Drive' | 'Bike' | 'Run' | 'Ski' | 'Adventure'>('Drive');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,107 +57,52 @@ export function AIChat({
         </div>
       </div>
 
-      {/* Generation Status Bar */}
-      {isGenerating && (
-        <div className="flex items-center justify-between px-4 py-1 bg-stone-800/30 border-b border-stone-700/30">
-          <div className="flex items-center gap-2 text-xs text-stone-400">
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            <span>Generating...</span>
-          </div>
-          <button 
-            onClick={() => {/* Add cancel logic */}}
-            className="text-xs text-stone-400 hover:text-stone-300"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto space-y-4 p-4">
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} px-2`}
-          >
-            {/* Message Bubble */}
+      {/* Messages Container - Cursor-like styling */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="flex flex-col justify-end min-h-full p-4 space-y-4">
+          {messages.map((message, index) => (
             <div
-              className={`max-w-[85%] rounded-lg px-4 py-2.5 ${
+              key={index}
+              className={`px-2 py-1 rounded ${
                 message.type === 'user'
-                  ? 'bg-emerald-600/10 text-emerald-200 border border-emerald-600/20'
-                  : 'bg-stone-800/50 text-stone-200 border border-stone-700/50'
+                  ? 'text-emerald-200'
+                  : 'text-stone-200'
               }`}
             >
-              {/* Typing Indicator */}
-              {message.type === 'assistant' && message.content === '...' ? (
-                <div className="flex items-center space-x-1.5 h-6 px-2">
-                  <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-pulse" />
-                  <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-pulse delay-150" />
-                  <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-pulse delay-300" />
-                </div>
-              ) : (
-                <div className="prose prose-invert prose-sm max-w-none">
-                  {message.content}
-                </div>
-              )}
-
-              {/* Suggestions - Cursor-like cards */}
-              {message.type === 'assistant' && message.suggestions?.waypoints?.length > 0 && (
-                <div className="mt-4 space-y-3">
-                  {message.suggestions.waypoints.map((suggestion, idx) => (
-                    <div 
-                      key={idx}
-                      className="bg-stone-800/70 border border-stone-700/50 rounded-lg p-3 space-y-2 hover:bg-stone-800/90 transition-colors"
-                    >
-                      <div className="flex justify-between items-start gap-4">
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-medium text-stone-100 truncate">{suggestion.name}</h4>
-                          <p className="text-xs text-stone-400 line-clamp-2">{suggestion.description}</p>
-                        </div>
-                        <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 bg-stone-700/50 text-stone-300 rounded-full">
-                          {suggestion.type}
-                        </span>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => onAddToRoute(suggestion)}
-                          className="text-xs px-3 py-1.5 bg-emerald-500/10 text-emerald-300 rounded-md hover:bg-emerald-500/20 transition-colors"
-                        >
-                          Add to Route
-                        </button>
-                        <button
-                          onClick={() => onViewSuggestion(suggestion)}
-                          className="text-xs px-3 py-1.5 bg-stone-700/50 text-stone-300 rounded-md hover:bg-stone-700/70 transition-colors"
-                        >
-                          View on Map
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {message.content}
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      {/* Route Type Selector and Input Form */}
+      {/* Input Area */}
       <div className="border-t border-stone-800/50">
-        {/* Route Type Selector */}
-        <div className="flex items-center justify-end gap-2 px-4 py-2 border-b border-stone-800/30">
-          {(['drive', 'bike', 'run', 'ski', 'adventure'] as const).map((type) => (
-            <button
-              key={type}
-              onClick={() => setRouteType(type)}
-              className={`text-xs px-2 py-1 rounded ${
-                routeType === type
-                  ? 'bg-stone-700/50 text-stone-200'
-                  : 'text-stone-400 hover:text-stone-300'
-              }`}
-            >
-              {type}
-            </button>
-          ))}
+        {/* Route Types and Loading State */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-stone-800/30">
+          {/* Loading Indicator */}
+          {isGenerating && (
+            <div className="flex items-center gap-2 text-xs text-stone-400">
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+              <span>Generating...</span>
+            </div>
+          )}
+          
+          {/* Route Types */}
+          <div className="flex items-center gap-2 ml-auto">
+            {(['Drive', 'Bike', 'Run', 'Ski', 'Adventure'] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => setRouteType(type)}
+                className={`text-xs px-2 py-1 rounded ${
+                  routeType === type
+                    ? 'bg-stone-700/50 text-stone-200'
+                    : 'text-stone-400 hover:text-stone-300'
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Input Form */}
@@ -173,6 +119,7 @@ export function AIChat({
             />
             <button
               type="submit"
+              onClick={handleSubmit}
               disabled={!inputValue.trim() || isGenerating}
               className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-stone-400 hover:text-emerald-400 disabled:opacity-30 disabled:hover:text-stone-400 transition-colors"
             >
