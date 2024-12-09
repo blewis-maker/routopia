@@ -12,3 +12,16 @@ export const env = {
   nextAuthUrl: process.env.NEXTAUTH_URL,
   nextAuthSecret: process.env.NEXTAUTH_SECRET,
 } as const; 
+
+export function validateEnv() {
+  const requiredEnvVars = ['OPENAI_API_KEY', 'OPENAI_ORG_ID'];
+  const missingEnvVars = requiredEnvVars.filter(
+    envVar => !process.env[envVar]
+  );
+
+  if (missingEnvVars.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missingEnvVars.join(', ')}`
+    );
+  }
+} 

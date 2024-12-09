@@ -1,173 +1,183 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useChat } from '@/hooks/useChat';
-import { useMapIntegration } from '@/hooks/useMapIntegration';
-import { ChatMessage } from '@/types/chat';
-import { AIContext } from '@/types/ai';
-import { RouteContext } from '@/types/route';
-import { ActivityType } from '@/types/activity';
-import { POISuggestion } from './POISuggestion';
-import { RouteSuggestion } from './RouteSuggestion';
-import logger from '@/utils/logger';
+import { useState, useRef, useEffect } from 'react';
+import { ChatMessage, RouteContext } from '@/types/chat/types';
+import { Location } from '@/types';
 
 interface AIChatProps {
-  onRouteUpdate?: (route: RouteContext) => void;
-  onActivitySelect?: (activity: ActivityType) => void;
-  className?: string;
-  initialContext?: AIContext;
+  messages: ChatMessage[];
+  onSendMessage: (message: string) => void;
+  userLocation?: Location | null;
+  destinationLocation?: Location | null;
+  weatherData?: {
+    temperature: number;
+    conditions: string;
+    windSpeed: number;
+  } | null;
 }
 
-export const AIChat: React.FC<AIChatProps> = ({
-  onRouteUpdate,
-  onActivitySelect,
-  className,
-  initialContext
-}) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [context, setContext] = useState<AIContext>(initialContext || {});
-  const { sendMessage, isProcessing } = useChat();
-  const { currentLocation } = useMapIntegration();
+export function AIChat({
+  messages,
+  onSendMessage,
+  userLocation,
+  destinationLocation,
+  weatherData
+}: AIChatProps) {
+  const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
 
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
+  };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, scrollToBottom]);
+  }, [messages]);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isProcessing) return;
+    if (!inputValue.trim()) return;
 
-    const userMessage: ChatMessage = {
-      id: `msg_${Date.now()}`,
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date().toISOString()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
+    setIsTyping(true);
+    setError(null);
 
     try {
-      const response = await sendMessage(input, {
-        route: context.route,
-        location: currentLocation || context.location
-      });
-
-      // Update context with AI response
-      if (response.context) {
-        setContext(prev => ({
-          ...prev,
-          ...response.context,
-          sessionContext: {
-            ...prev.sessionContext,
-            lastInteraction: Date.now(),
-            interactionCount: (prev.sessionContext?.interactionCount || 0) + 1
-          }
-        }));
-
-        // Handle route updates
-        if (response.context.route && onRouteUpdate) {
-          onRouteUpdate(response.context.route);
-        }
-      }
-
-      const assistantMessage: ChatMessage = {
-        id: `msg_${Date.now()}_response`,
-        role: 'assistant',
-        content: response.content,
-        timestamp: new Date().toISOString(),
-        context: {
-          route: response.context?.route,
-          location: response.context?.location,
-          suggestions: response.suggestions
-        }
+      // Create route context from current state
+      const context: Partial<RouteContext> = {
+        start: userLocation?.address || 'Current Location',
+        end: destinationLocation?.address,
+        mode: 'car',
+        timeOfDay: new Date().toLocaleTimeString(),
+        weather: weatherData ? {
+          temperature: weatherData.temperature,
+          conditions: weatherData.conditions,
+          windSpeed: weatherData.windSpeed
+        } : undefined
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
-      logger.error('Chat error:', error);
-      const errorMessage: ChatMessage = {
-        id: `msg_${Date.now()}_error`,
-        role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
-        timestamp: new Date().toISOString(),
-        context: {
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      onSendMessage(inputValue);
+      setInputValue('');
+    } catch (err) {
+      setError('Failed to send message. Please try again.');
+      console.error('Chat error:', err);
+    } finally {
+      setIsTyping(false);
     }
-  }, [input, isProcessing, context, currentLocation, sendMessage, onRouteUpdate]);
+  };
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      const form = e.currentTarget.closest('form');
-      if (form) form.requestSubmit();
+      handleSubmit(e);
     }
-  }, []);
+  };
+
+  const renderSuggestionButtons = (suggestion: any) => (
+    <div className="flex gap-2 mt-2">
+      <button
+        onClick={() => handleAddToRoute(suggestion)}
+        className="px-3 py-1 text-sm bg-emerald-600/20 text-emerald-400 rounded-full hover:bg-emerald-600/30"
+      >
+        Add to Route
+      </button>
+      <button
+        onClick={() => handleShowDetails(suggestion)}
+        className="px-3 py-1 text-sm bg-stone-700/50 text-stone-300 rounded-full hover:bg-stone-700/70"
+      >
+        Details
+      </button>
+    </div>
+  );
+
+  const handleAddToRoute = async (suggestion: any) => {
+    setSelectedSuggestion(suggestion.name);
+    // Trigger route recalculation with waypoint
+  };
+
+  const handleShowDetails = (suggestion: any) => {
+    // For now, just add the details to the chat
+    onSendMessage(`Tell me more about ${suggestion.name}`);
+  };
 
   return (
-    <div className={`flex flex-col h-full ${className || ''}`}>
+    <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
+        {messages.map((message, index) => (
           <div
-            key={message.id}
+            key={index}
             className={`flex ${
-              message.role === 'user' ? 'justify-end' : 'justify-start'
+              message.type === 'user' ? 'justify-end' : 'justify-start'
             }`}
           >
             <div
-              className={`max-w-3/4 p-3 rounded-lg ${
-                message.role === 'user'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-200 text-gray-800'
+              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                message.type === 'user'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-stone-800 text-stone-100'
               }`}
             >
               <p className="whitespace-pre-wrap">{message.content}</p>
-              {message.context?.route && (
-                <RouteSuggestion route={message.context.route} />
-              )}
-              {message.context?.suggestions && (
-                <POISuggestion
-                  suggestions={message.context.suggestions}
-                  onSelect={suggestion => setInput(prev => `${prev} ${suggestion}`)}
-                />
-              )}
             </div>
           </div>
         ))}
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="bg-stone-800 rounded-lg px-4 py-2">
+              <div className="flex space-x-2">
+                <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce delay-100" />
+                <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce delay-200" />
+              </div>
+            </div>
+          </div>
+        )}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-500">
+            {error}
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="p-4 border-t">
-        <div className="flex space-x-2">
+      <form onSubmit={handleSubmit} className="p-4 border-t border-stone-800">
+        <div className="relative">
           <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your message..."
-            className="flex-1 p-2 border rounded-lg resize-none"
+            ref={inputRef}
+            id="chat-input"
+            name="chat-message"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Ask about your route..."
+            className="w-full px-4 py-2 bg-stone-900/80 backdrop-blur-sm text-white rounded-lg border border-stone-800 focus:outline-none focus:border-emerald-500 resize-none"
             rows={1}
-            disabled={isProcessing}
+            aria-label="Chat message input"
           />
           <button
             type="submit"
-            disabled={isProcessing}
-            className={`px-4 py-2 rounded-lg ${
-              isProcessing
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-blue-500 hover:bg-blue-600'
-            } text-white`}
+            disabled={!inputValue.trim()}
+            aria-label="Send message"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-emerald-500 hover:text-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isProcessing ? 'Sending...' : 'Send'}
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+              />
+            </svg>
           </button>
         </div>
       </form>
     </div>
   );
-}; 
+} 

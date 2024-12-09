@@ -141,6 +141,8 @@ export class GoogleMapsManager implements MapServiceInterface {
     end: null as google.maps.Marker | null,
     overlays: new Set<google.maps.OverlayView>()
   };
+  private suggestionMarkers: Map<string, google.maps.Marker> = new Map();
+  private suggestionOverlays: Set<google.maps.OverlayView> = new Set();
 
   constructor() {
     // Remove the loader initialization as we'll use GoogleMapsLoader
@@ -644,6 +646,8 @@ export class GoogleMapsManager implements MapServiceInterface {
         this.currentMarkers.overlays.add(overlay);
       }
     }
+
+    this.clearSuggestions();
   }
 
   public async setTrafficLayer(visible: boolean): Promise<void> {
@@ -1350,5 +1354,99 @@ export class GoogleMapsManager implements MapServiceInterface {
       console.error('Error handling tool action:', error);
       throw error;
     }
+  }
+
+  public async visualizeSuggestions(suggestions: Array<{
+    name: string;
+    location: { lat: number; lng: number };
+    type: 'attraction' | 'rest' | 'viewpoint';
+    description: string;
+  }>) {
+    // Clear existing suggestion markers
+    this.clearSuggestions();
+
+    suggestions.forEach(async (suggestion) => {
+      const marker = await this.addMarker(
+        { lat: suggestion.location.lat, lng: suggestion.location.lng },
+        {
+          type: 'waypoint',
+          onClick: () => this.showSuggestionInfo(suggestion)
+        }
+      );
+      this.suggestionMarkers.set(suggestion.name, marker);
+    });
+  }
+
+  private showSuggestionInfo(suggestion: {
+    name: string;
+    description: string;
+    type: string;
+  }) {
+    const infoWindow = new google.maps.InfoWindow({
+      content: `
+        <div class="p-2">
+          <h3 class="font-semibold text-stone-900">${suggestion.name}</h3>
+          <p class="text-sm text-stone-600">${suggestion.description}</p>
+          <span class="text-xs text-emerald-600">${suggestion.type}</span>
+        </div>
+      `
+    });
+
+    const marker = this.suggestionMarkers.get(suggestion.name);
+    if (marker) {
+      infoWindow.open(this.map, marker);
+    }
+  }
+
+  private clearSuggestions() {
+    this.suggestionMarkers.forEach(marker => marker.setMap(null));
+    this.suggestionMarkers.clear();
+    this.suggestionOverlays.forEach(overlay => overlay.setMap(null));
+    this.suggestionOverlays.clear();
+  }
+
+  public async optimizeRouteWithWaypoints(
+    route: RouteVisualization,
+    waypoints: Array<{ location: Coordinates; stopover: boolean }>
+  ): Promise<RouteVisualization> {
+    const request: google.maps.DirectionsRequest = {
+      origin: route.waypoints.start,
+      destination: route.waypoints.end,
+      waypoints: waypoints,
+      optimizeWaypoints: true,
+      travelMode: google.maps.TravelMode.DRIVING
+    };
+
+    // Calculate optimized route
+    const result = await this.directionsService?.route(request);
+    return this.processDirectionsResult(result);
+  }
+
+  private visualizeOptimizedRoute(
+    route: google.maps.DirectionsResult,
+    waypoints: Array<{ name: string; type: string }>
+  ): void {
+    // Clear existing route
+    this.clearRoute();
+
+    // Draw main route with waypoints
+    this.directionsRenderer = new google.maps.DirectionsRenderer({
+      map: this.map,
+      directions: route,
+      suppressMarkers: true,
+      polylineOptions: {
+        strokeColor: '#A78BFA',
+        strokeOpacity: 0.75,
+        strokeWeight: 4
+      }
+    });
+
+    // Add custom markers for waypoints
+    waypoints.forEach((waypoint, index) => {
+      this.addWaypointMarker(
+        route.routes[0].legs[index].start_location,
+        waypoint
+      );
+    });
   }
 } 

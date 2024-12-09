@@ -71,6 +71,7 @@ export default async function RootLayout({
           rel="preload" 
           href="/_next/static/css/app/layout.css" 
           as="style"
+          crossOrigin="anonymous"
         />
       </head>
       <body className="antialiased bg-background-primary text-text-primary">

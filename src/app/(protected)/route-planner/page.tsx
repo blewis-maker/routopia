@@ -16,6 +16,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { Clock, Map } from 'lucide-react';
 import { Route } from '@/types/route/types';
+import { AIChat } from '@/components/chat/AIChat';
+import { ChatMessage } from '@/types/chat/types';
 
 interface WeatherInfo {
   location: string;
@@ -68,40 +70,85 @@ export default function RoutePlannerPage() {
   const { theme } = useTheme();
   const [mainRoute, setMainRoute] = useState<Route | null>(null);
 
-  const [messages, setMessages] = useState<Array<{
-    type: 'user' | 'assistant';
-    content: string;
-  }>>([{
+  const [messages, setMessages] = useState<ChatMessage[]>([{
     type: 'assistant',
-    content: "I'm here to help you plan routes in Colorado. Where would you like to go?"
+    content: "Hi! I'm your Colorado route planning assistant. I can help you find places to eat, interesting stops, and provide route information. What would you like to know?"
   }]);
 
   const handleChatMessage = async (message: string) => {
     try {
+      // Add user message
       setMessages(prev => [...prev, { type: 'user', content: message }]);
+
+      // Add typing indicator
+      setMessages(prev => [...prev, { type: 'assistant', content: '...' }]);
+
+      const requestBody = {
+        message,
+        context: {
+          start: userLocation?.address || null,
+          end: destinationLocation?.address || null,
+          mode: 'car',
+          weather: weatherData ? {
+            temperature: weatherData.temperature || 0,
+            conditions: weatherData.conditions || 'unknown',
+            windSpeed: weatherData.windSpeed || 0
+          } : null,
+          route: mainRoute ? {
+            distance: mainRoute.totalMetrics?.distance || 0,
+            duration: mainRoute.totalMetrics?.duration || 0
+          } : null
+        }
+      };
+
+      console.log('Sending request:', requestBody);
 
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          userLocation
-        })
+        body: JSON.stringify(requestBody)
       });
 
-      const data = await response.json();
-      
-      setMessages(prev => [...prev, { 
-        type: 'assistant', 
-        content: data.message 
-      }]);
+      let data;
+      try {
+        const text = await response.text();
+        console.log('Raw response:', text);
+        data = JSON.parse(text);
+      } catch (error) {
+        console.error('Failed to parse response:', error);
+        throw new Error('Failed to parse server response');
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Server error');
+      }
+
+      // Remove typing indicator and add AI response
+      setMessages(prev => {
+        const newMessages = prev.filter(msg => msg.content !== '...');
+        return [...newMessages, { 
+          type: 'assistant', 
+          content: data.message || 'I apologize, but I encountered an error processing your request.'
+        }];
+      });
+
+      // Handle suggestions if any
+      if (data.suggestions?.waypoints?.length > 0 && mapServiceRef.current) {
+        await mapServiceRef.current.visualizeSuggestions(data.suggestions.waypoints);
+      }
 
     } catch (error) {
       console.error('Chat error:', error);
-      setMessages(prev => [...prev, {
-        type: 'assistant',
-        content: 'Sorry, I encountered an error processing your request.'
-      }]);
+      // Remove typing indicator and add error message
+      setMessages(prev => {
+        const newMessages = prev.filter(msg => msg.content !== '...');
+        return [...newMessages, {
+          type: 'assistant',
+          content: error instanceof Error ? 
+            `I apologize, but I encountered an error: ${error.message}` : 
+            'I apologize, but I encountered an unexpected error.'
+        }];
+      });
     }
   };
 
@@ -394,9 +441,12 @@ export default function RoutePlannerPage() {
           </div>
           
           <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
-            <ChatWindow
+            <AIChat
               messages={messages}
               onSendMessage={handleChatMessage}
+              userLocation={userLocation}
+              destinationLocation={destinationLocation}
+              weatherData={weatherData}
             />
           </div>
         </div>
