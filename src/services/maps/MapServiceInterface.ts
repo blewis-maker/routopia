@@ -17,7 +17,7 @@ export interface TrafficOptions {
 }
 
 export interface RouteOptions {
-  activityType: 'car' | 'bike' | 'ski';
+  activityType: 'car' | 'bike' | 'walk';
   showTraffic?: boolean;
   showAlternatives?: boolean;
   isInteractive?: boolean;
@@ -32,6 +32,8 @@ export interface RouteVisualization {
   mainRoute: {
     coordinates: Coordinates[];
     trafficData?: TrafficData;
+    distance?: number;
+    duration?: number;
   };
   alternatives?: Array<{
     coordinates: Coordinates[];

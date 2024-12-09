@@ -1,11 +1,25 @@
 export enum ActivityType {
-  WALK = 'WALK',
-  RUN = 'RUN',
-  BIKE = 'BIKE',
-  SKI = 'SKI',
   CAR = 'CAR',
-  PUBLIC_TRANSPORT = 'PUBLIC_TRANSPORT'
+  BIKE = 'BIKE',
+  WALK = 'WALK'
 }
+
+export const convertToRouteActivity = (activityType: ActivityType): 'car' | 'bike' | 'walk' => {
+  switch (activityType) {
+    case ActivityType.CAR:
+      return 'car';
+    case ActivityType.BIKE:
+      return 'bike';
+    case ActivityType.WALK:
+      return 'walk';
+    default:
+      return 'car';
+  }
+};
+
+export const isRoutingSupported = (activityType: ActivityType): boolean => {
+  return [ActivityType.CAR, ActivityType.BIKE, ActivityType.WALK].includes(activityType);
+};
 
 export type ActivityStats = {
   type: ActivityType;

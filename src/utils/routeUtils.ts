@@ -1,14 +1,19 @@
-import type { ActivityType } from '@/types/routes';
+import { ActivityType } from '@/types/activity';
 
-export const getActivityColor = (activity: ActivityType): string => {
-  switch (activity) {
-    case 'car': return '#3F51B5';
-    case 'bike': return '#4CAF50';
-    case 'walk': return '#FF9800';
-    case 'ski': return '#2196F3';
-    default: return '#9E9E9E';
+export const getActivityColor = (activityType: ActivityType): string => {
+  switch (activityType) {
+    case ActivityType.WALK:
+      return '#10b981'; // Emerald/teal
+    case ActivityType.BIKE:
+      return '#3b82f6'; // Blue
+    case ActivityType.CAR:
+      return '#f59e0b'; // Amber
+    default:
+      return '#10b981'; // Default to teal
   }
 };
+
+export type TrafficSeverity = 'low' | 'medium' | 'high';
 
 export const projectToCanvas = (
   coordinates: [number, number], 

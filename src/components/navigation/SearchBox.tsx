@@ -3,10 +3,10 @@ import { useDebounce } from '@/hooks/useDebounce';
 import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
 
 export interface SearchResult {
-  place_id: string;
   place_name: string;
   coordinates: [number, number];
-  description?: string;
+  business_name?: string;
+  formatted_address?: string;
 }
 
 export interface SearchBoxProps {
@@ -79,7 +79,7 @@ export function SearchBox({
             {
               input: debouncedQuery,
               componentRestrictions: { country: 'us' },
-              types: ['geocode', 'establishment']
+              types: ['establishment', 'geocode']
             },
             (results, status) => {
               if (status === google.maps.places.PlacesServiceStatus.OK && results) {
@@ -110,8 +110,9 @@ export function SearchBox({
             });
 
             return {
-              place_id: prediction.place_id,
               place_name: details.formatted_address || prediction.description,
+              business_name: details.name,
+              formatted_address: details.formatted_address,
               coordinates: [
                 details.geometry?.location?.lng() || 0,
                 details.geometry?.location?.lat() || 0
@@ -153,7 +154,6 @@ export function SearchBox({
         const address = result.results[0].formatted_address;
         setQuery(address);
         onSelect({
-          place_id: 'current_location',
           place_name: address,
           coordinates: [lng, lat]
         });
@@ -219,7 +219,7 @@ export function SearchBox({
         <div className="absolute w-full mt-2 bg-stone-800 rounded-lg shadow-lg border border-stone-700 z-50">
           {results.map((result) => (
             <button
-              key={result.place_id}
+              key={result.place_name}
               className="w-full px-4 py-2 text-left hover:bg-stone-700 first:rounded-t-lg last:rounded-b-lg"
               onClick={() => {
                 setQuery(result.place_name.split(',')[0]);
@@ -227,7 +227,14 @@ export function SearchBox({
                 setIsOpen(false);
               }}
             >
-              <div className="text-white truncate">{result.place_name}</div>
+              <div className="text-white truncate">
+                {result.business_name && (
+                  <div className="font-medium">{result.business_name}</div>
+                )}
+                <div className="text-sm text-stone-400">
+                  {result.formatted_address || result.place_name}
+                </div>
+              </div>
             </button>
           ))}
         </div>

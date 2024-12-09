@@ -4,8 +4,8 @@ import {
   MapBounds, 
   TrafficOptions, 
   RouteOptions, 
-  RouteVisualization,
-  TrafficData,
+  RouteVisualization, 
+  TrafficData, 
   MapServiceInterface 
 } from './MapServiceInterface';
 import { mapUtils } from '@/lib/utils';
@@ -24,6 +24,115 @@ export class GoogleMapsManager implements MapServiceInterface {
   private placesService: google.maps.places.PlacesService | null = null;
   private userLocationMarker: google.maps.Marker | null = null;
   private userLocationOverlay: google.maps.OverlayView | null = null;
+  private alternativeRoutes: google.maps.Polyline[] = [];
+  private trafficLayerVisible = false;
+  private directionsRenderer: google.maps.DirectionsRenderer | null = null;
+  private mapStyles = {
+    default: [
+      // Light mode - clean, modern style
+      {
+        featureType: "all",
+        elementType: "geometry",
+        stylers: [{ visibility: "simplified" }]
+      },
+      {
+        featureType: "water",
+        elementType: "geometry",
+        stylers: [{ color: "#a2daf2" }]
+      },
+      {
+        featureType: "landscape",
+        elementType: "geometry",
+        stylers: [{ color: "#f5f5f5" }]
+      },
+      {
+        featureType: "road",
+        elementType: "geometry",
+        stylers: [{ color: "#ffffff" }]
+      },
+      {
+        featureType: "road",
+        elementType: "geometry.stroke",
+        stylers: [{ color: "#e6e6e6" }]
+      },
+      {
+        featureType: "road.highway",
+        elementType: "geometry",
+        stylers: [{ color: "#ffffff" }]
+      },
+      {
+        featureType: "poi",
+        elementType: "geometry",
+        stylers: [{ color: "#e8f0f9" }]
+      },
+      {
+        featureType: "transit",
+        elementType: "geometry",
+        stylers: [{ color: "#e8f0f9" }]
+      }
+    ],
+    dark: [
+      // Dark mode - current style
+      {
+        elementType: "geometry",
+        stylers: [{ color: "#242f3e" }]
+      },
+      {
+        elementType: "labels.text.stroke",
+        stylers: [{ color: "#242f3e" }]
+      },
+      {
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#746855" }]
+      },
+      {
+        featureType: "administrative.locality",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#d59563" }]
+      },
+      {
+        featureType: "road",
+        elementType: "geometry",
+        stylers: [{ color: "#38414e" }]
+      },
+      {
+        featureType: "road",
+        elementType: "geometry.stroke",
+        stylers: [{ color: "#212a37" }]
+      },
+      {
+        featureType: "road",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#9ca5b3" }]
+      },
+      {
+        featureType: "water",
+        elementType: "geometry",
+        stylers: [{ color: "#17263c" }]
+      },
+      {
+        featureType: "water",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#515c6d" }]
+      },
+      {
+        featureType: "water",
+        elementType: "labels.text.stroke",
+        stylers: [{ color: "#17263c" }]
+      },
+      {
+        featureType: "poi",
+        elementType: "geometry",
+        stylers: [{ color: "#283d6a" }]
+      },
+      {
+        featureType: "transit",
+        elementType: "geometry",
+        stylers: [{ color: "#2f3948" }]
+      }
+    ]
+  };
+  private mapLayerDark = false;
 
   constructor() {
     // Remove the loader initialization as we'll use GoogleMapsLoader
@@ -130,7 +239,9 @@ export class GoogleMapsManager implements MapServiceInterface {
       scaleControl: true,
       streetViewControl: false,
       rotateControl: false,
-      fullscreenControl: false
+      fullscreenControl: false,
+      scrollwheel: true,
+      gestureHandling: 'greedy'
     };
 
     this.map = new google.maps.Map(element, mapOptions);
@@ -252,16 +363,16 @@ export class GoogleMapsManager implements MapServiceInterface {
     this.map.setZoom(level);
   }
 
-  async addMarker(
-    coordinates: Coordinates, 
-    options?: { 
+  addMarker(
+    coordinates: Coordinates,
+    options?: {
       type?: 'start' | 'end' | 'waypoint';
       draggable?: boolean;
       icon?: string;
       onClick?: () => void;
       onDragEnd?: (coords: Coordinates) => void;
     }
-  ): Promise<string> {
+  ): string {
     if (!this.map) throw new Error('Map not initialized');
 
     const markerId = `marker-${Date.now()}`;
@@ -300,62 +411,52 @@ export class GoogleMapsManager implements MapServiceInterface {
     }
   }
 
-  async drawRoute(
+  public async drawRoute(
     route: RouteVisualization,
     options: RouteOptions
   ): Promise<void> {
     if (!this.map || !this.directionsService) return;
 
-    // Clear any existing routes
+    // Clear existing routes and markers
     this.clearRoute();
 
     try {
-      // Convert coordinates to LatLng for Google Maps
-      const mainRoutePath = route.mainRoute.coordinates.map(coord => ({
-        lat: coord.lat,
-        lng: coord.lng
-      }));
+      const request: google.maps.DirectionsRequest = {
+        origin: route.waypoints.start,
+        destination: route.waypoints.end,
+        travelMode: google.maps.TravelMode.DRIVING,  // Force driving mode
+      };
 
-      // Create the main route polyline
-      this.currentRoute = new google.maps.Polyline({
-        path: mainRoutePath,
-        geodesic: true,
-        strokeColor: options.style?.color || '#10b981', // Default to teal
-        strokeOpacity: options.style?.opacity || 0.8,
-        strokeWeight: options.style?.width || 4,
-        map: this.map
+      const result = await new Promise<google.maps.DirectionsResult>((resolve, reject) => {
+        this.directionsService?.route(request, (response, status) => {
+          if (status === google.maps.DirectionsStatus.OK && response) {
+            resolve(response);
+          } else {
+            reject(new Error(`Directions request failed: ${status}`));
+          }
+        });
       });
 
-      // Add markers for start and end points if route is interactive
-      if (options.isInteractive && route.waypoints) {
-        await this.addMarker(route.waypoints.start, { type: 'start' });
-        await this.addMarker(route.waypoints.end, { type: 'end' });
-
-        // Add waypoint markers
-        for (const waypoint of route.waypoints.via) {
-          await this.addMarker(waypoint, { 
-            type: 'waypoint',
-            draggable: true,
-            onDragEnd: (coords) => {
-              // Recalculate route when waypoint is dragged
-              this.updateRouteWithWaypoint(coords);
-            }
-          });
+      // Use DirectionsRenderer only
+      this.directionsRenderer = new google.maps.DirectionsRenderer({
+        map: this.map,
+        directions: result,
+        suppressMarkers: true,
+        polylineOptions: {
+          strokeColor: '#FFFFFF',
+          strokeOpacity: 0.8,
+          strokeWeight: 5
         }
-      }
+      });
 
-      // Show traffic data if enabled
-      if (options.showTraffic && route.mainRoute.trafficData) {
-        await this.visualizeTrafficData(route.mainRoute.trafficData);
-      }
+      // Add markers
+      await this.addMarker(route.waypoints.start, { type: 'start' });
+      await this.addMarker(route.waypoints.end, { type: 'end' });
 
-      // Show alternative routes if enabled
-      if (options.showAlternatives && route.alternatives) {
-        this.showAlternativeRoutes(route.alternatives);
-      }
-
-      // Fit the map bounds to show the entire route
-      this.fitRouteBounds(mainRoutePath);
+      // Fit bounds
+      const bounds = new google.maps.LatLngBounds();
+      result.routes[0].overview_path.forEach(point => bounds.extend(point));
+      this.map.fitBounds(bounds);
 
     } catch (error) {
       console.error('Failed to draw route:', error);
@@ -396,13 +497,13 @@ export class GoogleMapsManager implements MapServiceInterface {
   private getTrafficColor(congestion: 'low' | 'medium' | 'high'): string {
     switch (congestion) {
       case 'low':
-        return '#22c55e'; // Green
+        return '#22c55e'; // Brighter green
       case 'medium':
-        return '#f59e0b'; // Yellow
+        return '#eab308'; // Brighter yellow
       case 'high':
-        return '#ef4444'; // Red
+        return '#ef4444'; // Brighter red
       default:
-        return '#6b7280'; // Gray
+        return '#94a3b8'; // Brighter gray
     }
   }
 
@@ -443,37 +544,46 @@ export class GoogleMapsManager implements MapServiceInterface {
     console.log('Waypoint updated:', newWaypoint);
   }
 
-  clearRoute(): void {
+  public clearRoute(): void {
+    // Clear directions renderer
+    if (this.directionsRenderer) {
+      this.directionsRenderer.setMap(null);
+      this.directionsRenderer = null;
+    }
+
+    // Clear any polylines
     if (this.currentRoute) {
       this.currentRoute.setMap(null);
       this.currentRoute = null;
     }
+
+    // Clear alternative routes
+    this.clearAlternativeRoutes();
+
+    // Clear markers
+    this.markers.forEach(marker => marker.setMap(null));
+    this.markers.clear();
   }
 
-  async setTrafficLayer(visible: boolean, options?: TrafficOptions): Promise<void> {
+  public async setTrafficLayer(visible: boolean): Promise<void> {
     if (!this.map) return;
 
-    // Handle real-time traffic layer
-    if (visible && options?.showRealTime) {
-      if (!this.trafficLayer) {
-        this.trafficLayer = new google.maps.TrafficLayer();
+    try {
+      this.trafficLayerVisible = visible;
+      
+      if (visible) {
+        if (!this.trafficLayer) {
+          this.trafficLayer = new google.maps.TrafficLayer();
+        }
+        this.trafficLayer.setMap(this.map);
+      } else {
+        if (this.trafficLayer) {
+          this.trafficLayer.setMap(null);
+        }
       }
-      this.trafficLayer.setMap(this.map);
-    } else if (this.trafficLayer) {
-      this.trafficLayer.setMap(null);
-    }
-
-    // Handle incidents if enabled
-    if (visible && options?.showIncidents) {
-      const incidents = await this.getTrafficData();
-      this.visualizeIncidents(incidents);
-    } else if (this.trafficIncidentsLayer) {
-      this.trafficIncidentsLayer.setMap(null);
-    }
-
-    // Handle alternative routes if enabled
-    if (visible && options?.showAlternatives && this.currentRoute) {
-      await this.showAlternativeRoutes(this.currentRoute.coordinates);
+    } catch (error) {
+      console.error('Error toggling traffic layer:', error);
+      throw error; // Propagate error to handle in UI
     }
   }
 
@@ -481,28 +591,20 @@ export class GoogleMapsManager implements MapServiceInterface {
     if (!this.map) throw new Error('Map not initialized');
 
     try {
-      const response = await fetch(
-        `https://roads.googleapis.com/v1/snapToRoads?path=${bounds.getNorthEast().lat()},${bounds.getNorthEast().lng()}|${bounds.getSouthWest().lat()},${bounds.getSouthWest().lng()}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`
-      );
-
-      const data = await response.json();
-      const congestionLevel = this.analyzeCongestionLevel(data);
-      const incidents = await this.fetchTrafficIncidents(bounds);
-
+      // Use Google Maps Traffic Layer instead of Roads API
+      const trafficLayer = new google.maps.TrafficLayer();
+      
       return {
-        congestionLevel,
-        incidents: incidents.map(incident => ({
-          ...incident,
-          severity: this.determineSeverity(incident),
-          startTime: new Date(),
-          endTime: new Date(Date.now() + 3600000) // 1 hour from now
-        }))
+        congestionLevel: 'medium', // Default value
+        incidents: [], // We'll implement this separately
+        segments: [] // We'll implement this separately
       };
     } catch (error) {
       console.error('Failed to fetch traffic data:', error);
       return {
         congestionLevel: 'low',
-        incidents: []
+        incidents: [],
+        segments: []
       };
     }
   }
@@ -581,68 +683,52 @@ export class GoogleMapsManager implements MapServiceInterface {
     }
   }
 
-  private getMarkerIcon(type?: 'start' | 'end' | 'waypoint'): google.maps.Symbol | undefined {
+  private getMarkerIcon(type?: 'start' | 'end' | 'waypoint'): google.maps.Symbol | google.maps.Icon {
     if (!type) return undefined;
 
     switch (type) {
       case 'start':
         return {
-          url: '/location-marker.png',
-          scaledSize: new google.maps.Size(24, 24)
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: '#10b981', // Teal
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2
         };
       case 'end':
         return {
-          url: '/destination-marker.png',
-          scaledSize: new google.maps.Size(24, 24)
-        };
-      case 'waypoint':
-        return {
-          url: '/waypoint-marker.png',
-          scaledSize: new google.maps.Size(24, 24)
+          path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
+          fillColor: '#ef4444', // Red
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+          scale: 2,
+          anchor: new google.maps.Point(12, 22)
         };
       default:
-        return undefined;
+        return {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: '#6b7280', // Gray
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2
+        };
     }
   }
 
   private getTravelMode(activityType: string): google.maps.TravelMode {
-    switch (activityType) {
+    switch (activityType.toLowerCase()) {
+      case 'car':
+        return google.maps.TravelMode.DRIVING;
       case 'bike':
         return google.maps.TravelMode.BICYCLING;
       case 'walk':
         return google.maps.TravelMode.WALKING;
       default:
+        console.warn('Unknown activity type:', activityType);
         return google.maps.TravelMode.DRIVING;
-    }
-  }
-
-  private renderRoute(
-    route: google.maps.DirectionsRoute,
-    style: {
-      color?: string;
-      width?: number;
-      opacity?: number;
-      isMain: boolean;
-    }
-  ): void {
-    if (!this.map) return;
-
-    // Clear existing route if this is the main route
-    if (style.isMain && this.currentRoute) {
-      this.currentRoute.setMap(null);
-    }
-
-    const path = new google.maps.Polyline({
-      path: route.overview_path,
-      geodesic: true,
-      strokeColor: style.color || '#3F51B5',
-      strokeOpacity: style.opacity || 1.0,
-      strokeWeight: style.width || 5,
-      map: this.map
-    });
-
-    if (style.isMain) {
-      this.currentRoute = path;
     }
   }
 
@@ -999,12 +1085,13 @@ export class GoogleMapsManager implements MapServiceInterface {
       throw new Error('Map or DirectionsService not initialized');
     }
 
+    console.log('Generating route with mode:', options?.activityType || 'car'); // Debug log
+
     const request: google.maps.DirectionsRequest = {
       origin: start,
       destination: end,
-      waypoints: options?.waypoints?.map(wp => ({ location: wp, stopover: true })),
       travelMode: this.getTravelMode(options?.activityType || 'car'),
-      provideRouteAlternatives: options?.alternatives || false
+      provideRouteAlternatives: options?.alternatives
     };
 
     try {
@@ -1018,28 +1105,17 @@ export class GoogleMapsManager implements MapServiceInterface {
         });
       });
 
-      // Convert DirectionsResult to RouteVisualization
-      const mainRoute = {
-        coordinates: this.extractCoordinates(result.routes[0].overview_path),
-        trafficData: await this.getRouteTrafficData(result.routes[0])
-      };
-
-      const alternatives = result.routes.slice(1).map(route => ({
-        coordinates: this.extractCoordinates(route.overview_path),
-        duration: route.legs[0].duration?.value || 0,
-        distance: route.legs[0].distance?.value || 0
-      }));
-
-      const waypoints = {
-        start,
-        end,
-        via: options?.waypoints || []
-      };
-
       return {
-        mainRoute,
-        alternatives: alternatives.length > 0 ? alternatives : undefined,
-        waypoints
+        mainRoute: {
+          coordinates: this.extractCoordinates(result.routes[0].overview_path),
+          distance: result.routes[0].legs[0].distance?.value,
+          duration: result.routes[0].legs[0].duration?.value
+        },
+        waypoints: {
+          start,
+          end,
+          via: options?.waypoints || []
+        }
       };
     } catch (error) {
       console.error('Failed to generate route:', error);
@@ -1072,6 +1148,38 @@ export class GoogleMapsManager implements MapServiceInterface {
     } catch (error) {
       console.error('Failed to get traffic data:', error);
       return undefined;
+    }
+  }
+
+  private clearAlternativeRoutes(): void {
+    this.alternativeRoutes.forEach(route => route.setMap(null));
+    this.alternativeRoutes = [];
+  }
+
+  public async handleToolAction(tool: 'ROUTE' | 'SEARCH' | 'TRAFFIC' | 'LAYERS'): Promise<void> {
+    if (!this.map) return;
+
+    try {
+      switch (tool) {
+        case 'LAYERS':
+          this.mapLayerDark = !this.mapLayerDark;
+          this.map.setOptions({
+            styles: this.mapLayerDark ? this.mapStyles.dark : this.mapStyles.default
+          });
+          break;
+        case 'TRAFFIC':
+          await this.setTrafficLayer(!this.trafficLayerVisible);
+          break;
+        case 'ROUTE':
+          this.clearRoute();
+          break;
+        case 'SEARCH':
+          // Search functionality will be implemented separately
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling tool action:', error);
+      throw error;
     }
   }
 } 
