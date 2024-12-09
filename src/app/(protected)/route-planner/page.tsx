@@ -14,6 +14,8 @@ import { GoogleMapsManager } from '@/services/maps/GoogleMapsManager';
 import { MapToolbar } from '@/components/map/MapToolbar';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
+import { Clock, Map } from 'lucide-react';
+import { Route } from '@/types/route/types';
 
 interface WeatherInfo {
   location: string;
@@ -29,6 +31,28 @@ interface WeatherData {
   location?: string;
 }
 
+const formatDuration = (seconds: number): string => {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes} min`;
+};
+
+const formatDistance = (meters: number): string => {
+  // Check if user is in the US (you might want to make this configurable)
+  const useImperial = true; // For US users
+  
+  if (useImperial) {
+    const miles = meters / 1609.34; // Convert meters to miles
+    return `${miles.toFixed(1)} mi`;
+  } else {
+    const km = meters / 1000;
+    return `${km.toFixed(1)} km`;
+  }
+};
+
 export default function RoutePlannerPage() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [userLocation, setUserLocation] = useState<Location | null>(null);
@@ -42,6 +66,7 @@ export default function RoutePlannerPage() {
   const [activeLayer, setActiveLayer] = useState<'ROUTE' | 'SEARCH' | 'TRAFFIC' | 'LAYERS' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { theme } = useTheme();
+  const [mainRoute, setMainRoute] = useState<Route | null>(null);
 
   const [messages, setMessages] = useState<Array<{
     type: 'user' | 'assistant';
@@ -119,6 +144,34 @@ export default function RoutePlannerPage() {
         isInteractive: true
       });
 
+      // Set mainRoute state with route information
+      if (routeVisualization.mainRoute) {
+        const route: Route = {
+          id: 'generated-route',
+          name: `Route to ${destinationLocation?.address || 'destination'}`,
+          segments: [{
+            startPoint: {
+              latitude: start[1],
+              longitude: start[0]
+            },
+            endPoint: {
+              latitude: end[1],
+              longitude: end[0]
+            },
+            distance: routeVisualization.mainRoute.distance || 0,
+            duration: routeVisualization.mainRoute.duration || 0
+          }],
+          totalMetrics: {
+            distance: routeVisualization.mainRoute.distance || 0,
+            duration: routeVisualization.mainRoute.duration || 0
+          },
+          ...(routeVisualization.alternatives && {
+            alternatives: routeVisualization.alternatives
+          })
+        };
+        setMainRoute(route);
+      }
+
     } catch (error) {
       console.error('Failed to generate route:', error);
     } finally {
@@ -142,11 +195,16 @@ export default function RoutePlannerPage() {
     if (!('coordinates' in result)) return;
     
     const [lng, lat] = result.coordinates;
-    const displayName = result.business_name || result.formatted_address || result.place_name;
+    const address = result.formatted_address || result.place_name;
+    const addressParts = address.split(',').map(part => part.trim());
+    const street = addressParts[0];
+    const city = addressParts[1];
+    const state = addressParts[2]?.split(' ')[0];
+    const displayAddress = `${street}, ${city}, ${state}`;
     
     setDestinationLocation({
       coordinates: [lng, lat],
-      address: displayName
+      address: displayAddress
     });
 
     if (userLocation) {
@@ -358,12 +416,13 @@ export default function RoutePlannerPage() {
               placeholder="Set your starting point..."
               useCurrentLocation={true}
               initialValue={userLocation?.address || ''}
-              key={userLocation?.address}
+              key={`start-${userLocation?.coordinates?.join(',')}-${Date.now()}`}
             />
             <SearchBox 
               onSelect={handleDestinationSelect}
               placeholder="Choose destination..."
               initialValue={destinationLocation?.address || ''}
+              key={`end-${destinationLocation?.coordinates?.join(',')}-${Date.now()}`}
             />
           </div>
 
@@ -377,6 +436,31 @@ export default function RoutePlannerPage() {
           {/* Loading Overlay */}
           {isLoading && (
             <LoadingOverlay message="Generating route..." />
+          )}
+
+          {mainRoute && (
+            <div className="absolute bottom-4 left-4 z-10 max-w-md">
+              <div className="bg-stone-900/90 rounded-lg p-4 backdrop-blur shadow-lg">
+                <h3 className="text-lg font-semibold text-white mb-2">Current Route</h3>
+                <div className="text-stone-300 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    <span>{formatDuration(mainRoute.totalMetrics?.duration || 0)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Map className="w-4 h-4" />
+                    <span>{formatDistance(mainRoute.totalMetrics?.distance || 0)}</span>
+                  </div>
+                  {mainRoute.alternatives?.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-stone-700">
+                      <p className="text-sm text-stone-400">
+                        {mainRoute.alternatives.length} alternative {mainRoute.alternatives.length === 1 ? 'route' : 'routes'} available
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>

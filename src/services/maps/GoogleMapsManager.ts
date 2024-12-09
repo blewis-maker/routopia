@@ -425,14 +425,14 @@ export class GoogleMapsManager implements MapServiceInterface {
   ): Promise<void> {
     if (!this.map || !this.directionsService) return;
 
-    // Clear existing routes and markers
     this.clearRoute();
 
     try {
       const request: google.maps.DirectionsRequest = {
         origin: route.waypoints.start,
         destination: route.waypoints.end,
-        travelMode: google.maps.TravelMode.DRIVING
+        travelMode: google.maps.TravelMode.DRIVING,
+        provideRouteAlternatives: true // Enable alternative routes
       };
 
       const result = await new Promise<google.maps.DirectionsResult>((resolve, reject) => {
@@ -445,16 +445,35 @@ export class GoogleMapsManager implements MapServiceInterface {
         });
       });
 
-      // Create and configure DirectionsRenderer with purple route
+      // Draw alternative routes first (so they appear under the main route)
+      if (options.showAlternatives && result.routes.length > 1) {
+        result.routes.slice(1).forEach((_, index) => {
+          new google.maps.DirectionsRenderer({
+            map: this.map,
+            directions: result,
+            routeIndex: index + 1,
+            suppressMarkers: true,
+            zIndex: 1, // Lower z-index for alternatives
+            polylineOptions: {
+              strokeColor: '#FDE68A', // Warm yellow
+              strokeOpacity: 0.6,
+              strokeWeight: 3
+            }
+          });
+        });
+      }
+
+      // Then draw main route on top
       this.directionsRenderer = new google.maps.DirectionsRenderer({
         map: this.map,
         directions: result,
+        routeIndex: 0,
         suppressMarkers: true,
+        zIndex: 2, // Higher z-index for main route
         polylineOptions: {
-          strokeColor: '#A78BFA', // Violet-400
-          strokeOpacity: 0.9,
-          strokeWeight: 4,
-          geodesic: true
+          strokeColor: '#A78BFA', // Main route in purple
+          strokeOpacity: 0.75,
+          strokeWeight: 4
         }
       });
 
@@ -569,9 +588,14 @@ export class GoogleMapsManager implements MapServiceInterface {
     // Clear alternative routes
     this.clearAlternativeRoutes();
 
-    // Clear markers
+    // Clear all markers
     this.markers.forEach(marker => marker.setMap(null));
     this.markers.clear();
+
+    // Clear any overlays (like pulsing markers)
+    if (this.map) {
+      google.maps.event.clearListeners(this.map, 'overlay');
+    }
   }
 
   public async setTrafficLayer(visible: boolean): Promise<void> {
@@ -582,17 +606,42 @@ export class GoogleMapsManager implements MapServiceInterface {
       
       if (visible) {
         if (!this.trafficLayer) {
-          this.trafficLayer = new google.maps.TrafficLayer();
+          this.trafficLayer = new google.maps.TrafficLayer({
+            autoRefresh: true
+          });
         }
         this.trafficLayer.setMap(this.map);
+        
+        // Add a slight transparency to the route to make traffic more visible
+        if (this.directionsRenderer) {
+          const currentOptions = this.directionsRenderer.getOptions();
+          this.directionsRenderer.setOptions({
+            ...currentOptions,
+            polylineOptions: {
+              ...currentOptions.polylineOptions,
+              strokeOpacity: 0.7
+            }
+          });
+        }
       } else {
         if (this.trafficLayer) {
           this.trafficLayer.setMap(null);
         }
+        // Restore route opacity
+        if (this.directionsRenderer) {
+          const currentOptions = this.directionsRenderer.getOptions();
+          this.directionsRenderer.setOptions({
+            ...currentOptions,
+            polylineOptions: {
+              ...currentOptions.polylineOptions,
+              strokeOpacity: 0.9
+            }
+          });
+        }
       }
     } catch (error) {
       console.error('Error toggling traffic layer:', error);
-      throw error; // Propagate error to handle in UI
+      throw error;
     }
   }
 
@@ -699,59 +748,58 @@ export class GoogleMapsManager implements MapServiceInterface {
       case 'start':
         return {
           path: google.maps.SymbolPath.CIRCLE,
-          scale: 10,
+          scale: 8,
           fillColor: '#10b981', // Teal
           fillOpacity: 1,
           strokeColor: '#ffffff',
-          strokeWeight: 2
+          strokeWeight: 1
         };
       case 'end':
         return {
           path: google.maps.SymbolPath.CIRCLE,
-          scale: 10,
+          scale: 8,
           fillColor: '#8B5CF6', // Violet-500
           fillOpacity: 1,
           strokeColor: '#ffffff',
-          strokeWeight: 2
+          strokeWeight: 1
         };
       default:
         return {
           path: google.maps.SymbolPath.CIRCLE,
-          scale: 8,
+          scale: 6,
           fillColor: '#6b7280', // Gray
           fillOpacity: 1,
           strokeColor: '#ffffff',
-          strokeWeight: 2
+          strokeWeight: 1
         };
     }
   }
 
   private createPulsingMarker(coordinates: Coordinates, color: string): void {
     class PulsingMarkerOverlay extends google.maps.OverlayView {
-      private div: HTMLDivElement | null = null;
-      private markerPosition: Coordinates;
-
-      constructor(position: Coordinates) {
-        super();
-        this.markerPosition = position;
-      }
-
       onAdd(): void {
         const div = document.createElement('div');
         div.style.position = 'absolute';
-        div.style.width = '18px';
-        div.style.height = '18px';
+        div.style.width = '14px';
+        div.style.height = '14px';
+
+        // Make both pulses equally bright
+        const glowIntensity = '20px';  // Increased from 15px/10px
+        const pulseOpacity = '1';      // Increased from 0.9/0.7
+        const pulseColor = color === '#8B5CF6' ? '#A78BFA' : color; // Use lighter purple for end marker pulse
+
         div.innerHTML = `
           <div style="position: relative; width: 100%; height: 100%;">
-            <div style="position: absolute; width: 18px; height: 18px; background: ${color}; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px ${color}80;"></div>
-            <div style="position: absolute; width: 18px; height: 18px; background: ${color}40; border-radius: 50%; animation: pulse 2s ease-out infinite;"></div>
+            <div style="position: absolute; width: 14px; height: 14px; background: ${color}; border: 1px solid white; border-radius: 50%; box-shadow: 0 0 ${glowIntensity} ${pulseColor}"></div>
+            <div style="position: absolute; width: 14px; height: 14px; background: ${pulseColor}40; border-radius: 50%; animation: pulse-${color.replace('#', '')} 2s ease-out infinite;"></div>
           </div>
         `;
 
         const style = document.createElement('style');
         style.textContent = `
-          @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
+          @keyframes pulse-${color.replace('#', '')} {
+            0% { transform: scale(1); opacity: ${pulseOpacity}; }
+            70% { transform: scale(2.5); opacity: 0.5; }
             100% { transform: scale(3); opacity: 0; }
           }
         `;
@@ -766,12 +814,12 @@ export class GoogleMapsManager implements MapServiceInterface {
         if (!this.div) return;
         const overlayProjection = this.getProjection();
         const position = overlayProjection.fromLatLngToDivPixel(
-          new google.maps.LatLng(this.markerPosition.lat, this.markerPosition.lng)
+          new google.maps.LatLng(coordinates.lat, coordinates.lng)
         );
         
         if (position) {
-          this.div.style.left = (position.x - 9) + 'px';
-          this.div.style.top = (position.y - 9) + 'px';
+          this.div.style.left = (position.x - 7) + 'px';
+          this.div.style.top = (position.y - 7) + 'px';
         }
       }
 
@@ -1154,13 +1202,16 @@ export class GoogleMapsManager implements MapServiceInterface {
       throw new Error('Map or DirectionsService not initialized');
     }
 
+    // Clear existing route and markers
+    this.clearRoute();
+
     console.log('Generating route with mode:', options?.activityType || 'car'); // Debug log
 
     const request: google.maps.DirectionsRequest = {
       origin: start,
       destination: end,
       travelMode: this.getTravelMode(options?.activityType || 'car'),
-      provideRouteAlternatives: options?.alternatives
+      provideRouteAlternatives: true
     };
 
     try {

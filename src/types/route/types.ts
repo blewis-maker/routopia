@@ -1,4 +1,5 @@
 import { ActivityType } from '../activity';
+import { Coordinates } from '@/services/maps/MapServiceInterface';
 
 export interface GeoPoint {
   latitude: number;
@@ -43,7 +44,25 @@ export interface RoutePreferences {
 export interface Route {
   id: string;
   name: string;
-  segments: RouteSegment[];
-  totalMetrics?: RouteMetrics;
-  preferences: RoutePreferences;
+  segments: Array<{
+    startPoint: {
+      latitude: number;
+      longitude: number;
+    };
+    endPoint: {
+      latitude: number;
+      longitude: number;
+    };
+    distance: number;
+    duration: number;
+  }>;
+  totalMetrics: {
+    distance: number;
+    duration: number;
+  };
+  alternatives?: Array<{
+    coordinates: Coordinates[];
+    duration: number;
+    distance: number;
+  }>;
 }

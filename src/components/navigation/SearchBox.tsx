@@ -217,9 +217,9 @@ export function SearchBox({
 
       {isOpen && results.length > 0 && (
         <div className="absolute w-full mt-2 bg-stone-800 rounded-lg shadow-lg border border-stone-700 z-50">
-          {results.map((result) => (
+          {results.map((result, index) => (
             <button
-              key={result.place_name}
+              key={`${result.place_name}-${index}-${Date.now()}`}
               className="w-full px-4 py-2 text-left hover:bg-stone-700 first:rounded-t-lg last:rounded-b-lg"
               onClick={() => {
                 setQuery(result.place_name.split(',')[0]);
