@@ -72,7 +72,11 @@ export default function RoutePlannerPage() {
 
       try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject);
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
+          });
         });
 
         const { latitude: lat, longitude: lng } = position.coords;
@@ -84,11 +88,12 @@ export default function RoutePlannerPage() {
 
         if (result.results[0]) {
           const address = result.results[0].formatted_address;
+          const shortAddress = address.split(',')[0];
           
           // Update state as if user selected this location
           setUserLocation({
             coordinates: [lng, lat],
-            address
+            address: shortAddress
           });
           setMapCenter([lng, lat]);
           setMapZoom(14);
@@ -225,7 +230,7 @@ export default function RoutePlannerPage() {
           zoom={mapZoom}
           route={mainRoute}
           onMapClick={handleMapClick}
-          showWeather={!!weatherInfo}
+          showWeather={false}
           showElevation={!!mainRoute}
           showUserLocation={true}
           darkMode={theme === 'dark'}
@@ -237,9 +242,11 @@ export default function RoutePlannerPage() {
             onSelect={(result) => {
               if ('coordinates' in result) {
                 const [lng, lat] = result.coordinates;
+                const shortAddress = result.place_name.split(',')[0];
+                
                 setUserLocation({
                   coordinates: [lng, lat],
-                  address: result.place_name
+                  address: shortAddress
                 });
                 setMapCenter([lng, lat]);
                 setMapZoom(14);
@@ -255,19 +262,23 @@ export default function RoutePlannerPage() {
           />
         </div>
 
-        {/* Weather Overlay */}
-        {weatherInfo && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-            <div className="bg-stone-900/90 rounded-lg backdrop-blur shadow-lg">
-              <WeatherWidget 
-                coordinates={{
-                  lat: weatherInfo.coordinates[1],
-                  lng: weatherInfo.coordinates[0]
-                }}
-              />
+        {/* Weather Banner - Center Top */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+          <div className="bg-stone-900/80 backdrop-blur-sm shadow-lg rounded-lg border border-stone-800">
+            <WeatherWidget 
+              coordinates={weatherInfo ? {
+                lat: weatherInfo.coordinates[1],
+                lng: weatherInfo.coordinates[0]
+              } : {
+                lat: mapCenter[1],
+                lng: mapCenter[0]
+              }}
+            />
+            <div className="text-xs text-stone-300 text-center px-4 pb-2">
+              {weatherInfo?.location ? 'Berthoud, CO' : ''}
             </div>
           </div>
-        )}
+        </div>
 
         {/* Route Information Overlay */}
         {mainRoute && (

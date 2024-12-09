@@ -9,7 +9,7 @@ export interface SearchResult {
   description?: string;
 }
 
-interface SearchBoxProps {
+export interface SearchBoxProps {
   onSelect: (result: SearchResult) => void;
   placeholder?: string;
   useCurrentLocation?: boolean;
@@ -47,7 +47,6 @@ export function SearchBox({
           autocompleteService.current = new google.maps.places.AutocompleteService();
         }
         if (!placesService.current) {
-          // Create a dummy div for PlacesService (required by Google Maps)
           const dummyDiv = document.createElement('div');
           placesService.current = new google.maps.places.PlacesService(dummyDiv);
         }
@@ -110,12 +109,11 @@ export function SearchBox({
 
             return {
               place_id: prediction.place_id,
-              place_name: details.name || prediction.description,
+              place_name: details.formatted_address || prediction.description,
               coordinates: [
                 details.geometry?.location?.lng() || 0,
                 details.geometry?.location?.lat() || 0
-              ] as [number, number],
-              description: details.formatted_address
+              ] as [number, number]
             };
           })
         );
@@ -166,6 +164,18 @@ export function SearchBox({
     }
   };
 
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
     <div ref={searchBoxRef} className={`relative ${className}`}>
       <div className="relative">
@@ -174,7 +184,7 @@ export function SearchBox({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
-          className="w-full px-4 py-2 bg-stone-800 text-white rounded-lg border border-stone-700 focus:outline-none focus:border-emerald-500"
+          className="w-full px-4 py-2 bg-stone-900/80 backdrop-blur-sm text-white rounded-lg border border-stone-800 focus:outline-none focus:border-emerald-500"
           onFocus={() => setIsOpen(true)}
         />
         {isLoading && (
@@ -203,15 +213,12 @@ export function SearchBox({
               key={result.place_id}
               className="w-full px-4 py-2 text-left hover:bg-stone-700 first:rounded-t-lg last:rounded-b-lg"
               onClick={() => {
+                setQuery(result.place_name.split(',')[0]);
                 onSelect(result);
-                setQuery('');
                 setIsOpen(false);
               }}
             >
-              <div className="text-white">{result.place_name}</div>
-              {result.description && (
-                <div className="text-sm text-stone-400">{result.description}</div>
-              )}
+              <div className="text-white truncate">{result.place_name}</div>
             </button>
           ))}
         </div>

@@ -1,5 +1,4 @@
 {
-  "/api/weather/route": "app/api/weather/route.js",
   "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
   "/(protected)/route-planner/page": "app/(protected)/route-planner/page.js"
 }
