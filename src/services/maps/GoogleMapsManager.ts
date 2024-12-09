@@ -12,6 +12,7 @@ import { mapUtils } from '@/lib/utils';
 import { ACTIVITY_COLORS, getActivityStyle, getTrafficStyle, mapStyles } from '@/lib/utils/mapStyles';
 import { RouteVisualizationData, ActivityType, TrafficSegment } from '@/types/maps';
 import GoogleMapsLoader from './GoogleMapsLoader';
+import { Route } from '@/types/route/types';
 
 export class GoogleMapsManager implements MapServiceInterface {
   private map: google.maps.Map | null = null;
@@ -160,7 +161,7 @@ export class GoogleMapsManager implements MapServiceInterface {
   async addUserLocationMarker(location: Coordinates): Promise<void> {
     if (!this.map) return;
 
-    // Remove existing marker and overlay if any
+    // Remove existing marker and overlay
     if (this.userLocationMarker) {
       this.userLocationMarker.setMap(null);
       this.userLocationMarker = null;
@@ -182,75 +183,61 @@ export class GoogleMapsManager implements MapServiceInterface {
       }
     });
 
-    // Create the pulse effect overlay
-    const overlay = new google.maps.OverlayView();
-    
-    overlay.onAdd = function() {
-      const div = document.createElement('div');
-      div.style.position = 'absolute';
-      div.style.width = '18px';
-      div.style.height = '18px';
-      div.innerHTML = `
-        <div style="
-          position: relative;
-          width: 100%;
-          height: 100%;
-        ">
-          <div style="
-            position: absolute;
-            width: 18px;
-            height: 18px;
-            background: #10b981;
-            border: 2px solid white;
-            border-radius: 50%;
-            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
-          "></div>
-          <div style="
-            position: absolute;
-            width: 18px;
-            height: 18px;
-            background: rgba(16, 185, 129, 0.4);
-            border-radius: 50%;
-            animation: pulse 2s ease-out infinite;
-          "></div>
-        </div>
-      `;
+    // Create custom overlay class
+    class UserLocationOverlay extends google.maps.OverlayView {
+      private div: HTMLDivElement | null = null;
 
-      const style = document.createElement('style');
-      style.textContent = `
-        @keyframes pulse {
-          0% { transform: scale(1); opacity: 1; }
-          100% { transform: scale(3); opacity: 0; }
+      onAdd(): void {
+        const div = document.createElement('div');
+        div.style.position = 'absolute';
+        div.style.width = '18px';
+        div.style.height = '18px';
+        div.innerHTML = `
+          <div style="position: relative; width: 100%; height: 100%;">
+            <div style="position: absolute; width: 18px; height: 18px; background: #10b981; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);"></div>
+            <div style="position: absolute; width: 18px; height: 18px; background: rgba(16, 185, 129, 0.4); border-radius: 50%; animation: pulse 2s ease-out infinite;"></div>
+          </div>
+        `;
+
+        const style = document.createElement('style');
+        style.textContent = `
+          @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(3); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+
+        this.div = div;
+        const panes = this.getPanes();
+        panes?.overlayImage.appendChild(div);
+      }
+
+      draw(): void {
+        if (!this.div) return;
+        const overlayProjection = this.getProjection();
+        const position = overlayProjection.fromLatLngToDivPixel(
+          new google.maps.LatLng(location.lat, location.lng)
+        );
+        
+        if (position) {
+          this.div.style.left = (position.x - 9) + 'px';
+          this.div.style.top = (position.y - 9) + 'px';
         }
-      `;
-      document.head.appendChild(style);
-
-      this.div = div;
-      const panes = this.getPanes();
-      panes.overlayImage.appendChild(div);
-    };
-
-    overlay.draw = function() {
-      const overlayProjection = this.getProjection();
-      const position = overlayProjection.fromLatLngToDivPixel(location);
-      
-      const div = this.div;
-      if (div && position) {
-        div.style.left = (position.x - 9) + 'px';
-        div.style.top = (position.y - 9) + 'px';
       }
-    };
 
-    overlay.onRemove = function() {
-      if (this.div) {
-        this.div.parentNode?.removeChild(this.div);
-        delete this.div;
+      onRemove(): void {
+        if (this.div) {
+          this.div.parentNode?.removeChild(this.div);
+          this.div = null;
+        }
       }
-    };
+    }
 
+    // Create and add the overlay
+    const overlay = new UserLocationOverlay();
     overlay.setMap(this.map);
-    
-    // Store references to both marker and overlay
+
     this.userLocationMarker = marker;
     this.userLocationOverlay = overlay;
   }
@@ -274,7 +261,7 @@ export class GoogleMapsManager implements MapServiceInterface {
       onClick?: () => void;
       onDragEnd?: (coords: Coordinates) => void;
     }
-  ): string {
+  ): Promise<string> {
     if (!this.map) throw new Error('Map not initialized');
 
     const markerId = `marker-${Date.now()}`;
@@ -319,53 +306,141 @@ export class GoogleMapsManager implements MapServiceInterface {
   ): Promise<void> {
     if (!this.map || !this.directionsService) return;
 
-    const { mainRoute, alternatives, waypoints } = route;
+    // Clear any existing routes
+    this.clearRoute();
 
-    // Configure route rendering based on activity type
-    const travelMode = this.getTravelMode(options.activityType);
-    
     try {
-      // Draw main route with traffic data if enabled
-      const result = await this.directionsService.route({
-        origin: mainRoute.coordinates[0],
-        destination: mainRoute.coordinates[mainRoute.coordinates.length - 1],
-        waypoints: waypoints?.via.map(wp => ({
-          location: wp,
-          stopover: true
-        })),
-        travelMode,
-        provideRouteAlternatives: options.showAlternatives
+      // Convert coordinates to LatLng for Google Maps
+      const mainRoutePath = route.mainRoute.coordinates.map(coord => ({
+        lat: coord.lat,
+        lng: coord.lng
+      }));
+
+      // Create the main route polyline
+      this.currentRoute = new google.maps.Polyline({
+        path: mainRoutePath,
+        geodesic: true,
+        strokeColor: options.style?.color || '#10b981', // Default to teal
+        strokeOpacity: options.style?.opacity || 0.8,
+        strokeWeight: options.style?.width || 4,
+        map: this.map
       });
 
-      // Render main route with custom styling
-      this.renderRoute(result.routes[0], {
-        ...options.style,
-        isMain: true
-      });
+      // Add markers for start and end points if route is interactive
+      if (options.isInteractive && route.waypoints) {
+        await this.addMarker(route.waypoints.start, { type: 'start' });
+        await this.addMarker(route.waypoints.end, { type: 'end' });
 
-      // Handle traffic visualization if enabled
-      if (options.showTraffic && mainRoute.trafficData) {
-        this.visualizeTraffic(mainRoute.trafficData);
-      }
-
-      // Render alternative routes if available and enabled
-      if (options.showAlternatives && alternatives) {
-        alternatives.forEach((alt, index) => {
-          this.renderRoute(result.routes[index + 1], {
-            ...options.style,
-            isMain: false
+        // Add waypoint markers
+        for (const waypoint of route.waypoints.via) {
+          await this.addMarker(waypoint, { 
+            type: 'waypoint',
+            draggable: true,
+            onDragEnd: (coords) => {
+              // Recalculate route when waypoint is dragged
+              this.updateRouteWithWaypoint(coords);
+            }
           });
-        });
+        }
       }
 
-      // Add interactive waypoint markers if enabled
-      if (options.isInteractive && waypoints) {
-        this.addInteractiveWaypoints(waypoints);
+      // Show traffic data if enabled
+      if (options.showTraffic && route.mainRoute.trafficData) {
+        await this.visualizeTrafficData(route.mainRoute.trafficData);
       }
+
+      // Show alternative routes if enabled
+      if (options.showAlternatives && route.alternatives) {
+        this.showAlternativeRoutes(route.alternatives);
+      }
+
+      // Fit the map bounds to show the entire route
+      this.fitRouteBounds(mainRoutePath);
+
     } catch (error) {
       console.error('Failed to draw route:', error);
       throw error;
     }
+  }
+
+  private async visualizeTrafficData(trafficData: TrafficData): Promise<void> {
+    if (!this.map) return;
+
+    // Visualize traffic segments with color-coding
+    trafficData.segments?.forEach(segment => {
+      const color = this.getTrafficColor(segment.congestion);
+      new google.maps.Polyline({
+        path: [
+          { lat: segment.start.lat, lng: segment.start.lng },
+          { lat: segment.end.lat, lng: segment.end.lng }
+        ],
+        strokeColor: color,
+        strokeOpacity: 0.7,
+        strokeWeight: 4,
+        map: this.map
+      });
+    });
+
+    // Show traffic incidents if any
+    trafficData.incidents.forEach(incident => {
+      this.addMarker(incident.location, {
+        icon: this.getIncidentIcon(incident.severity),
+        onClick: () => {
+          // Show incident details in an InfoWindow
+          this.showIncidentDetails(incident);
+        }
+      });
+    });
+  }
+
+  private getTrafficColor(congestion: 'low' | 'medium' | 'high'): string {
+    switch (congestion) {
+      case 'low':
+        return '#22c55e'; // Green
+      case 'medium':
+        return '#f59e0b'; // Yellow
+      case 'high':
+        return '#ef4444'; // Red
+      default:
+        return '#6b7280'; // Gray
+    }
+  }
+
+  private getIncidentIcon(severity: 'low' | 'medium' | 'high'): string {
+    // Return appropriate icon URL based on severity
+    return `/icons/traffic-incident-${severity}.png`;
+  }
+
+  private showIncidentDetails(incident: TrafficData['incidents'][0]): void {
+    if (!this.map) return;
+
+    const infoWindow = new google.maps.InfoWindow({
+      content: `
+        <div class="p-4">
+          <h3 class="font-semibold">${incident.type}</h3>
+          <p>${incident.description}</p>
+          <p class="text-sm text-gray-500">
+            ${incident.startTime ? new Date(incident.startTime).toLocaleString() : 'Ongoing'}
+          </p>
+        </div>
+      `
+    });
+
+    infoWindow.setPosition(incident.location);
+    infoWindow.open(this.map);
+  }
+
+  private fitRouteBounds(path: google.maps.LatLngLiteral[]): void {
+    if (!this.map || !path.length) return;
+
+    const bounds = new google.maps.LatLngBounds();
+    path.forEach(point => bounds.extend(point));
+    this.map.fitBounds(bounds, { padding: 50 });
+  }
+
+  private async updateRouteWithWaypoint(newWaypoint: Coordinates): Promise<void> {
+    // This will be implemented when we add waypoint drag functionality
+    console.log('Waypoint updated:', newWaypoint);
   }
 
   clearRoute(): void {
@@ -760,5 +835,243 @@ export class GoogleMapsManager implements MapServiceInterface {
         }
       });
     });
+  }
+
+  public showAlternativeRoutes(routes: RouteVisualization['alternatives']): void {
+    if (!this.map || !routes) return;
+    
+    routes.forEach((route, index) => {
+      const path = route.coordinates.map(coord => ({
+        lat: coord.lat,
+        lng: coord.lng
+      }));
+
+      new google.maps.Polyline({
+        path,
+        geodesic: true,
+        strokeColor: '#6b7280', // Gray color for alternatives
+        strokeOpacity: 0.6,
+        strokeWeight: 3,
+        map: this.map
+      });
+    });
+  }
+
+  public hideAlternativeRoutes(): void {
+    // Clear alternative routes logic here
+    // This will be implemented when we store references to alternative polylines
+  }
+
+  public addControls(options: {
+    navigation?: boolean;
+    geolocate?: boolean;
+    scale?: boolean;
+    fullscreen?: boolean;
+  }): void {
+    if (!this.map) return;
+
+    this.map.setOptions({
+      zoomControl: options.navigation,
+      scaleControl: options.scale,
+      fullscreenControl: options.fullscreen
+    });
+  }
+
+  public on(event: 'click' | 'move' | 'zoom' | 'dragend', callback: (e: any) => void): void {
+    if (!this.map) return;
+    this.map.addListener(event, callback);
+  }
+
+  public off(event: 'click' | 'move' | 'zoom' | 'dragend', callback: (e: any) => void): void {
+    if (!this.map) return;
+    google.maps.event.removeListener(callback);
+  }
+
+  public fitBounds(bounds: MapBounds, options?: { padding?: number }): void {
+    if (!this.map) return;
+    
+    const googleBounds = new google.maps.LatLngBounds(
+      new google.maps.LatLng(bounds.south, bounds.west),
+      new google.maps.LatLng(bounds.north, bounds.east)
+    );
+    
+    this.map.fitBounds(googleBounds, options);
+  }
+
+  public panTo(coordinates: Coordinates, options?: { duration?: number }): void {
+    if (!this.map) return;
+    this.map.panTo(coordinates);
+  }
+
+  public addLayer(layerId: string, options: any): void {
+    // Implement when needed for specific layer types
+  }
+
+  public removeLayer(layerId: string): void {
+    // Implement when needed for specific layer types
+  }
+
+  public setLayerVisibility(layerId: string, visible: boolean): void {
+    // Implement when needed for specific layer types
+  }
+
+  public getBounds(): MapBounds {
+    if (!this.map) throw new Error('Map not initialized');
+    const bounds = this.map.getBounds();
+    if (!bounds) throw new Error('Map bounds not available');
+    
+    return {
+      north: bounds.getNorthEast().lat(),
+      south: bounds.getSouthWest().lat(),
+      east: bounds.getNorthEast().lng(),
+      west: bounds.getSouthWest().lng()
+    };
+  }
+
+  public getCenter(): Coordinates {
+    if (!this.map) throw new Error('Map not initialized');
+    const center = this.map.getCenter();
+    if (!center) throw new Error('Map center not available');
+    
+    return {
+      lat: center.lat(),
+      lng: center.lng()
+    };
+  }
+
+  public getZoom(): number {
+    if (!this.map) throw new Error('Map not initialized');
+    return this.map.getZoom() || 12;
+  }
+
+  public updateMarker(markerId: string, coordinates: Coordinates): void {
+    const marker = this.markers.get(markerId);
+    if (marker) {
+      marker.setPosition(coordinates);
+    }
+  }
+
+  public async visualizeRoute(route: Route): Promise<void> {
+    if (!this.map) throw new Error('Map not initialized');
+    
+    // Clear existing route
+    this.clearRoute();
+
+    // Create path from route segments
+    const path = route.segments.flatMap(segment => [
+      { lat: segment.startPoint.latitude, lng: segment.startPoint.longitude },
+      { lat: segment.endPoint.latitude, lng: segment.endPoint.longitude }
+    ]);
+
+    // Create and render the route polyline
+    this.currentRoute = new google.maps.Polyline({
+      path,
+      geodesic: true,
+      strokeColor: '#10b981', // Teal color matching the theme
+      strokeOpacity: 0.8,
+      strokeWeight: 4,
+      map: this.map
+    });
+
+    // Add markers for start and end points if needed
+    const startPoint = path[0];
+    const endPoint = path[path.length - 1];
+
+    await this.addMarker(startPoint, { type: 'start' });
+    await this.addMarker(endPoint, { type: 'end' });
+
+    // Fit bounds to show the entire route
+    const bounds = new google.maps.LatLngBounds();
+    path.forEach(point => bounds.extend(point));
+    this.map.fitBounds(bounds);
+  }
+
+  public async generateRoute(
+    start: Coordinates,
+    end: Coordinates,
+    options?: {
+      waypoints?: Coordinates[];
+      activityType?: 'car' | 'bike' | 'walk';
+      alternatives?: boolean;
+    }
+  ): Promise<RouteVisualization> {
+    if (!this.directionsService || !this.map) {
+      throw new Error('Map or DirectionsService not initialized');
+    }
+
+    const request: google.maps.DirectionsRequest = {
+      origin: start,
+      destination: end,
+      waypoints: options?.waypoints?.map(wp => ({ location: wp, stopover: true })),
+      travelMode: this.getTravelMode(options?.activityType || 'car'),
+      provideRouteAlternatives: options?.alternatives || false
+    };
+
+    try {
+      const result = await new Promise<google.maps.DirectionsResult>((resolve, reject) => {
+        this.directionsService?.route(request, (response, status) => {
+          if (status === google.maps.DirectionsStatus.OK && response) {
+            resolve(response);
+          } else {
+            reject(new Error(`Route generation failed: ${status}`));
+          }
+        });
+      });
+
+      // Convert DirectionsResult to RouteVisualization
+      const mainRoute = {
+        coordinates: this.extractCoordinates(result.routes[0].overview_path),
+        trafficData: await this.getRouteTrafficData(result.routes[0])
+      };
+
+      const alternatives = result.routes.slice(1).map(route => ({
+        coordinates: this.extractCoordinates(route.overview_path),
+        duration: route.legs[0].duration?.value || 0,
+        distance: route.legs[0].distance?.value || 0
+      }));
+
+      const waypoints = {
+        start,
+        end,
+        via: options?.waypoints || []
+      };
+
+      return {
+        mainRoute,
+        alternatives: alternatives.length > 0 ? alternatives : undefined,
+        waypoints
+      };
+    } catch (error) {
+      console.error('Failed to generate route:', error);
+      throw error;
+    }
+  }
+
+  private extractCoordinates(path: google.maps.LatLng[]): Coordinates[] {
+    return path.map(point => ({
+      lat: point.lat(),
+      lng: point.lng()
+    }));
+  }
+
+  private async getRouteTrafficData(
+    route: google.maps.DirectionsRoute
+  ): Promise<TrafficData | undefined> {
+    try {
+      const bounds = new google.maps.LatLngBounds();
+      route.overview_path.forEach(point => bounds.extend(point));
+      
+      const mapBounds: MapBounds = {
+        north: bounds.getNorthEast().lat(),
+        south: bounds.getSouthWest().lat(),
+        east: bounds.getNorthEast().lng(),
+        west: bounds.getSouthWest().lng()
+      };
+
+      return await this.getTrafficData(mapBounds);
+    } catch (error) {
+      console.error('Failed to get traffic data:', error);
+      return undefined;
+    }
   }
 } 

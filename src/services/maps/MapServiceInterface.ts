@@ -128,4 +128,17 @@ export interface MapServiceInterface {
   addLayer(layerId: string, options: any): void;
   removeLayer(layerId: string): void;
   setLayerVisibility(layerId: string, visible: boolean): void;
-} 
+}
+
+export interface RouteSegment {
+  startPoint: {
+    latitude: number;
+    longitude: number;
+  };
+  endPoint: {
+    latitude: number;
+    longitude: number;
+  };
+  distance: number;
+  duration: number;
+}

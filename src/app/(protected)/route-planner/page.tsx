@@ -13,6 +13,9 @@ import { Coordinates } from '@/services/maps/MapServiceInterface';
 import { useTheme } from 'next-themes';
 import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
 import { GoogleMapsManager } from '@/services/maps/GoogleMapsManager';
+import { RouteVisualization } from '@/services/maps/MapServiceInterface';
+import { MapToolbar } from '@/components/map/MapToolbar';
+import { MapLegend } from '@/components/map/MapLegend';
 
 interface WeatherInfo {
   location: string;
@@ -40,6 +43,7 @@ export default function RoutePlannerPage() {
   const geocoder = useRef<google.maps.Geocoder | null>(null);
   const mapServiceRef = useRef<GoogleMapsManager | null>(null);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [activeLayer, setActiveLayer] = useState<'ROUTE' | 'SEARCH' | 'TRAFFIC' | 'LAYERS' | null>(null);
 
   const [preferences, setPreferences] = useState<RoutePreferences>({
     activityType: ActivityType.WALK,
@@ -201,40 +205,63 @@ export default function RoutePlannerPage() {
 
   const generateRoute = async (start: [number, number], end: [number, number]) => {
     try {
-      const response = await fetch('/api/routes/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          start,
-          end,
-          preferences
-        })
+      if (!mapServiceRef.current) {
+        console.error('Map service not initialized');
+        return;
+      }
+
+      const startCoords = { lat: start[1], lng: start[0] };
+      const endCoords = { lat: end[1], lng: end[0] };
+      
+      const routeVisualization = await mapServiceRef.current.generateRoute(
+        startCoords,
+        endCoords,
+        {
+          activityType: preferences.activityType,
+          alternatives: true
+        }
+      );
+
+      // Draw the route on the map
+      await mapServiceRef.current.drawRoute(routeVisualization, {
+        activityType: preferences.activityType,
+        showTraffic: true,
+        showAlternatives: true,
+        isInteractive: true,
+        style: {
+          color: '#10b981',
+          width: 4,
+          opacity: 0.8
+        }
       });
 
-      const data = await response.json();
-      if (data.route) {
-        setMainRoute(data.route);
-        setWeatherInfo({
-          location: data.route.name,
-          coordinates: end
-        });
-
-        // Adjust map to show the entire route
-        const bounds = new google.maps.LatLngBounds();
-        bounds.extend({ lat: start[1], lng: start[0] });
-        bounds.extend({ lat: end[1], lng: end[0] });
-        
-        // Get the center and zoom from the bounds
-        const center = [
-          (bounds.getCenter().lng()),
-          (bounds.getCenter().lat())
-        ] as [number, number];
-        
-        setMapCenter(center);
-        setMapZoom(14); // We can adjust this based on the route distance
+      // Update route state if needed
+      if (routeVisualization.mainRoute) {
+        const route: Route = {
+          id: 'generated-route',
+          name: `Route to ${destinationLocation?.address || 'destination'}`,
+          segments: [{
+            startPoint: {
+              latitude: start[1],
+              longitude: start[0]
+            },
+            endPoint: {
+              latitude: end[1],
+              longitude: end[0]
+            },
+            distance: 0, // Will be updated from route data
+            duration: 0  // Will be updated from route data
+          }],
+          totalMetrics: {
+            distance: 0, // Will be updated from route data
+            duration: 0  // Will be updated from route data
+          },
+          preferences
+        };
+        setMainRoute(route);
       }
     } catch (error) {
-      console.error('Route generation error:', error);
+      console.error('Failed to generate route:', error);
     }
   };
 
@@ -305,6 +332,86 @@ export default function RoutePlannerPage() {
     fetchWeatherData(lat, lng, result.place_name);
   };
 
+  const handleDestinationSelect = async (result: any) => {
+    if (!('coordinates' in result)) return;
+    
+    const [lng, lat] = result.coordinates;
+    const shortAddress = result.place_name.split(',')[0];
+    
+    setDestinationLocation({
+      coordinates: [lng, lat],
+      address: shortAddress
+    });
+
+    // Generate route if we have both start and end points
+    if (userLocation) {
+      try {
+        if (!mapServiceRef.current) {
+          console.error('Map service not initialized');
+          return;
+        }
+
+        const startCoords = { 
+          lat: userLocation.coordinates[1], 
+          lng: userLocation.coordinates[0] 
+        };
+        const endCoords = { lat, lng };
+        
+        const routeVisualization = await mapServiceRef.current.generateRoute(
+          startCoords,
+          endCoords,
+          {
+            activityType: preferences.activityType === ActivityType.WALK ? 'walk' : 
+                         preferences.activityType === ActivityType.BIKE ? 'bike' : 'car',
+            alternatives: true
+          }
+        );
+
+        // Draw the route
+        await mapServiceRef.current.drawRoute(routeVisualization, {
+          activityType: preferences.activityType === ActivityType.WALK ? 'walk' :
+                       preferences.activityType === ActivityType.BIKE ? 'bike' : 'car',
+          showTraffic: activeLayer === 'TRAFFIC',
+          showAlternatives: true,
+          isInteractive: true,
+          style: {
+            color: '#10b981',
+            width: 4,
+            opacity: 0.8
+          }
+        });
+
+        // Update route info
+        if (routeVisualization.mainRoute) {
+          const route: Route = {
+            id: 'generated-route',
+            name: `Route to ${shortAddress}`,
+            segments: [{
+              startPoint: {
+                latitude: userLocation.coordinates[1],
+                longitude: userLocation.coordinates[0]
+              },
+              endPoint: {
+                latitude: lat,
+                longitude: lng
+              },
+              distance: routeVisualization.mainRoute.distance || 0,
+              duration: routeVisualization.mainRoute.duration || 0
+            }],
+            totalMetrics: {
+              distance: routeVisualization.mainRoute.distance || 0,
+              duration: routeVisualization.mainRoute.duration || 0
+            },
+            preferences
+          };
+          setMainRoute(route);
+        }
+      } catch (error) {
+        console.error('Failed to generate route:', error);
+      }
+    }
+  };
+
   // Fix the route prop type error
   const routeToPass = mainRoute || undefined;
 
@@ -320,6 +427,18 @@ export default function RoutePlannerPage() {
       });
     } catch (error) {
       console.error('Error fetching weather:', error);
+    }
+  };
+
+  const handleToolSelect = async (tool: 'ROUTE' | 'SEARCH' | 'TRAFFIC' | 'LAYERS') => {
+    setActiveLayer(tool);
+    
+    if (tool === 'TRAFFIC' && mapServiceRef.current) {
+      await mapServiceRef.current.setTrafficLayer(true, {
+        showRealTime: true,
+        showIncidents: true,
+        showAlternatives: true
+      });
     }
   };
 
@@ -364,6 +483,19 @@ export default function RoutePlannerPage() {
           onMapInit={handleMapServiceInit}
         />
 
+        {/* Add MapToolbar */}
+        <MapToolbar 
+          mapIntegration={mapServiceRef.current}
+          onToolSelect={handleToolSelect}
+        />
+
+        {/* Add MapLegend */}
+        <MapLegend 
+          showRiverLegend={!!mainRoute}
+          showTributaries={!!mainRoute && activeLayer === 'TRAFFIC'}
+          showPOIs={activeLayer === 'LAYERS'}
+        />
+
         {/* Search Box Overlay */}
         <div className="absolute top-4 left-4 z-10 w-96 max-w-[calc(100%-2rem)] space-y-2">
           <SearchBox 
@@ -371,62 +503,10 @@ export default function RoutePlannerPage() {
             placeholder="Set your starting point..."
             useCurrentLocation={true}
             initialValue={userLocation?.address || ''}
-            key={userLocation?.address} // Force re-render when address changes
+            key={userLocation?.address}
           />
           <SearchBox 
-            onSelect={async (result) => {
-              if ('coordinates' in result) {
-                const [lng, lat] = result.coordinates;
-                const shortAddress = result.place_name.split(',')[0];
-                
-                setDestinationLocation({
-                  coordinates: [lng, lat],
-                  address: shortAddress
-                });
-
-                // If we have both start and end locations, generate a route using Google's DirectionsService
-                if (userLocation && mapServiceRef.current) {
-                  try {
-                    const startCoords = { lat: userLocation.coordinates[1], lng: userLocation.coordinates[0] };
-                    const endCoords = { lat, lng };
-                    
-                    const directionsResult = await mapServiceRef.current.generateDirectionsRoute(startCoords, endCoords);
-                    
-                    // Update route info if needed
-                    if (directionsResult.routes[0]) {
-                      const route = directionsResult.routes[0];
-                      const leg = route.legs[0];
-                      if (leg) {
-                        setMainRoute({
-                          id: 'google-route',
-                          name: `Route to ${shortAddress}`,
-                          segments: [{
-                            startPoint: {
-                              latitude: userLocation.coordinates[1],
-                              longitude: userLocation.coordinates[0]
-                            },
-                            endPoint: {
-                              latitude: lat,
-                              longitude: lng
-                            },
-                            distance: leg.distance?.value || 0,
-                            duration: leg.duration?.value || 0,
-                            type: 'LineString'
-                          }],
-                          totalMetrics: {
-                            distance: (leg.distance?.value || 0) / 1000, // Convert to km
-                            duration: leg.duration?.value || 0,
-                          },
-                          preferences: preferences
-                        });
-                      }
-                    }
-                  } catch (error) {
-                    console.error('Error generating route:', error);
-                  }
-                }
-              }
-            }}
+            onSelect={handleDestinationSelect}
             placeholder="Choose destination..."
             initialValue={destinationLocation?.address || ''}
           />
