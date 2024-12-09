@@ -4,14 +4,18 @@ import { RouteContext } from '@/types/chat/types';
 import { validateEnv } from '@/lib/env';
 
 export async function POST(request: Request) {
+  console.log('API route called');
+  
   try {
     // First validate environment variables
     try {
       validateEnv();
-    } catch (envError) {
-      console.error('Environment validation failed:', envError);
+      console.log('Environment validated');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Environment validation failed:', message);
       return NextResponse.json(
-        { error: 'Server configuration error: Missing environment variables' },
+        { error: `Server configuration error: ${message}` },
         { status: 500 }
       );
     }
@@ -20,10 +24,12 @@ export async function POST(request: Request) {
     let routeEnhancer: OpenAIRouteEnhancer;
     try {
       routeEnhancer = new OpenAIRouteEnhancer();
-    } catch (initError) {
-      console.error('Failed to initialize OpenAI:', initError);
+      console.log('OpenAI route enhancer initialized');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to initialize OpenAI:', message);
       return NextResponse.json(
-        { error: 'Failed to initialize AI service' },
+        { error: `AI service initialization failed: ${message}` },
         { status: 500 }
       );
     }
@@ -31,21 +37,32 @@ export async function POST(request: Request) {
     // Parse request body
     let body;
     try {
-      body = await request.json();
+      const text = await request.text();
+      console.log('Raw request body:', text);
+      body = JSON.parse(text);
+      console.log('Parsed request body:', body);
     } catch (error) {
-      console.error('Failed to parse request body:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to parse request body:', message);
       return NextResponse.json(
-        { error: 'Invalid request body' },
+        { error: 'Invalid request body', details: message },
         { status: 400 }
       );
     }
 
-    const { message, context } = body;
-    console.log('Received request:', { message, context });
-
-    if (!message) {
+    if (!body || typeof body !== 'object') {
       return NextResponse.json(
-        { error: 'Message is required' },
+        { error: 'Invalid request format' },
+        { status: 400 }
+      );
+    }
+
+    const { message, context } = body as { message?: string; context?: any };
+    console.log('Processing request:', { message, context });
+
+    if (!message || typeof message !== 'string') {
+      return NextResponse.json(
+        { error: 'Message is required and must be a string' },
         { status: 400 }
       );
     }
@@ -58,38 +75,55 @@ export async function POST(request: Request) {
         mode: context?.mode || 'car',
         timeOfDay: context?.timeOfDay || new Date().toLocaleTimeString(),
         weather: {
-          temperature: context?.weather?.temperature || 0,
-          conditions: context?.weather?.conditions || 'unknown',
-          windSpeed: context?.weather?.windSpeed || 0
+          temperature: Number(context?.weather?.temperature) || 0,
+          conditions: String(context?.weather?.conditions) || 'unknown',
+          windSpeed: Number(context?.weather?.windSpeed) || 0
         },
-        preferences: context?.preferences || []
+        preferences: Array.isArray(context?.preferences) ? context.preferences : []
       };
 
-      console.log('Processing with context:', routeContext);
+      console.log('Calling OpenAI with context:', routeContext);
 
       const enhancedRoute = await routeEnhancer.enhanceRoute(routeContext);
-      console.log('Enhanced route:', enhancedRoute);
+      console.log('OpenAI route response:', enhancedRoute);
 
       const suggestions = await routeEnhancer.generateSuggestions(routeContext);
-      console.log('Suggestions:', suggestions);
+      console.log('OpenAI suggestions response:', suggestions);
 
-      return NextResponse.json({
+      if (!enhancedRoute || !Array.isArray(enhancedRoute.insights)) {
+        throw new Error('Invalid response from AI service');
+      }
+
+      const response = {
         message: enhancedRoute.insights.join('\n') || 'I understand your request. How else can I help?',
         suggestions: suggestions || { waypoints: [], attractions: [], breaks: [] }
-      });
+      };
 
-    } catch (aiError) {
-      console.error('OpenAI processing error:', aiError);
+      console.log('Sending response:', response);
+      return NextResponse.json(response);
+
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('OpenAI processing error:', message);
       return NextResponse.json(
-        { error: 'Failed to process request with AI service', details: aiError instanceof Error ? aiError.message : 'Unknown error' },
+        { 
+          error: 'AI Service Error', 
+          message,
+          details: process.env.NODE_ENV === 'development' ? message : undefined
+        },
         { status: 500 }
       );
     }
 
   } catch (error) {
-    console.error('Unhandled API error:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Unhandled API error:', message);
     return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { 
+        error: 'Internal Server Error',
+        message,
+        details: process.env.NODE_ENV === 'development' ? message : undefined
+      },
       { status: 500 }
     );
   }

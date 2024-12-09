@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChatMessage, RouteContext } from '@/types/chat/types';
+import { ChatMessage, RouteContext, ChatSuggestion } from '@/types/chat/types';
 import { Location } from '@/types';
 
 interface AIChatProps {
@@ -12,6 +12,8 @@ interface AIChatProps {
     conditions: string;
     windSpeed: number;
   } | null;
+  onViewSuggestion: (suggestion: ChatSuggestion) => void;
+  onAddToRoute: (suggestion: ChatSuggestion) => void;
 }
 
 export function AIChat({
@@ -19,7 +21,9 @@ export function AIChat({
   onSendMessage,
   userLocation,
   destinationLocation,
-  weatherData
+  weatherData,
+  onViewSuggestion,
+  onAddToRoute
 }: AIChatProps) {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -91,14 +95,121 @@ export function AIChat({
     </div>
   );
 
-  const handleAddToRoute = async (suggestion: any) => {
-    setSelectedSuggestion(suggestion.name);
-    // Trigger route recalculation with waypoint
+  const handleViewOnMap = (suggestion: ChatSuggestion) => {
+    onViewSuggestion(suggestion);
+  };
+
+  const handleAddToRoute = (suggestion: ChatSuggestion) => {
+    onAddToRoute(suggestion);
   };
 
   const handleShowDetails = (suggestion: any) => {
     // For now, just add the details to the chat
     onSendMessage(`Tell me more about ${suggestion.name}`);
+  };
+
+  const renderMessage = (message: ChatMessage) => {
+    // Helper function to format numbered lists
+    const formatNumberedList = (text: string) => {
+      return text.split('\n').map((line, index) => {
+        // Check if line starts with a number followed by a dot
+        const isNumberedLine = /^\d+\./.test(line.trim());
+        if (isNumberedLine) {
+          return (
+            <div key={index} className="flex gap-2 py-1">
+              <span className="text-emerald-400">{line.split('.')[0]}.</span>
+              <span>{line.split('.').slice(1).join('.')}</span>
+            </div>
+          );
+        }
+        // Handle sub-bullets
+        if (line.trim().startsWith('-')) {
+          return (
+            <div key={index} className="pl-6 py-1 text-stone-300">
+              {line}
+            </div>
+          );
+        }
+        return <div key={index} className="py-1">{line}</div>;
+      });
+    };
+
+    // Format the message content
+    const formatContent = (content: string) => {
+      const sections = content.split(/(?=\d+\.\s)/).filter(Boolean);
+      
+      return sections.map((section, index) => {
+        if (/^\d+\.\s/.test(section)) {
+          // This is a numbered section
+          const [title, ...details] = section.split('\n');
+          return (
+            <div key={index} className="mb-4">
+              <div className="text-emerald-400 font-medium mb-2">{title}</div>
+              <div className="pl-4 text-stone-300">
+                {details.map((detail, i) => (
+                  <div key={i} className="py-1">
+                    {detail.trim()}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        return <div key={index} className="mb-4">{section}</div>;
+      });
+    };
+
+    if (message.type === 'assistant') {
+      return (
+        <div className="space-y-4">
+          <div className="prose prose-invert prose-sm max-w-none">
+            {formatContent(message.content)}
+          </div>
+          {message.suggestions?.waypoints?.length > 0 && (
+            <div className="mt-6 space-y-2">
+              <h4 className="text-sm font-medium text-emerald-400">Suggested Stops</h4>
+              <div className="grid gap-3">
+                {message.suggestions.waypoints.map((suggestion, index) => (
+                  <div 
+                    key={index} 
+                    className="bg-stone-800/50 backdrop-blur rounded-lg p-3 space-y-2 border border-stone-700/50"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h5 className="font-medium text-white">{suggestion.name}</h5>
+                        <p className="text-sm text-stone-400">{suggestion.description}</p>
+                      </div>
+                      <span className="text-xs px-2 py-1 bg-stone-700/50 rounded-full text-stone-300">
+                        {suggestion.type}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleAddToRoute(suggestion)}
+                        className="text-sm px-3 py-1 bg-emerald-600/20 text-emerald-400 rounded-full hover:bg-emerald-600/30 transition-colors"
+                      >
+                        Add to Route
+                      </button>
+                      <button
+                        onClick={() => handleViewOnMap(suggestion)}
+                        className="text-sm px-3 py-1 bg-stone-700/50 text-stone-300 rounded-full hover:bg-stone-700/70 transition-colors"
+                      >
+                        View on Map
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // User messages
+    return (
+      <p className="whitespace-pre-wrap">{message.content}</p>
+    );
   };
 
   return (
@@ -112,13 +223,13 @@ export function AIChat({
             }`}
           >
             <div
-              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+              className={`max-w-[85%] rounded-lg px-4 py-3 ${
                 message.type === 'user'
                   ? 'bg-emerald-600 text-white'
-                  : 'bg-stone-800 text-stone-100'
+                  : 'bg-stone-800/90 backdrop-blur-sm text-stone-100 border border-stone-700/50'
               }`}
             >
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              {renderMessage(message)}
             </div>
           </div>
         ))}

@@ -18,6 +18,7 @@ import { Clock, Map } from 'lucide-react';
 import { Route } from '@/types/route/types';
 import { AIChat } from '@/components/chat/AIChat';
 import { ChatMessage } from '@/types/chat/types';
+import { ChatSuggestion } from '@/types/chat/types';
 
 interface WeatherInfo {
   location: string;
@@ -93,15 +94,11 @@ export default function RoutePlannerPage() {
             temperature: weatherData.temperature || 0,
             conditions: weatherData.conditions || 'unknown',
             windSpeed: weatherData.windSpeed || 0
-          } : null,
-          route: mainRoute ? {
-            distance: mainRoute.totalMetrics?.distance || 0,
-            duration: mainRoute.totalMetrics?.duration || 0
           } : null
         }
       };
 
-      console.log('Sending request:', requestBody);
+      console.log('Sending chat request:', requestBody);
 
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -109,18 +106,27 @@ export default function RoutePlannerPage() {
         body: JSON.stringify(requestBody)
       });
 
+      const responseText = await response.text();
+      console.log('Raw API response:', responseText);
+
       let data;
       try {
-        const text = await response.text();
-        console.log('Raw response:', text);
-        data = JSON.parse(text);
+        data = JSON.parse(responseText);
+        console.log('Parsed API response:', data);
       } catch (error) {
-        console.error('Failed to parse response:', error);
+        console.error('Failed to parse API response:', error);
         throw new Error('Failed to parse server response');
       }
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Server error');
+      if (!response.ok || !data) {
+        const errorMessage = data?.error || data?.message || 'Unknown server error';
+        console.error('API error:', errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      if (typeof data.message !== 'string') {
+        console.error('Invalid response format:', data);
+        throw new Error('Invalid response format from server');
       }
 
       // Remove typing indicator and add AI response
@@ -128,12 +134,13 @@ export default function RoutePlannerPage() {
         const newMessages = prev.filter(msg => msg.content !== '...');
         return [...newMessages, { 
           type: 'assistant', 
-          content: data.message || 'I apologize, but I encountered an error processing your request.'
+          content: data.message
         }];
       });
 
       // Handle suggestions if any
       if (data.suggestions?.waypoints?.length > 0 && mapServiceRef.current) {
+        console.log('Processing suggestions:', data.suggestions.waypoints);
         await mapServiceRef.current.visualizeSuggestions(data.suggestions.waypoints);
       }
 
@@ -423,6 +430,90 @@ export default function RoutePlannerPage() {
     }
   }, [messages]);
 
+  const handleViewOnMap = async (suggestion: ChatSuggestion) => {
+    // Update destination with the suggestion
+    const destinationInfo: Location = {
+      coordinates: [suggestion.location.lng, suggestion.location.lat],
+      address: suggestion.name
+    };
+    
+    handleDestinationSelect({
+      coordinates: [suggestion.location.lng, suggestion.location.lat],
+      formatted_address: suggestion.name
+    });
+  };
+
+  const handleAddToRoute = async (suggestion: ChatSuggestion) => {
+    if (!userLocation) {
+      // Show error or prompt to set start location
+      return;
+    }
+
+    try {
+      if (!mapServiceRef.current) {
+        console.error('Map service not initialized');
+        return;
+      }
+
+      // Generate route to the suggestion
+      const start = { lat: userLocation.coordinates[1], lng: userLocation.coordinates[0] };
+      const end = suggestion.location;
+
+      const routeVisualization = await mapServiceRef.current.generateRoute(
+        start,
+        end,
+        {
+          activityType: 'car',
+          alternatives: true
+        }
+      );
+
+      await mapServiceRef.current.drawRoute(routeVisualization, {
+        activityType: 'car',
+        showTraffic: true,
+        showAlternatives: true,
+        isInteractive: true
+      });
+
+      // Update mainRoute state
+      if (routeVisualization.mainRoute) {
+        const route: Route = {
+          id: 'generated-route',
+          name: `Route to ${suggestion.name}`,
+          segments: [{
+            startPoint: {
+              latitude: start.lat,
+              longitude: start.lng
+            },
+            endPoint: {
+              latitude: end.lat,
+              longitude: end.lng
+            },
+            distance: routeVisualization.mainRoute.distance || 0,
+            duration: routeVisualization.mainRoute.duration || 0
+          }],
+          totalMetrics: {
+            distance: routeVisualization.mainRoute.distance || 0,
+            duration: routeVisualization.mainRoute.duration || 0
+          },
+          ...(routeVisualization.alternatives && {
+            alternatives: routeVisualization.alternatives
+          })
+        };
+        setMainRoute(route);
+      }
+
+      // Update destination location state
+      setDestinationLocation({
+        coordinates: [suggestion.location.lng, suggestion.location.lat],
+        address: suggestion.name
+      });
+
+    } catch (error) {
+      console.error('Failed to add suggestion to route:', error);
+    }
+  };
+
   return (
     <ErrorBoundary>
       <div className="grid grid-cols-[minmax(350px,_400px)_1fr] h-full w-full overflow-hidden">
@@ -447,6 +538,8 @@ export default function RoutePlannerPage() {
               userLocation={userLocation}
               destinationLocation={destinationLocation}
               weatherData={weatherData}
+              onViewSuggestion={handleViewOnMap}
+              onAddToRoute={handleAddToRoute}
             />
           </div>
         </div>

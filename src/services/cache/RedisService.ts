@@ -6,15 +6,17 @@ export class RedisService {
   private readonly TTL = 60 * 60 * 24; // 24 hours in seconds
 
   constructor() {
-    // Create Redis client with Upstash configuration
+    // Format Redis URL based on environment
+    const redisUrl = this.getRedisUrl();
+    console.log('Initializing Redis with URL:', this.maskSensitiveInfo(redisUrl));
+
     this.client = createClient({
-      url: `${process.env.UPSTASH_REDIS_URL}?token=${process.env.UPSTASH_REDIS_TOKEN}`,
+      url: redisUrl,
       socket: {
-        reconnectStrategy: (retries: number) => {
-          if (retries > 10) {
-            console.error('Max reconnection attempts reached');
-            return new Error('Max reconnection attempts reached');
-          }
+        tls: true, // Enable TLS for Upstash
+        rejectUnauthorized: false, // Required for some Redis services
+        reconnectStrategy: (retries) => {
+          if (retries > 10) return new Error('Max reconnection attempts reached');
           return Math.min(retries * 100, 3000);
         }
       }
@@ -22,13 +24,6 @@ export class RedisService {
 
     this.client.on('error', (err) => {
       console.error('Redis Client Error:', err);
-      // Attempt to reconnect if connection is lost
-      if (err.message.includes('ECONNREFUSED')) {
-        console.log('Attempting to reconnect to Redis...');
-        setTimeout(() => {
-          this.client.connect().catch(console.error);
-        }, 5000);
-      }
     });
 
     this.client.on('connect', () => {
@@ -36,25 +31,30 @@ export class RedisService {
     });
 
     // Connect immediately
-    this.initializeConnection();
+    this.connect();
   }
 
-  private async initializeConnection() {
+  private getRedisUrl(): string {
+    // Use Upstash Redis URL with correct format
+    if (process.env.UPSTASH_REDIS_URL && process.env.UPSTASH_REDIS_TOKEN) {
+      // Format: redis://default:token@hostname:port
+      const url = new URL(process.env.UPSTASH_REDIS_URL);
+      return `redis://default:${process.env.UPSTASH_REDIS_TOKEN}@${url.hostname}:${url.port || 6379}`;
+    }
+
+    // Fallback to local Redis
+    return 'redis://localhost:6379';
+  }
+
+  private maskSensitiveInfo(url: string): string {
+    return url.replace(/default:([^@]+)@/, 'default:***@');
+  }
+
+  private async connect() {
     try {
       await this.client.connect();
-      console.log('Redis connection initialized');
-    } catch (err) {
-      console.error('Failed to initialize Redis connection:', err);
-      // Try AWS Redis endpoint as fallback
-      try {
-        this.client = createClient({
-          url: `redis://${process.env.REDIS_ENDPOINT}:${process.env.REDIS_PORT}`
-        });
-        await this.client.connect();
-        console.log('Connected to fallback Redis endpoint');
-      } catch (fallbackErr) {
-        console.error('Failed to connect to fallback Redis:', fallbackErr);
-      }
+    } catch (error) {
+      console.error('Failed to connect to Redis:', error);
     }
   }
 
