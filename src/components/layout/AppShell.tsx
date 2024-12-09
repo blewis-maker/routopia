@@ -17,12 +17,12 @@ const AppShell = ({ children, variant = 'default' }: AppShellProps) => {
   const isLandingPage = variant === 'marketing';
 
   return (
-    <div className={`app-shell ${isLandingPage ? 'app-shell--marketing' : ''}`}>
+    <div className={`min-h-screen bg-[#1B1B1B] ${isLandingPage ? '' : 'pt-16'}`}>
       <NavigationBar 
         user={session?.user}
         isLandingPage={isLandingPage}
       />
-      <main className={`app-shell__main ${!isLandingPage ? 'pt-16' : ''}`}>
+      <main className="h-[calc(100vh-4rem)]">
         {children}
       </main>
       {session && <CommandPalette />}

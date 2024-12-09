@@ -620,43 +620,74 @@ export default function RoutePlannerPage() {
               useCurrentLocation={true}
               initialValue={userLocation?.address || ''}
               key={`start-${userLocation?.coordinates?.join(',')}-${Date.now()}`}
+              className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
             />
             <SearchBox 
               onSelect={handleDestinationSelect}
               placeholder="Choose destination..."
               initialValue={destinationLocation?.address || ''}
               key={`end-${destinationLocation?.coordinates?.join(',')}-${Date.now()}`}
+              className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
             />
           </div>
 
           {/* Weather Widget */}
           {weatherData && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-              <WeatherWidget data={weatherData} />
+              <div className="bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg border border-stone-800/50 px-4 py-2">
+                <div className="flex items-center gap-4">
+                  <div className="text-stone-200">
+                    <span className="text-lg font-medium">{weatherData.temperature}°F</span>
+                    <span className="text-stone-400 text-sm ml-2">{weatherData.location}</span>
+                  </div>
+                  <div className="text-stone-400 text-sm border-l border-stone-800/50 pl-4">
+                    <div>{weatherData.conditions}</div>
+                    <div>{weatherData.windSpeed} mph</div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
           {/* Loading Overlay */}
           {isLoading && (
-            <LoadingOverlay message="Generating route..." />
+            <div className="absolute inset-0 bg-[#1B1B1B]/50 backdrop-blur-sm flex items-center justify-center z-50">
+              <div className="bg-[#1B1B1B]/95 rounded-lg border border-stone-800/50 px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                  <span className="text-stone-200">Generating route...</span>
+                </div>
+              </div>
+            </div>
           )}
 
           {mainRoute && (
             <div className="absolute bottom-4 left-4 z-10 max-w-md">
-              <div className="bg-stone-900/90 rounded-lg p-4 backdrop-blur shadow-lg">
-                <h3 className="text-lg font-semibold text-white mb-2">Current Route</h3>
-                <div className="text-stone-300 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    <span>{formatDuration(mainRoute.totalMetrics?.duration || 0)}</span>
+              <div className="bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg border border-stone-800/50">
+                {/* Route Header */}
+                <div className="px-4 py-2 border-b border-stone-800/50">
+                  <div className="flex items-center gap-2 text-xs text-stone-400">
+                    <Map className="w-3.5 h-3.5" />
+                    <span>CURRENT ROUTE</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Map className="w-4 h-4" />
-                    <span>{formatDistance(mainRoute.totalMetrics?.distance || 0)}</span>
+                </div>
+
+                {/* Route Details */}
+                <div className="p-4 space-y-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 text-stone-200">
+                      <Clock className="w-4 h-4 text-stone-400" />
+                      <span>{formatDuration(mainRoute.totalMetrics?.duration || 0)}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-stone-200">
+                      <Map className="w-4 h-4 text-stone-400" />
+                      <span>{formatDistance(mainRoute.totalMetrics?.distance || 0)}</span>
+                    </div>
                   </div>
+
                   {mainRoute.alternatives && mainRoute.alternatives.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-stone-700">
-                      <p className="text-sm text-stone-400">
+                    <div className="pt-3 border-t border-stone-800/50">
+                      <p className="text-xs text-stone-400">
                         {mainRoute.alternatives.length} alternative{' '}
                         {mainRoute.alternatives.length === 1 ? 'route' : 'routes'} available
                       </p>

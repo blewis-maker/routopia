@@ -39,64 +39,62 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
   return (
     <>
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${
-        isLandingPage ? 'bg-transparent' : 'glass-effect'
+        isLandingPage ? 'bg-transparent' : 'bg-[#1B1B1B]/95 backdrop-blur-sm border-b border-stone-800/50'
       } ${className}`}>
-        <div className="nav-bar__container">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
-            <Link href="/" className="nav-bar__logo group flex items-center gap-3 hover:opacity-80 transition-opacity duration-300">
-              <div className="relative w-8 h-8 transform group-hover:scale-110 transition-transform duration-300">
+            <Link href="/" className="group flex items-center gap-3 hover:opacity-80 transition-opacity duration-300">
+              <div className="relative w-8 h-8">
                 <Image
                   src={Logo}
                   alt="Routopia Logo"
                   width={36}
                   height={36}
-                  className="nav-bar__logo-image animate-float"
+                  className="w-8 h-8"
                   priority
                 />
               </div>
-              <span className="nav-bar__logo-text text-lg font-semibold tracking-wide bg-gradient-to-r from-teal-300 via-teal-400 to-emerald-400 bg-clip-text text-transparent group-hover:from-teal-200 group-hover:to-emerald-300 transition-all duration-300">
+              <span className="text-lg font-medium text-stone-200">
                 Routopia
               </span>
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
+            <div className="hidden md:flex items-center gap-6">
               {!isLandingPage && (
-                <>
-                  <Link
-                    href="/route-planner"
-                    className="text-stone-300 hover:text-white transition-colors duration-200 font-medium"
-                  >
-                    Route Planner
-                  </Link>
-                </>
+                <Link
+                  href="/route-planner"
+                  className="text-sm text-stone-300 hover:text-stone-200 transition-colors duration-200"
+                >
+                  Route Planner
+                </Link>
               )}
               {user ? (
-                <div className="flex items-center space-x-4">
-                  {user?.name && (
-                    <span className="text-sm text-stone-300">
-                      {user.name}
-                    </span>
-                  )}
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-stone-400">
+                    {user.name}
+                  </span>
                   {user.image ? (
-                    <Image
-                      src={user.image || ''}
-                      alt={user.name || 'User'}
-                      width={32}
-                      height={32}
-                      className="rounded-full"
-                    />
+                    <div className="relative w-8 h-8 rounded-full overflow-hidden border border-stone-700/50">
+                      <Image
+                        src={user.image}
+                        alt={user.name || 'User'}
+                        width={32}
+                        height={32}
+                        className="rounded-full"
+                      />
+                    </div>
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-teal-900 flex items-center justify-center">
-                      <span className="text-sm font-medium text-teal-300">
+                    <div className="w-8 h-8 rounded-full bg-stone-800 border border-stone-700/50 flex items-center justify-center">
+                      <span className="text-sm font-medium text-stone-300">
                         {user.name?.[0] || '?'}
                       </span>
                     </div>
                   )}
                   <button
                     onClick={handleSignOut}
-                    className="text-sm text-stone-300 hover:text-white transition-colors duration-200"
+                    className="text-sm text-stone-400 hover:text-stone-300 transition-colors duration-200"
                   >
                     Sign Out
                   </button>
@@ -104,7 +102,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
               ) : (
                 <button
                   onClick={handleSignIn}
-                  className="flex items-center gap-2 text-stone-300 hover:text-white transition-colors duration-200 font-medium"
+                  className="flex items-center gap-2 text-sm text-stone-300 hover:text-stone-200 transition-colors duration-200"
                 >
                   <User className="w-4 h-4" />
                   Sign In
@@ -115,12 +113,12 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
             {/* Mobile menu button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-md text-stone-300 hover:text-white"
+              className="md:hidden p-2 text-stone-400 hover:text-stone-300 transition-colors duration-200"
             >
               {isMobileMenuOpen ? (
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5" />
               ) : (
-                <Menu className="h-6 w-6" />
+                <Menu className="h-5 w-5" />
               )}
             </button>
           </div>
@@ -132,7 +130,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
           transition-all duration-300 ease-in-out
           ${isMobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}
           overflow-hidden
-          bg-stone-900/80 backdrop-blur-md
+          bg-[#1B1B1B]/95 backdrop-blur-sm border-t border-stone-800/50
         `}>
           <div className="px-4 pt-2 pb-3 space-y-1">
             {!isLandingPage && (

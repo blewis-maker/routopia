@@ -205,7 +205,7 @@ export function SearchBox({
             userTypedRef.current = true;
           }}
           placeholder={placeholder}
-          className="w-full px-4 py-2 bg-stone-900/80 backdrop-blur-sm text-white rounded-lg border border-stone-800 focus:outline-none focus:border-emerald-500"
+          className="w-full px-4 py-2.5 bg-[#1B1B1B]/95 text-stone-200 rounded-lg border border-stone-800/50 focus:outline-none focus:border-emerald-500/30 focus:ring-1 focus:ring-emerald-500/30 placeholder-stone-500"
           onFocus={() => {
             if (userTypedRef.current) {
               setIsOpen(true);
@@ -232,11 +232,11 @@ export function SearchBox({
       )}
 
       {isOpen && results.length > 0 && (
-        <div className="absolute w-full mt-2 bg-stone-800 rounded-lg shadow-lg border border-stone-700 z-50">
+        <div className="absolute w-full mt-2 bg-[#1B1B1B]/95 rounded-lg border border-stone-800/50 shadow-lg backdrop-blur-sm z-50">
           {results.map((result, index) => (
             <button
-              key={`${result.place_name}-${index}-${Date.now()}`}
-              className="w-full px-4 py-2 text-left hover:bg-stone-700 first:rounded-t-lg last:rounded-b-lg"
+              key={`${result.place_name}-${index}`}
+              className="w-full px-4 py-2.5 text-left hover:bg-stone-800/50 first:rounded-t-lg last:rounded-b-lg"
               onClick={() => {
                 setQuery(result.place_name);
                 onSelect({
@@ -247,7 +247,7 @@ export function SearchBox({
                 setIsOpen(false);
               }}
             >
-              <div className="text-white truncate">
+              <div className="text-stone-200 truncate">
                 {result.business_name && (
                   <div className="font-medium">{result.business_name}</div>
                 )}

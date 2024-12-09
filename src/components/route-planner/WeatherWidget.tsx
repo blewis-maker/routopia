@@ -33,7 +33,7 @@ export function WeatherWidget({ data }: WeatherWidgetProps) {
   const tempF = Math.round((data.temperature * 9/5) + 32);
 
   return (
-    <div className="px-4 py-2 text-white bg-stone-900/80 backdrop-blur-sm rounded-lg border border-stone-800">
+    <div className="bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg border border-stone-800/50 px-4 py-3">
       <div className="flex items-center gap-6">
         {/* Temperature and Location Section */}
         <div className="flex items-center gap-2.5">
