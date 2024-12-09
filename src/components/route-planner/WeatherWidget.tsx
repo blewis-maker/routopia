@@ -1,11 +1,13 @@
-import { Sun, Cloud, CloudRain, CloudSnow, CloudFog, Moon } from 'lucide-react';
+import { Cloud, CloudRain, CloudSnow, Sun, Wind, Droplets } from 'lucide-react';
 
 interface WeatherData {
   temperature: number;
   conditions: string;
   windSpeed: number;
   humidity: number;
+  precipitation?: number;
   icon: string;
+  location?: string;
 }
 
 interface WeatherWidgetProps {
@@ -13,47 +15,53 @@ interface WeatherWidgetProps {
 }
 
 export function WeatherWidget({ data }: WeatherWidgetProps) {
-  const getWeatherIcon = (condition: string, icon: string) => {
-    // Check if it's night (icon codes ending with 'n')
-    const isNight = icon.endsWith('n');
-    const conditionLower = condition.toLowerCase();
-
-    if (isNight && conditionLower.includes('clear')) {
-      return <Moon className="w-8 h-8 text-stone-300" />;
-    }
-    
-    if (conditionLower.includes('clear') || conditionLower.includes('sun')) {
-      return <Sun className="w-8 h-8 text-yellow-400" />;
-    }
-    if (conditionLower.includes('rain')) {
-      return <CloudRain className="w-8 h-8 text-blue-400" />;
-    }
-    if (conditionLower.includes('snow')) {
-      return <CloudSnow className="w-8 h-8 text-blue-200" />;
-    }
-    if (conditionLower.includes('fog') || conditionLower.includes('mist')) {
-      return <CloudFog className="w-8 h-8 text-stone-400" />;
-    }
-    if (conditionLower.includes('cloud')) {
-      return <Cloud className="w-8 h-8 text-stone-300" />;
-    }
-    
-    return <Sun className="w-8 h-8 text-yellow-400" />;
+  const getWeatherIcon = () => {
+    const condition = data.conditions.toLowerCase();
+    if (condition.includes('rain')) return <CloudRain className="w-6 h-6 text-blue-400" />;
+    if (condition.includes('snow')) return <CloudSnow className="w-6 h-6 text-blue-200" />;
+    if (condition.includes('cloud')) return <Cloud className="w-6 h-6 text-stone-300" />;
+    return <Sun className="w-6 h-6 text-yellow-400" />;
   };
+
+  // Extract city and state from location if available
+  const locationParts = data.location?.split(',').map(part => part.trim()) || [];
+  const city = locationParts[1];
+  const state = locationParts[2]?.split(' ')[0];
+  const locationDisplay = city && state ? `${city}, ${state}` : '';
 
   // Convert Celsius to Fahrenheit
   const tempF = Math.round((data.temperature * 9/5) + 32);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2">
-      {getWeatherIcon(data.conditions, data.icon)}
-      <div className="text-lg font-medium text-white">
-        {tempF}°F
-      </div>
-      <div className="text-stone-300 text-sm border-l border-stone-700 pl-3 flex gap-4">
-        <span className="capitalize">{data.conditions}</span>
-        <span>Wind: {Math.round(data.windSpeed * 2.237)} mph</span>
-        <span>Humidity: {data.humidity}%</span>
+    <div className="px-4 py-2 text-white bg-stone-900/80 backdrop-blur-sm rounded-lg border border-stone-800">
+      <div className="flex items-center gap-6">
+        {/* Temperature and Location Section */}
+        <div className="flex items-center gap-2.5">
+          {getWeatherIcon()}
+          <div className="flex flex-col">
+            <span className="text-xl font-semibold leading-none mb-0.5">{tempF}°F</span>
+            {locationDisplay && (
+              <span className="text-xs font-medium text-emerald-400/90">
+                {locationDisplay}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="h-6 w-px bg-stone-700/50"></div>
+
+        {/* Weather Details Section */}
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1 text-sm text-stone-200">
+            <Wind className="w-4 h-4 text-stone-400" />
+            {Math.round(data.windSpeed)} mph
+          </span>
+          <span className="flex items-center gap-1 text-sm text-stone-200">
+            <Droplets className="w-4 h-4 text-blue-400" />
+            {data.precipitation ?? Math.round(data.humidity / 10)}%
+          </span>
+        </div>
       </div>
     </div>
   );

@@ -25,6 +25,7 @@ interface WeatherData {
   windSpeed: number;
   humidity: number;
   icon: string;
+  location?: string;
 }
 
 export default function RoutePlannerPage() {
@@ -99,12 +100,15 @@ export default function RoutePlannerPage() {
 
         if (result.results[0]) {
           const address = result.results[0].formatted_address;
-          const shortAddress = address.split(',')[0];
+          const addressParts = address.split(',').map(part => part.trim());
+          const street = addressParts[0];
+          const city = addressParts[1];
+          const state = addressParts[2]?.split(' ')[0];
+          const displayAddress = `${street}, ${city}, ${state}`;
 
-          // Set location as if user selected it from search
           setUserLocation({
             coordinates: [lng, lat],
-            address: shortAddress
+            address: displayAddress
           });
           setMapCenter([lng, lat]);
           setMapZoom(14);
@@ -113,13 +117,12 @@ export default function RoutePlannerPage() {
             coordinates: [lng, lat]
           });
 
-          // Fetch weather data for the location
-          await fetchWeatherData(lat, lng);
-
-          // Update marker on map
           if (mapServiceRef.current) {
             mapServiceRef.current.addUserLocationMarker({ lat, lng });
           }
+
+          // Pass full address to fetchWeatherData
+          await fetchWeatherData(lat, lng, address);
         }
       } catch (error) {
         console.error('Error getting user location:', error);
@@ -264,9 +267,14 @@ export default function RoutePlannerPage() {
     if (!('coordinates' in result)) return;
     
     const [lng, lat] = result.coordinates;
-    const shortAddress = result.place_name.split(',')[0];
+    // Get city and state from the full address
+    const addressParts = result.place_name.split(',').map(part => part.trim());
+    const street = addressParts[0];
+    const city = addressParts[1];
+    const state = addressParts[2]?.split(' ')[0];
+    const displayAddress = `${street}, ${city}, ${state}`;
     
-    console.log('Updating location:', { lng, lat, address: shortAddress });
+    console.log('Updating location:', { lng, lat, address: displayAddress });
     
     // Update map center first
     setMapCenter([lng, lat]);
@@ -282,10 +290,10 @@ export default function RoutePlannerPage() {
       }
     }
     
-    // Update state
+    // Update state with full address
     setUserLocation({
       coordinates: [lng, lat],
-      address: shortAddress
+      address: displayAddress
     });
     
     setWeatherInfo({
@@ -293,19 +301,23 @@ export default function RoutePlannerPage() {
       coordinates: [lng, lat]
     });
     
-    fetchWeatherData(lat, lng);
+    // Pass full location to fetchWeatherData
+    fetchWeatherData(lat, lng, result.place_name);
   };
 
   // Fix the route prop type error
   const routeToPass = mainRoute || undefined;
 
   // Add this function to fetch weather data
-  const fetchWeatherData = async (lat: number, lng: number) => {
+  const fetchWeatherData = async (lat: number, lng: number, location?: string) => {
     try {
       const response = await fetch(`/api/weather?lat=${lat}&lng=${lng}`);
       if (!response.ok) throw new Error('Failed to fetch weather');
       const data = await response.json();
-      setWeatherData(data);
+      setWeatherData({
+        ...data,
+        location: location // Add location to weather data
+      });
     } catch (error) {
       console.error('Error fetching weather:', error);
     }
