@@ -72,9 +72,14 @@ export default function RoutePlannerPage() {
   const [mainRoute, setMainRoute] = useState<Route | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [routeType, setRouteType] = useState<'drive' | 'bike' | 'run' | 'ski' | 'adventure'>('drive');
 
   const handleChatMessage = async (message: string) => {
+    let controller: AbortController | null = new AbortController();
+    
     try {
+      setIsGenerating(true);
       setMessages(prev => [...prev, { type: 'user', content: message }]);
       setMessages(prev => [...prev, { type: 'assistant', content: '...' }]);
 
@@ -85,22 +90,22 @@ export default function RoutePlannerPage() {
           message,
           context: {
             start: userLocation?.address || null,
-            message, // Include the user's message for context
-            mode: 'car',
+            message,
+            mode: routeType,
             weather: weatherData ? {
               temperature: weatherData.temperature || 0,
               conditions: weatherData.conditions || 'unknown',
               windSpeed: weatherData.windSpeed || 0
             } : null
           }
-        })
+        }),
+        signal: controller.signal
       });
 
       const data = await response.json();
-
       if (!response.ok) throw new Error(data.error || 'Failed to process request');
 
-      // Remove typing indicator and add AI response
+      // Remove typing indicator
       setMessages(prev => {
         const newMessages = prev.filter(msg => msg.content !== '...');
         return [...newMessages, { 
@@ -109,22 +114,55 @@ export default function RoutePlannerPage() {
         }];
       });
 
-      // If we have a suggestion, automatically generate the route
+      // If we have a suggestion, update the destination and generate route
       if (data.suggestion) {
-        await handleAddToRoute(data.suggestion);
+        // Create a destination object that matches the search box format
+        const destinationInfo = {
+          coordinates: [data.suggestion.location.lng, data.suggestion.location.lat],
+          formatted_address: data.suggestion.name,
+          place_name: data.suggestion.name,
+          place_id: `suggestion-${Date.now()}` // Add a unique ID
+        };
+
+        try {
+          // Update the destination using the search box handler
+          await handleDestinationSelect(destinationInfo);
+          
+          // After destination is set, add to route
+          await handleAddToRoute(data.suggestion);
+        } catch (error) {
+          console.error('Failed to update destination:', error);
+          setMessages(prev => [...prev, {
+            type: 'assistant',
+            content: 'I found a location but had trouble setting it as the destination. Please try again.'
+          }]);
+        }
       }
 
     } catch (error) {
-      console.error('Chat error:', error);
-      setMessages(prev => {
-        const newMessages = prev.filter(msg => msg.content !== '...');
-        return [...newMessages, {
-          type: 'assistant',
-          content: error instanceof Error ? 
-            `I apologize, but I encountered an error: ${error.message}` : 
-            'I apologize, but I encountered an unexpected error.'
-        }];
-      });
+      if (error.name === 'AbortError') {
+        setMessages(prev => prev.filter(msg => msg.content !== '...'));
+      } else {
+        console.error('Chat error:', error);
+        setMessages(prev => {
+          const newMessages = prev.filter(msg => msg.content !== '...');
+          return [...newMessages, {
+            type: 'assistant',
+            content: error instanceof Error ? 
+              `I apologize, but I encountered an error: ${error.message}` : 
+              'I apologize, but I encountered an unexpected error.'
+          }];
+        });
+      }
+    } finally {
+      setIsGenerating(false);
+      controller = null;
+    }
+  };
+
+  const handleCancelGeneration = () => {
+    if (controller) {
+      controller.abort();
     }
   };
 

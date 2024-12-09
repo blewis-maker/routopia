@@ -2,18 +2,18 @@ import { useState, useEffect, useRef } from 'react';
 import { useDebounce } from '@/hooks/useDebounce';
 import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
 
-export interface SearchResult {
-  place_name: string;
+interface SearchResult {
   coordinates: [number, number];
-  business_name?: string;
-  formatted_address?: string;
+  formatted_address: string;
+  place_name?: string;
+  place_id?: string;
 }
 
-export interface SearchBoxProps {
+interface SearchBoxProps {
   onSelect: (result: SearchResult) => void;
   placeholder?: string;
-  useCurrentLocation?: boolean;
   initialValue?: string;
+  useCurrentLocation?: boolean;
   className?: string;
 }
 
@@ -134,6 +134,28 @@ export function SearchBox({
     searchPlaces();
   }, [debouncedQuery]);
 
+  const handleSearchResult = (result: google.maps.places.AutocompletePrediction) => {
+    if (!placesService.current) return;
+
+    placesService.current.getDetails(
+      { placeId: result.place_id },
+      (place: google.maps.places.PlaceResult | null) => {
+        if (place && place.geometry?.location) {
+          const searchResult: SearchResult = {
+            coordinates: [
+              place.geometry.location.lng(),
+              place.geometry.location.lat()
+            ],
+            formatted_address: place.formatted_address || result.description,
+            place_name: place.name,
+            place_id: place.place_id
+          };
+          onSelect(searchResult);
+        }
+      }
+    );
+  };
+
   const handleCurrentLocation = async () => {
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -148,18 +170,12 @@ export function SearchBox({
 
       if (result.results[0]) {
         const address = result.results[0].formatted_address;
-        // Format address to match our standard format
-        const addressParts = address.split(',').map(part => part.trim());
-        const street = addressParts[0];
-        const city = addressParts[1];
-        const state = addressParts[2]?.split(' ')[0];
-        const displayAddress = `${street}, ${city}, ${state}`;
-
-        onSelect({
+        const searchResult: SearchResult = {
           coordinates: [lng, lat],
-          place_name: displayAddress,
-          formatted_address: displayAddress
-        });
+          formatted_address: address,
+          place_name: address
+        };
+        onSelect(searchResult);
       }
     } catch (error) {
       console.error('Error getting current location:', error);
@@ -222,8 +238,12 @@ export function SearchBox({
               key={`${result.place_name}-${index}-${Date.now()}`}
               className="w-full px-4 py-2 text-left hover:bg-stone-700 first:rounded-t-lg last:rounded-b-lg"
               onClick={() => {
-                setQuery(result.place_name.split(',')[0]);
-                onSelect(result);
+                setQuery(result.place_name);
+                onSelect({
+                  coordinates: result.coordinates,
+                  formatted_address: result.formatted_address || result.place_name,
+                  place_name: result.place_name
+                });
                 setIsOpen(false);
               }}
             >
