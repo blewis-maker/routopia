@@ -22,6 +22,7 @@ export class GoogleMapsManager implements MapServiceInterface {
   private directionsService: google.maps.DirectionsService | null = null;
   private placesService: google.maps.places.PlacesService | null = null;
   private userLocationMarker: google.maps.Marker | null = null;
+  private userLocationOverlay: google.maps.OverlayView | null = null;
 
   constructor() {
     // Remove the loader initialization as we'll use GoogleMapsLoader
@@ -159,9 +160,14 @@ export class GoogleMapsManager implements MapServiceInterface {
   async addUserLocationMarker(location: Coordinates): Promise<void> {
     if (!this.map) return;
 
-    // Remove existing marker if any
+    // Remove existing marker and overlay if any
     if (this.userLocationMarker) {
       this.userLocationMarker.setMap(null);
+      this.userLocationMarker = null;
+    }
+    if (this.userLocationOverlay) {
+      this.userLocationOverlay.setMap(null);
+      this.userLocationOverlay = null;
     }
 
     // Create marker with a small transparent icon
@@ -243,7 +249,10 @@ export class GoogleMapsManager implements MapServiceInterface {
     };
 
     overlay.setMap(this.map);
+    
+    // Store references to both marker and overlay
     this.userLocationMarker = marker;
+    this.userLocationOverlay = overlay;
   }
 
   setCenter(coordinates: Coordinates): void {
@@ -718,5 +727,38 @@ export class GoogleMapsManager implements MapServiceInterface {
       marker.setMap(null);
     });
     this.markers.clear();
+  }
+
+  async generateDirectionsRoute(start: Coordinates, end: Coordinates): Promise<google.maps.DirectionsResult> {
+    if (!this.directionsService || !this.map) {
+      throw new Error('Map or DirectionsService not initialized');
+    }
+
+    const request: google.maps.DirectionsRequest = {
+      origin: start,
+      destination: end,
+      travelMode: google.maps.TravelMode.DRIVING
+    };
+
+    return new Promise((resolve, reject) => {
+      this.directionsService?.route(request, (result, status) => {
+        if (status === google.maps.DirectionsStatus.OK && result) {
+          // Create DirectionsRenderer to display the route
+          const directionsRenderer = new google.maps.DirectionsRenderer({
+            map: this.map,
+            suppressMarkers: true, // We'll handle markers ourselves
+            polylineOptions: {
+              strokeColor: '#10b981', // Teal color
+              strokeWeight: 4,
+              strokeOpacity: 0.8
+            }
+          });
+          directionsRenderer.setDirections(result);
+          resolve(result);
+        } else {
+          reject(new Error('Failed to generate route'));
+        }
+      });
+    });
   }
 } 

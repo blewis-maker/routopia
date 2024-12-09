@@ -5,17 +5,26 @@ import { Route, RoutePreferences } from '@/types/route/types';
 import { Location } from '@/types';
 import { ActivityType } from '@/types/activity';
 import { MapView } from '@/components/shared/MapView';
-import { WeatherWidget } from '@/components/dashboard/WeatherWidget';
+import { WeatherWidget } from '@/components/route-planner/WeatherWidget';
 import { SearchBox } from '@/components/navigation/SearchBox';
 import ChatWindow from '@/components/chat/ChatWindow';
 import Image from 'next/image';
 import { Coordinates } from '@/services/maps/MapServiceInterface';
 import { useTheme } from 'next-themes';
 import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
+import { GoogleMapsManager } from '@/services/maps/GoogleMapsManager';
 
 interface WeatherInfo {
   location: string;
   coordinates: [number, number];
+}
+
+interface WeatherData {
+  temperature: number;
+  conditions: string;
+  windSpeed: number;
+  humidity: number;
+  icon: string;
 }
 
 export default function RoutePlannerPage() {
@@ -23,10 +32,13 @@ export default function RoutePlannerPage() {
   const [mainRoute, setMainRoute] = useState<Route | null>(null);
   const [tributaryRoutes, setTributaryRoutes] = useState<Route[]>([]);
   const [userLocation, setUserLocation] = useState<Location | null>(null);
+  const [destinationLocation, setDestinationLocation] = useState<Location | null>(null);
   const [weatherInfo, setWeatherInfo] = useState<WeatherInfo | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([-105.0749801, 40.5852602]); // Default to Berthoud, CO
   const [mapZoom, setMapZoom] = useState(12);
   const geocoder = useRef<google.maps.Geocoder | null>(null);
+  const mapServiceRef = useRef<GoogleMapsManager | null>(null);
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
 
   const [preferences, setPreferences] = useState<RoutePreferences>({
     activityType: ActivityType.WALK,
@@ -65,23 +77,22 @@ export default function RoutePlannerPage() {
     initGoogleServices();
   }, []);
 
-  // Get initial user location
+  // Get user's location on page load
   useEffect(() => {
     const getUserLocation = async () => {
-      if (!geocoder.current) return;
+      if (!geocoder.current) {
+        await GoogleMapsLoader.getInstance().load();
+        geocoder.current = new google.maps.Geocoder();
+      }
 
       try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0
-          });
+          navigator.geolocation.getCurrentPosition(resolve, reject);
         });
 
         const { latitude: lat, longitude: lng } = position.coords;
-        
-        // Reverse geocode the coordinates
+
+        // Reverse geocode to get address
         const result = await geocoder.current.geocode({
           location: { lat, lng }
         });
@@ -89,8 +100,8 @@ export default function RoutePlannerPage() {
         if (result.results[0]) {
           const address = result.results[0].formatted_address;
           const shortAddress = address.split(',')[0];
-          
-          // Update state as if user selected this location
+
+          // Set location as if user selected it from search
           setUserLocation({
             coordinates: [lng, lat],
             address: shortAddress
@@ -101,14 +112,37 @@ export default function RoutePlannerPage() {
             location: address,
             coordinates: [lng, lat]
           });
+
+          // Fetch weather data for the location
+          await fetchWeatherData(lat, lng);
+
+          // Update marker on map
+          if (mapServiceRef.current) {
+            mapServiceRef.current.addUserLocationMarker({ lat, lng });
+          }
         }
       } catch (error) {
-        console.error('Error getting location:', error);
+        console.error('Error getting user location:', error);
       }
     };
 
     getUserLocation();
-  }, [geocoder.current]);
+  }, []);
+
+  // Update marker when user location changes
+  useEffect(() => {
+    if (userLocation && mapServiceRef.current) {
+      const [lng, lat] = userLocation.coordinates;
+      mapServiceRef.current.addUserLocationMarker({ lat, lng });
+    }
+  }, [userLocation]);
+
+  // Update map center when user location changes
+  useEffect(() => {
+    if (userLocation) {
+      setMapCenter(userLocation.coordinates);
+    }
+  }, [userLocation]);
 
   // Auto-scroll chat to bottom when new messages arrive
   useEffect(() => {
@@ -162,6 +196,45 @@ export default function RoutePlannerPage() {
     }
   };
 
+  const generateRoute = async (start: [number, number], end: [number, number]) => {
+    try {
+      const response = await fetch('/api/routes/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start,
+          end,
+          preferences
+        })
+      });
+
+      const data = await response.json();
+      if (data.route) {
+        setMainRoute(data.route);
+        setWeatherInfo({
+          location: data.route.name,
+          coordinates: end
+        });
+
+        // Adjust map to show the entire route
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend({ lat: start[1], lng: start[0] });
+        bounds.extend({ lat: end[1], lng: end[0] });
+        
+        // Get the center and zoom from the bounds
+        const center = [
+          (bounds.getCenter().lng()),
+          (bounds.getCenter().lat())
+        ] as [number, number];
+        
+        setMapCenter(center);
+        setMapZoom(14); // We can adjust this based on the route distance
+      }
+    } catch (error) {
+      console.error('Route generation error:', error);
+    }
+  };
+
   const handleMapClick = async (coordinates: Coordinates) => {
     if (!userLocation) {
       // If no starting point is set, use clicked location as start
@@ -171,28 +244,70 @@ export default function RoutePlannerPage() {
       });
     } else {
       // If starting point exists, generate route to clicked location
-      try {
-        const response = await fetch('/api/routes/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            start: userLocation.coordinates,
-            end: [coordinates.lng, coordinates.lat],
-            preferences
-          })
-        });
+      const end: [number, number] = [coordinates.lng, coordinates.lat];
+      await generateRoute(userLocation.coordinates, end);
+    }
+  };
 
-        const data = await response.json();
-        if (data.route) {
-          setMainRoute(data.route);
-          setWeatherInfo({
-            location: data.route.name,
-            coordinates: [coordinates.lng, coordinates.lat]
-          });
-        }
+  const handleMapServiceInit = (service: GoogleMapsManager) => {
+    console.log('Map service initialized');
+    mapServiceRef.current = service;
+    
+    // If we have a user location, update the marker
+    if (userLocation) {
+      const [lng, lat] = userLocation.coordinates;
+      service.addUserLocationMarker({ lat, lng });
+    }
+  };
+
+  const handleLocationSelect = async (result: any) => {
+    if (!('coordinates' in result)) return;
+    
+    const [lng, lat] = result.coordinates;
+    const shortAddress = result.place_name.split(',')[0];
+    
+    console.log('Updating location:', { lng, lat, address: shortAddress });
+    
+    // Update map center first
+    setMapCenter([lng, lat]);
+    setMapZoom(14);
+    
+    // Update marker if map service is available
+    if (mapServiceRef.current) {
+      try {
+        console.log('Updating marker position');
+        await mapServiceRef.current.addUserLocationMarker({ lat, lng });
       } catch (error) {
-        console.error('Route generation error:', error);
+        console.error('Error updating marker:', error);
       }
+    }
+    
+    // Update state
+    setUserLocation({
+      coordinates: [lng, lat],
+      address: shortAddress
+    });
+    
+    setWeatherInfo({
+      location: result.place_name,
+      coordinates: [lng, lat]
+    });
+    
+    fetchWeatherData(lat, lng);
+  };
+
+  // Fix the route prop type error
+  const routeToPass = mainRoute || undefined;
+
+  // Add this function to fetch weather data
+  const fetchWeatherData = async (lat: number, lng: number) => {
+    try {
+      const response = await fetch(`/api/weather?lat=${lat}&lng=${lng}`);
+      if (!response.ok) throw new Error('Failed to fetch weather');
+      const data = await response.json();
+      setWeatherData(data);
+    } catch (error) {
+      console.error('Error fetching weather:', error);
     }
   };
 
@@ -228,57 +343,91 @@ export default function RoutePlannerPage() {
         <MapView
           center={mapCenter}
           zoom={mapZoom}
-          route={mainRoute}
+          route={routeToPass}
           onMapClick={handleMapClick}
           showWeather={false}
           showElevation={!!mainRoute}
           showUserLocation={true}
           darkMode={theme === 'dark'}
+          onMapInit={handleMapServiceInit}
         />
 
         {/* Search Box Overlay */}
-        <div className="absolute top-4 left-4 z-10 w-96 max-w-[calc(100%-2rem)]">
+        <div className="absolute top-4 left-4 z-10 w-96 max-w-[calc(100%-2rem)] space-y-2">
           <SearchBox 
-            onSelect={(result) => {
+            onSelect={handleLocationSelect}
+            placeholder="Set your starting point..."
+            useCurrentLocation={true}
+            initialValue={userLocation?.address || ''}
+            key={userLocation?.address} // Force re-render when address changes
+          />
+          <SearchBox 
+            onSelect={async (result) => {
               if ('coordinates' in result) {
                 const [lng, lat] = result.coordinates;
                 const shortAddress = result.place_name.split(',')[0];
                 
-                setUserLocation({
+                setDestinationLocation({
                   coordinates: [lng, lat],
                   address: shortAddress
                 });
-                setMapCenter([lng, lat]);
-                setMapZoom(14);
-                setWeatherInfo({
-                  location: result.place_name,
-                  coordinates: [lng, lat]
-                });
+
+                // If we have both start and end locations, generate a route using Google's DirectionsService
+                if (userLocation && mapServiceRef.current) {
+                  try {
+                    const startCoords = { lat: userLocation.coordinates[1], lng: userLocation.coordinates[0] };
+                    const endCoords = { lat, lng };
+                    
+                    const directionsResult = await mapServiceRef.current.generateDirectionsRoute(startCoords, endCoords);
+                    
+                    // Update route info if needed
+                    if (directionsResult.routes[0]) {
+                      const route = directionsResult.routes[0];
+                      const leg = route.legs[0];
+                      if (leg) {
+                        setMainRoute({
+                          id: 'google-route',
+                          name: `Route to ${shortAddress}`,
+                          segments: [{
+                            startPoint: {
+                              latitude: userLocation.coordinates[1],
+                              longitude: userLocation.coordinates[0]
+                            },
+                            endPoint: {
+                              latitude: lat,
+                              longitude: lng
+                            },
+                            distance: leg.distance?.value || 0,
+                            duration: leg.duration?.value || 0,
+                            type: 'LineString'
+                          }],
+                          totalMetrics: {
+                            distance: (leg.distance?.value || 0) / 1000, // Convert to km
+                            duration: leg.duration?.value || 0,
+                          },
+                          preferences: preferences
+                        });
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Error generating route:', error);
+                  }
+                }
               }
             }}
-            placeholder="Set your starting point..."
-            useCurrentLocation={true}
-            initialValue={userLocation?.address || ''}
+            placeholder="Choose destination..."
+            initialValue={destinationLocation?.address || ''}
           />
         </div>
 
         {/* Weather Banner - Center Top */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-          <div className="bg-stone-900/80 backdrop-blur-sm shadow-lg rounded-lg border border-stone-800">
-            <WeatherWidget 
-              coordinates={weatherInfo ? {
-                lat: weatherInfo.coordinates[1],
-                lng: weatherInfo.coordinates[0]
-              } : {
-                lat: mapCenter[1],
-                lng: mapCenter[0]
-              }}
-            />
-            <div className="text-xs text-stone-300 text-center px-4 pb-2">
-              {weatherInfo?.location ? 'Berthoud, CO' : ''}
+        {weatherData && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+            <div className="bg-stone-900/80 backdrop-blur-sm shadow-lg rounded-lg border border-stone-800">
+              <WeatherWidget data={weatherData} />
             </div>
           </div>
-        </div>
+        )}
 
         {/* Route Information Overlay */}
         {mainRoute && (

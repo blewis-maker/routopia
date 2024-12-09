@@ -33,6 +33,7 @@ export function SearchBox({
   const geocoder = useRef<google.maps.Geocoder | null>(null);
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
+  const userTypedRef = useRef(false);
 
   // Initialize Google services
   useEffect(() => {
@@ -62,13 +63,14 @@ export function SearchBox({
   useEffect(() => {
     if (initialValue) {
       setQuery(initialValue);
+      userTypedRef.current = false; // Reset user typed flag when initialValue changes
     }
   }, [initialValue]);
 
   // Handle search
   useEffect(() => {
     const searchPlaces = async () => {
-      if (!debouncedQuery || !autocompleteService.current) return;
+      if (!debouncedQuery || !autocompleteService.current || !userTypedRef.current) return;
 
       setIsLoading(true);
       try {
@@ -182,10 +184,17 @@ export function SearchBox({
         <input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            userTypedRef.current = true;
+          }}
           placeholder={placeholder}
           className="w-full px-4 py-2 bg-stone-900/80 backdrop-blur-sm text-white rounded-lg border border-stone-800 focus:outline-none focus:border-emerald-500"
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => {
+            if (userTypedRef.current) {
+              setIsOpen(true);
+            }
+          }}
         />
         {isLoading && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">

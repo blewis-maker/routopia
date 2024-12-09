@@ -8,12 +8,13 @@ import { Coordinates } from '@/services/maps/MapServiceInterface';
 interface MapViewProps {
   center: [number, number];
   zoom: number;
-  route: Route | null;
+  route?: Route;
   onMapClick?: (coordinates: Coordinates) => void;
   showWeather?: boolean;
   showElevation?: boolean;
   showUserLocation?: boolean;
   darkMode?: boolean;
+  onMapInit?: (service: GoogleMapsManager) => void;
 }
 
 export function MapView({
@@ -24,11 +25,12 @@ export function MapView({
   showWeather = false,
   showElevation = false,
   showUserLocation = true,
-  darkMode = true
+  darkMode = true,
+  onMapInit
 }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [mapService, setMapService] = useState<GoogleMapsManager | null>(null);
-  const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Initialize map
   useEffect(() => {
@@ -48,6 +50,8 @@ export function MapView({
         if (!isMounted) return;
 
         setMapService(service);
+        setIsInitialized(true);
+        onMapInit?.(service);
 
         // Add click handler
         if (onMapClick) {
@@ -55,41 +59,9 @@ export function MapView({
             onMapClick(coords);
           });
         }
-
-        // Get user location if enabled
-        if (showUserLocation && navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              if (!isMounted) return;
-              
-              const location = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude
-              };
-              
-              setUserLocation(location);
-              service.setCenter(location);
-              service.setZoom(14);
-              service.addUserLocationMarker(location);
-            },
-            (error) => {
-              if (isMounted) {
-                console.warn('Geolocation error:', error);
-                service.setCenter({ lat: center[1], lng: center[0] });
-                service.setZoom(zoom);
-              }
-            },
-            {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 0
-            }
-          );
-        }
-
       } catch (error) {
         if (isMounted) {
-          console.warn('Map initialization error:', error);
+          console.error('Map initialization error:', error);
         }
       }
     };
@@ -99,12 +71,21 @@ export function MapView({
     return () => {
       isMounted = false;
     };
-  }, [center, zoom, darkMode, onMapClick, showUserLocation]);
+  }, []);
+
+  // Handle center and zoom updates
+  useEffect(() => {
+    if (!mapService || !isInitialized) return;
+
+    console.log('Updating map center:', { lat: center[1], lng: center[0] });
+    mapService.setCenter({ lat: center[1], lng: center[0] });
+    mapService.setZoom(zoom);
+  }, [mapService, isInitialized, center, zoom]);
 
   // Update map when route changes
   useEffect(() => {
     const visualizeRoute = async () => {
-      if (!mapService || !route) return;
+      if (!mapService || !route || !isInitialized) return;
 
       try {
         await mapService.visualizeRoute(route);
@@ -114,7 +95,7 @@ export function MapView({
     };
 
     visualizeRoute();
-  }, [mapService, route]);
+  }, [mapService, route, isInitialized]);
 
   return (
     <div className="w-full h-full relative">
@@ -123,31 +104,6 @@ export function MapView({
         className="w-full h-full"
         id="map-container"
       />
-      
-      {/* Search Bar */}
-      <div className="absolute top-4 left-4 z-10">
-        <SearchBox 
-          onSelect={(result: SearchResult) => {
-            if ('coordinates' in result) {
-              const [lng, lat] = result.coordinates;
-              setUserLocation({
-                lat,
-                lng
-              });
-            }
-          }}
-          placeholder="Set your starting point..."
-          useCurrentLocation={true}
-          className="w-96 max-w-[calc(100%-2rem)]"
-        />
-      </div>
-
-      {showElevation && route && (
-        <div
-          id="elevation-chart"
-          className="absolute bottom-0 left-0 right-0 h-32 bg-stone-900/90 backdrop-blur"
-        />
-      )}
     </div>
   );
 } 
