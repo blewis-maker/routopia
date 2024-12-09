@@ -363,25 +363,33 @@ export class GoogleMapsManager implements MapServiceInterface {
     this.map.setZoom(level);
   }
 
-  addMarker(
+  async addMarker(
     coordinates: Coordinates,
     options?: {
       type?: 'start' | 'end' | 'waypoint';
       draggable?: boolean;
-      icon?: string;
       onClick?: () => void;
       onDragEnd?: (coords: Coordinates) => void;
     }
-  ): string {
+  ): Promise<string> {
     if (!this.map) throw new Error('Map not initialized');
 
     const markerId = `marker-${Date.now()}`;
+    
+    // Create the basic marker
     const marker = new google.maps.Marker({
       position: coordinates,
       map: this.map,
       icon: this.getMarkerIcon(options?.type),
       draggable: options?.draggable
     });
+
+    // Add pulsing effect overlay based on marker type
+    if (options?.type === 'start') {
+      this.createPulsingMarker(coordinates, '#10b981'); // Teal
+    } else if (options?.type === 'end') {
+      this.createPulsingMarker(coordinates, '#8B5CF6'); // Purple
+    }
 
     if (options?.onClick) {
       marker.addListener('click', options.onClick);
@@ -424,7 +432,7 @@ export class GoogleMapsManager implements MapServiceInterface {
       const request: google.maps.DirectionsRequest = {
         origin: route.waypoints.start,
         destination: route.waypoints.end,
-        travelMode: google.maps.TravelMode.DRIVING,  // Force driving mode
+        travelMode: google.maps.TravelMode.DRIVING
       };
 
       const result = await new Promise<google.maps.DirectionsResult>((resolve, reject) => {
@@ -437,15 +445,16 @@ export class GoogleMapsManager implements MapServiceInterface {
         });
       });
 
-      // Use DirectionsRenderer only
+      // Create and configure DirectionsRenderer with purple route
       this.directionsRenderer = new google.maps.DirectionsRenderer({
         map: this.map,
         directions: result,
         suppressMarkers: true,
         polylineOptions: {
-          strokeColor: '#FFFFFF',
-          strokeOpacity: 0.8,
-          strokeWeight: 5
+          strokeColor: '#A78BFA', // Violet-400
+          strokeOpacity: 0.9,
+          strokeWeight: 4,
+          geodesic: true
         }
       });
 
@@ -683,7 +692,7 @@ export class GoogleMapsManager implements MapServiceInterface {
     }
   }
 
-  private getMarkerIcon(type?: 'start' | 'end' | 'waypoint'): google.maps.Symbol | google.maps.Icon {
+  private getMarkerIcon(type?: 'start' | 'end' | 'waypoint'): google.maps.Symbol {
     if (!type) return undefined;
 
     switch (type) {
@@ -698,13 +707,12 @@ export class GoogleMapsManager implements MapServiceInterface {
         };
       case 'end':
         return {
-          path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
-          fillColor: '#ef4444', // Red
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: '#8B5CF6', // Violet-500
           fillOpacity: 1,
           strokeColor: '#ffffff',
-          strokeWeight: 2,
-          scale: 2,
-          anchor: new google.maps.Point(12, 22)
+          strokeWeight: 2
         };
       default:
         return {
@@ -716,6 +724,67 @@ export class GoogleMapsManager implements MapServiceInterface {
           strokeWeight: 2
         };
     }
+  }
+
+  private createPulsingMarker(coordinates: Coordinates, color: string): void {
+    class PulsingMarkerOverlay extends google.maps.OverlayView {
+      private div: HTMLDivElement | null = null;
+      private markerPosition: Coordinates;
+
+      constructor(position: Coordinates) {
+        super();
+        this.markerPosition = position;
+      }
+
+      onAdd(): void {
+        const div = document.createElement('div');
+        div.style.position = 'absolute';
+        div.style.width = '18px';
+        div.style.height = '18px';
+        div.innerHTML = `
+          <div style="position: relative; width: 100%; height: 100%;">
+            <div style="position: absolute; width: 18px; height: 18px; background: ${color}; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px ${color}80;"></div>
+            <div style="position: absolute; width: 18px; height: 18px; background: ${color}40; border-radius: 50%; animation: pulse 2s ease-out infinite;"></div>
+          </div>
+        `;
+
+        const style = document.createElement('style');
+        style.textContent = `
+          @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(3); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+
+        this.div = div;
+        const panes = this.getPanes();
+        panes?.overlayImage.appendChild(div);
+      }
+
+      draw(): void {
+        if (!this.div) return;
+        const overlayProjection = this.getProjection();
+        const position = overlayProjection.fromLatLngToDivPixel(
+          new google.maps.LatLng(this.markerPosition.lat, this.markerPosition.lng)
+        );
+        
+        if (position) {
+          this.div.style.left = (position.x - 9) + 'px';
+          this.div.style.top = (position.y - 9) + 'px';
+        }
+      }
+
+      onRemove(): void {
+        if (this.div) {
+          this.div.parentNode?.removeChild(this.div);
+          this.div = null;
+        }
+      }
+    }
+
+    const overlay = new PulsingMarkerOverlay(coordinates);
+    overlay.setMap(this.map);
   }
 
   private getTravelMode(activityType: string): google.maps.TravelMode {
