@@ -201,12 +201,23 @@ export default function RoutePlannerPage() {
     const city = addressParts[1];
     const state = addressParts[2]?.split(' ')[0];
     const displayAddress = `${street}, ${city}, ${state}`;
+
+    // Clear existing routes and markers
+    if (mapServiceRef.current) {
+      mapServiceRef.current.clearRoute();
+      mapServiceRef.current.clearDirectionsRenderer();
+    }
     
+    // Reset main route state
+    setMainRoute(null);
+
+    // Update destination location
     setDestinationLocation({
       coordinates: [lng, lat],
       address: displayAddress
     });
 
+    // Generate new route if we have a start location
     if (userLocation) {
       try {
         await generateRoute(userLocation.coordinates, [lng, lat]);

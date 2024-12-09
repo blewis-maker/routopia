@@ -133,6 +133,14 @@ export class GoogleMapsManager implements MapServiceInterface {
     ]
   };
   private mapLayerDark = false;
+  private alternativeRenderers: google.maps.DirectionsRenderer[] = [];
+  private destinationMarkers: Set<google.maps.Marker> = new Set();
+  private destinationOverlays: Set<google.maps.OverlayView> = new Set();
+  private currentMarkers = {
+    start: null as google.maps.Marker | null,
+    end: null as google.maps.Marker | null,
+    overlays: new Set<google.maps.OverlayView>()
+  };
 
   constructor() {
     // Remove the loader initialization as we'll use GoogleMapsLoader
@@ -374,9 +382,15 @@ export class GoogleMapsManager implements MapServiceInterface {
   ): Promise<string> {
     if (!this.map) throw new Error('Map not initialized');
 
-    const markerId = `marker-${Date.now()}`;
-    
-    // Create the basic marker
+    // Clear existing marker of the same type
+    if (options?.type === 'start' && this.currentMarkers.start) {
+      this.currentMarkers.start.setMap(null);
+      this.currentMarkers.start = null;
+    } else if (options?.type === 'end' && this.currentMarkers.end) {
+      this.currentMarkers.end.setMap(null);
+      this.currentMarkers.end = null;
+    }
+
     const marker = new google.maps.Marker({
       position: coordinates,
       map: this.map,
@@ -384,13 +398,21 @@ export class GoogleMapsManager implements MapServiceInterface {
       draggable: options?.draggable
     });
 
-    // Add pulsing effect overlay based on marker type
+    // Store marker reference
     if (options?.type === 'start') {
-      this.createPulsingMarker(coordinates, '#10b981'); // Teal
+      this.currentMarkers.start = marker;
     } else if (options?.type === 'end') {
-      this.createPulsingMarker(coordinates, '#8B5CF6'); // Purple
+      this.currentMarkers.end = marker;
     }
 
+    // Add pulsing effect
+    if (options?.type === 'start' || options?.type === 'end') {
+      const color = options.type === 'start' ? '#10b981' : '#8B5CF6';
+      const overlay = this.createPulsingMarker(coordinates, color);
+      this.currentMarkers.overlays.add(overlay);
+    }
+
+    // Add event listeners
     if (options?.onClick) {
       marker.addListener('click', options.onClick);
     }
@@ -407,8 +429,7 @@ export class GoogleMapsManager implements MapServiceInterface {
       });
     }
 
-    this.markers.set(markerId, marker);
-    return markerId;
+    return `marker-${Date.now()}`;
   }
 
   removeMarker(markerId: string): void {
@@ -432,7 +453,11 @@ export class GoogleMapsManager implements MapServiceInterface {
         origin: route.waypoints.start,
         destination: route.waypoints.end,
         travelMode: google.maps.TravelMode.DRIVING,
-        provideRouteAlternatives: true // Enable alternative routes
+        provideRouteAlternatives: true,
+        optimizeWaypoints: true,
+        // Add these parameters to encourage alternative routes
+        avoidHighways: false,
+        avoidTolls: false
       };
 
       const result = await new Promise<google.maps.DirectionsResult>((resolve, reject) => {
@@ -445,21 +470,22 @@ export class GoogleMapsManager implements MapServiceInterface {
         });
       });
 
-      // Draw alternative routes first (so they appear under the main route)
+      // Draw alternative routes first
       if (options.showAlternatives && result.routes.length > 1) {
         result.routes.slice(1).forEach((_, index) => {
-          new google.maps.DirectionsRenderer({
+          const alternativeRenderer = new google.maps.DirectionsRenderer({
             map: this.map,
             directions: result,
             routeIndex: index + 1,
             suppressMarkers: true,
-            zIndex: 1, // Lower z-index for alternatives
+            zIndex: 1,
             polylineOptions: {
-              strokeColor: '#FDE68A', // Warm yellow
+              strokeColor: '#FDE68A',
               strokeOpacity: 0.6,
               strokeWeight: 3
             }
           });
+          this.alternativeRenderers.push(alternativeRenderer);
         });
       }
 
@@ -572,12 +598,34 @@ export class GoogleMapsManager implements MapServiceInterface {
     console.log('Waypoint updated:', newWaypoint);
   }
 
-  public clearRoute(): void {
-    // Clear directions renderer
+  public clearDirectionsRenderer(): void {
     if (this.directionsRenderer) {
       this.directionsRenderer.setMap(null);
       this.directionsRenderer = null;
     }
+  }
+
+  public clearRoute(): void {
+    // Clear directions renderer
+    this.clearDirectionsRenderer();
+
+    // Clear alternative routes renderers
+    this.alternativeRenderers.forEach(renderer => {
+      if (renderer) renderer.setMap(null);
+    });
+    this.alternativeRenderers = [];
+
+    // Clear end marker and its overlay
+    if (this.currentMarkers.end) {
+      this.currentMarkers.end.setMap(null);
+      this.currentMarkers.end = null;
+    }
+
+    // Clear all overlays except start marker's
+    this.currentMarkers.overlays.forEach(overlay => {
+      if (overlay) overlay.setMap(null);
+    });
+    this.currentMarkers.overlays.clear();
 
     // Clear any polylines
     if (this.currentRoute) {
@@ -585,16 +633,16 @@ export class GoogleMapsManager implements MapServiceInterface {
       this.currentRoute = null;
     }
 
-    // Clear alternative routes
-    this.clearAlternativeRoutes();
-
-    // Clear all markers
-    this.markers.forEach(marker => marker.setMap(null));
-    this.markers.clear();
-
-    // Clear any overlays (like pulsing markers)
-    if (this.map) {
-      google.maps.event.clearListeners(this.map, 'overlay');
+    // Re-add start marker's pulse if it exists
+    if (this.currentMarkers.start) {
+      const position = this.currentMarkers.start.getPosition();
+      if (position) {
+        const overlay = this.createPulsingMarker(
+          { lat: position.lat(), lng: position.lng() },
+          '#10b981'
+        );
+        this.currentMarkers.overlays.add(overlay);
+      }
     }
   }
 
@@ -775,7 +823,7 @@ export class GoogleMapsManager implements MapServiceInterface {
     }
   }
 
-  private createPulsingMarker(coordinates: Coordinates, color: string): void {
+  private createPulsingMarker(coordinates: Coordinates, color: string): google.maps.OverlayView {
     class PulsingMarkerOverlay extends google.maps.OverlayView {
       onAdd(): void {
         const div = document.createElement('div');
@@ -833,6 +881,7 @@ export class GoogleMapsManager implements MapServiceInterface {
 
     const overlay = new PulsingMarkerOverlay(coordinates);
     overlay.setMap(this.map);
+    return overlay;
   }
 
   private getTravelMode(activityType: string): google.maps.TravelMode {

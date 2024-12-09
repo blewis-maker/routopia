@@ -135,9 +135,6 @@ export function SearchBox({
   }, [debouncedQuery]);
 
   const handleCurrentLocation = async () => {
-    if (!geocoder.current) return;
-
-    setIsLoading(true);
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject);
@@ -145,24 +142,27 @@ export function SearchBox({
 
       const { latitude: lat, longitude: lng } = position.coords;
       
-      // Reverse geocode the coordinates
-      const result = await geocoder.current.geocode({
-        location: { lat, lng }
-      });
+      // Get address using Google Geocoder
+      const geocoder = new google.maps.Geocoder();
+      const result = await geocoder.geocode({ location: { lat, lng } });
 
       if (result.results[0]) {
         const address = result.results[0].formatted_address;
-        setQuery(address);
+        // Format address to match our standard format
+        const addressParts = address.split(',').map(part => part.trim());
+        const street = addressParts[0];
+        const city = addressParts[1];
+        const state = addressParts[2]?.split(' ')[0];
+        const displayAddress = `${street}, ${city}, ${state}`;
+
         onSelect({
-          place_name: address,
-          coordinates: [lng, lat]
+          coordinates: [lng, lat],
+          place_name: displayAddress,
+          formatted_address: displayAddress
         });
       }
     } catch (error) {
       console.error('Error getting current location:', error);
-    } finally {
-      setIsLoading(false);
-      setIsOpen(false);
     }
   };
 
