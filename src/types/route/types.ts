@@ -44,25 +44,10 @@ export interface RoutePreferences {
 export interface Route {
   id: string;
   name: string;
-  segments: Array<{
-    startPoint: {
-      latitude: number;
-      longitude: number;
-    };
-    endPoint: {
-      latitude: number;
-      longitude: number;
-    };
-    distance: number;
-    duration: number;
-  }>;
+  segments: RouteSegment[];
   totalMetrics: {
     distance: number;
     duration: number;
   };
-  alternatives?: Array<{
-    coordinates: Coordinates[];
-    duration: number;
-    distance: number;
-  }>;
+  alternatives?: RouteVisualization[];
 }

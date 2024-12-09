@@ -1,5 +1,12 @@
 import OpenAI from 'openai';
-import { RouteContext, RouteSuggestions, EnhancedRoute } from '@/types/chat/types';
+import { 
+  RouteContext, 
+  RouteSuggestions, 
+  EnhancedRoute, 
+  ChatSuggestion,
+  AIResponse,
+  EnhancedRouteWithSuggestion
+} from '@/types/chat/types';
 import { RedisService } from '../cache/RedisService';
 
 export class OpenAIRouteEnhancer {
@@ -11,10 +18,15 @@ export class OpenAIRouteEnhancer {
       throw new Error('OpenAI API key is not configured');
     }
 
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      organization: process.env.OPENAI_ORG_ID
-    });
+    try {
+      this.openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+        organization: process.env.OPENAI_ORG_ID
+      });
+    } catch (error) {
+      console.error('Failed to initialize OpenAI client:', error);
+      throw new Error('Failed to initialize OpenAI client');
+    }
 
     // Initialize Redis cache with error handling
     try {
@@ -25,7 +37,7 @@ export class OpenAIRouteEnhancer {
     }
   }
 
-  async enhanceRoute(context: RouteContext): Promise<EnhancedRoute> {
+  async enhanceRoute(context: RouteContext): Promise<EnhancedRouteWithSuggestion> {
     try {
       // Try cache if available
       if (this.cache) {
@@ -50,7 +62,7 @@ export class OpenAIRouteEnhancer {
           },
           {
             role: "user",
-            content: this.buildRoutePrompt(context)
+            content: this.buildPromptForRequest(context)
           }
         ]
       });
@@ -60,7 +72,7 @@ export class OpenAIRouteEnhancer {
         throw new Error('No response from OpenAI');
       }
 
-      const result = this.parseAIResponse(response);
+      const result = await this.parseAIResponse(response, context);
 
       // Try to cache if available
       if (this.cache) {
@@ -141,73 +153,137 @@ export class OpenAIRouteEnhancer {
     }
   }
 
-  private buildRoutePrompt(context: RouteContext): string {
+  private buildPromptForRequest(context: RouteContext): string {
     return `
-      Route from ${context.start} to ${context.end}
-      Time: ${context.timeOfDay}
-      Weather: ${context.weather.conditions}, ${context.weather.temperature}°F
-      
-      Provide insights about:
-      1. Traffic patterns and timing
-      2. Weather impacts
-      3. Local area information
-      4. Safety considerations
+      You are a Colorado route planning assistant. User at ${context.start} is looking for ${context.message}.
+      Current conditions: ${context.weather.temperature}°F, ${context.weather.conditions}
+
+      Provide ONE specific suggestion in this exact format:
+      Name: [Full business name]
+      Type: rest
+      Location: [latitude,longitude]
+      Description: [One brief sentence about the place]
+      Distance: [Approximate distance]
+      ETA: [Estimated time considering current conditions]
+
+      Requirements:
+      - Must be a real place that exists
+      - Must be currently open
+      - Must provide exact coordinates
+      - Must be suitable for current weather (${context.weather.temperature}°F)
+      - Must consider current time (${context.timeOfDay})
+
+      Example:
+      Name: Berthoud Brewing Company
+      Type: rest
+      Location: 40.3084,-105.0811
+      Description: Local brewery with craft beers and pub food in a cozy atmosphere.
+      Distance: 1.2 miles
+      ETA: 5 minutes
     `;
   }
 
   private buildSuggestionsPrompt(context: RouteContext): string {
     return `
-      For a route from ${context.start} to ${context.end}:
-      - Current time: ${context.timeOfDay}
-      - Weather: ${context.weather.conditions}, ${context.weather.temperature}°F
-      
-      Suggest 2-3 interesting stops along or near this route. For each suggestion:
-      1. Choose locations that are actually accessible and exist
-      2. Provide real coordinates (latitude,longitude)
-      3. Consider the current time and weather conditions
-      4. Focus on popular and well-known locations
-      
-      Format each suggestion exactly as follows:
-      Name: [full name of location]
-      Type: [attraction/rest/viewpoint]
-      Location: [latitude,longitude]
-      Description: [brief 1-2 sentence description]
+      You are a Colorado local expert. Based on the location ${context.start}, suggest 2-3 nearby places worth visiting.
+      Current time: ${context.timeOfDay}
+      Weather: ${context.weather.temperature}°F, ${context.weather.conditions}
 
-      Example format:
-      Name: Garden of the Gods
+      IMPORTANT: You must respond with EXACTLY 2-3 suggestions in this format:
+
+      Name: [Exact business/location name]
+      Type: [Must be one of: attraction, rest, viewpoint]
+      Location: [Exact latitude,longitude - use real coordinates]
+      Description: [2-3 sentences describing why to visit]
+
+      Example response:
+      Name: Berthoud Community Library
+      Type: rest
+      Location: 40.3084,-105.0811
+      Description: Modern library with comfortable seating and free WiFi. Perfect spot to warm up and relax.
+
+      Name: Fickel Park
       Type: attraction
-      Location: 38.8784,-104.8687
-      Description: Stunning red rock formations with hiking trails and scenic views. Perfect for photos and short walks.
+      Location: 40.3075,-105.0819
+      Description: Historic downtown park with gazebo and walking paths. Great for photos and short walks.
+
+      Remember:
+      1. Only suggest real places that exist
+      2. Use actual coordinates (not made up)
+      3. Consider current time and weather
+      4. Format must be exact
+      5. Each suggestion must include all fields
     `;
   }
 
-  private parseAIResponse(response: string): EnhancedRoute {
+  private async parseAIResponse(
+    response: string,
+    context: RouteContext
+  ): Promise<EnhancedRouteWithSuggestion> {
     try {
       const lines = response.split('\n').filter(line => line.trim());
-      
-      // Categorize lines
-      const insights: string[] = [];
-      const warnings: string[] = [];
+      let suggestion: Partial<ChatSuggestion> = {};
       
       lines.forEach(line => {
-        if (line.toLowerCase().includes('warning') || 
-            line.toLowerCase().includes('caution') || 
-            line.toLowerCase().includes('alert')) {
-          warnings.push(line.replace(/^(WARNING|CAUTION|ALERT):/i, '').trim());
-        } else {
-          insights.push(line);
+        const [key, ...valueParts] = line.split(':');
+        const value = valueParts.join(':').trim();
+        
+        switch (key?.trim().toLowerCase()) {
+          case 'name':
+            suggestion.name = value;
+            break;
+          case 'type':
+            suggestion.type = value.toLowerCase() as 'rest';
+            break;
+          case 'location':
+            try {
+              const [lat, lng] = value.split(',').map(n => parseFloat(n.trim()));
+              if (!isNaN(lat) && !isNaN(lng)) {
+                suggestion.location = { lat, lng };
+              }
+            } catch (e) {
+              console.warn('Failed to parse location:', value);
+            }
+            break;
+          case 'description':
+            suggestion.description = value;
+            break;
+          case 'distance':
+            suggestion.distance = value;
+            break;
+          case 'eta':
+            suggestion.eta = value;
+            break;
         }
       });
 
+      if (suggestion.name && suggestion.location) {
+        const enrichedSuggestion = await this.enrichSuggestionWithRouteDetails(
+          suggestion as ChatSuggestion,
+          context
+        );
+
+        return {
+          insights: [
+            `I recommend ${enrichedSuggestion.name}.`,
+            enrichedSuggestion.description || '',
+            `It's ${enrichedSuggestion.distance} away, estimated ${enrichedSuggestion.eta} travel time.`
+          ].filter(Boolean),
+          warnings: [],
+          suggestions: [],
+          suggestion: enrichedSuggestion
+        };
+      }
+
       return {
-        insights,
-        warnings,
+        insights: ['I could not find a suitable destination. Please try again.'],
+        warnings: [],
         suggestions: []
       };
     } catch (error) {
       console.error('Error parsing AI response:', error);
       return {
-        insights: [response], // Return full response as a single insight
+        insights: ['Sorry, I encountered an error processing your request.'],
         warnings: [],
         suggestions: []
       };
@@ -222,34 +298,58 @@ export class OpenAIRouteEnhancer {
         breaks: [] as string[]
       };
 
-      // Split response into sections
-      const sections = response.split('\n\n');
+      // Split into sections by double newline and filter empty sections
+      const sections = response.split('\n\n').filter(section => 
+        section.includes('Name:') && 
+        section.includes('Type:') && 
+        section.includes('Location:')
+      );
       
       sections.forEach(section => {
         const lines = section.split('\n');
         let currentSuggestion: any = {};
         
         lines.forEach(line => {
-          const [key, value] = line.split(':').map(s => s.trim());
+          if (!line.includes(':')) return;
           
-          if (key === 'Name') {
-            currentSuggestion.name = value;
-          } else if (key === 'Type') {
-            currentSuggestion.type = value.toLowerCase();
-          } else if (key === 'Location') {
-            try {
-              const [lat, lng] = value.replace(/[\[\]]/g, '').split(',').map(Number);
-              currentSuggestion.location = { lat, lng };
-            } catch (e) {
-              console.warn('Failed to parse location:', value);
-            }
-          } else if (key === 'Description') {
-            currentSuggestion.description = value;
+          const [key, ...valueParts] = line.split(':');
+          const value = valueParts.join(':').trim();
+          
+          switch (key?.trim().toLowerCase()) {
+            case 'name':
+              currentSuggestion.name = value;
+              break;
+            case 'type':
+              const type = value.toLowerCase();
+              if (['attraction', 'rest', 'viewpoint'].includes(type)) {
+                currentSuggestion.type = type;
+              }
+              break;
+            case 'location':
+              try {
+                const [lat, lng] = value.split(',').map(n => parseFloat(n.trim()));
+                if (!isNaN(lat) && !isNaN(lng)) {
+                  currentSuggestion.location = { lat, lng };
+                }
+              } catch (e) {
+                console.warn('Failed to parse location:', value);
+              }
+              break;
+            case 'description':
+              currentSuggestion.description = value;
+              break;
           }
         });
 
-        if (currentSuggestion.name && currentSuggestion.location) {
+        // Only add if all required fields are present and valid
+        if (
+          currentSuggestion.name &&
+          currentSuggestion.type &&
+          currentSuggestion.location &&
+          currentSuggestion.description
+        ) {
           suggestions.waypoints.push(currentSuggestion);
+          
           if (currentSuggestion.type === 'attraction') {
             suggestions.attractions.push(currentSuggestion.name);
           } else if (currentSuggestion.type === 'rest') {
@@ -258,6 +358,7 @@ export class OpenAIRouteEnhancer {
         }
       });
 
+      console.log('Parsed suggestions:', suggestions);
       return suggestions;
     } catch (error) {
       console.error('Error parsing suggestions:', error);
@@ -266,6 +367,113 @@ export class OpenAIRouteEnhancer {
         attractions: [],
         breaks: []
       };
+    }
+  }
+
+  private adjustRouteForConditions(
+    route: EnhancedRoute, 
+    context: RouteContext
+  ): EnhancedRoute {
+    const warnings: string[] = [];
+    let adjustedDuration = route.duration || 0;
+
+    // Weather adjustments
+    if (context.weather.temperature < 32) {
+      warnings.push('Icy conditions possible - drive with caution');
+      adjustedDuration *= 1.2; // 20% longer in icy conditions
+    }
+    if (context.weather.conditions.toLowerCase().includes('snow')) {
+      warnings.push('Snowy conditions - expect delays');
+      adjustedDuration *= 1.3; // 30% longer in snow
+    }
+    if (context.weather.windSpeed > 20) {
+      warnings.push('High winds - watch for debris');
+    }
+
+    // Time of day adjustments
+    const hour = new Date().getHours();
+    if ((hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 18)) {
+      warnings.push('Rush hour traffic may affect travel time');
+      adjustedDuration *= 1.25; // 25% longer during rush hour
+    }
+
+    return {
+      ...route,
+      duration: adjustedDuration,
+      warnings
+    };
+  }
+
+  private async getRouteDetails(
+    start: { lat: number; lng: number },
+    end: { lat: number; lng: number }
+  ): Promise<{ distance: string; duration: string }> {
+    try {
+      // Use Google's Distance Matrix API
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/distancematrix/json?` +
+        `origins=${start.lat},${start.lng}&` +
+        `destinations=${end.lat},${end.lng}&` +
+        `mode=driving&` +
+        `key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
+      );
+
+      const data = await response.json();
+      
+      if (data.rows?.[0]?.elements?.[0]?.status === 'OK') {
+        const element = data.rows[0].elements[0];
+        return {
+          distance: element.distance.text,
+          duration: element.duration.text
+        };
+      }
+
+      throw new Error('Failed to get route details');
+    } catch (error) {
+      console.error('Error getting route details:', error);
+      return {
+        distance: 'unknown distance',
+        duration: 'unknown duration'
+      };
+    }
+  }
+
+  private async enrichSuggestionWithRouteDetails(
+    suggestion: ChatSuggestion,
+    context: RouteContext
+  ): Promise<ChatSuggestion> {
+    if (!context.start || !suggestion.location) {
+      return suggestion;
+    }
+
+    try {
+      // Get coordinates for start location using Google Geocoding API
+      const geocodeResponse = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?` +
+        `address=${encodeURIComponent(context.start)}&` +
+        `key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
+      );
+
+      const geocodeData = await geocodeResponse.json();
+      
+      if (geocodeData.results?.[0]?.geometry?.location) {
+        const startLocation = geocodeData.results[0].geometry.location;
+        const routeDetails = await this.getRouteDetails(
+          startLocation,
+          suggestion.location
+        );
+
+        return {
+          ...suggestion,
+          distance: routeDetails.distance,
+          eta: routeDetails.duration
+        };
+      }
+
+      return suggestion;
+    } catch (error) {
+      console.error('Error enriching suggestion:', error);
+      return suggestion;
     }
   }
 } 

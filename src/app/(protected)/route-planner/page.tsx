@@ -71,63 +71,34 @@ export default function RoutePlannerPage() {
   const { theme } = useTheme();
   const [mainRoute, setMainRoute] = useState<Route | null>(null);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([{
-    type: 'assistant',
-    content: "Hi! I'm your Colorado route planning assistant. I can help you find places to eat, interesting stops, and provide route information. What would you like to know?"
-  }]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const handleChatMessage = async (message: string) => {
     try {
-      // Add user message
       setMessages(prev => [...prev, { type: 'user', content: message }]);
-
-      // Add typing indicator
       setMessages(prev => [...prev, { type: 'assistant', content: '...' }]);
-
-      const requestBody = {
-        message,
-        context: {
-          start: userLocation?.address || null,
-          end: destinationLocation?.address || null,
-          mode: 'car',
-          weather: weatherData ? {
-            temperature: weatherData.temperature || 0,
-            conditions: weatherData.conditions || 'unknown',
-            windSpeed: weatherData.windSpeed || 0
-          } : null
-        }
-      };
-
-      console.log('Sending chat request:', requestBody);
 
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({
+          message,
+          context: {
+            start: userLocation?.address || null,
+            message, // Include the user's message for context
+            mode: 'car',
+            weather: weatherData ? {
+              temperature: weatherData.temperature || 0,
+              conditions: weatherData.conditions || 'unknown',
+              windSpeed: weatherData.windSpeed || 0
+            } : null
+          }
+        })
       });
 
-      const responseText = await response.text();
-      console.log('Raw API response:', responseText);
+      const data = await response.json();
 
-      let data;
-      try {
-        data = JSON.parse(responseText);
-        console.log('Parsed API response:', data);
-      } catch (error) {
-        console.error('Failed to parse API response:', error);
-        throw new Error('Failed to parse server response');
-      }
-
-      if (!response.ok || !data) {
-        const errorMessage = data?.error || data?.message || 'Unknown server error';
-        console.error('API error:', errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      if (typeof data.message !== 'string') {
-        console.error('Invalid response format:', data);
-        throw new Error('Invalid response format from server');
-      }
+      if (!response.ok) throw new Error(data.error || 'Failed to process request');
 
       // Remove typing indicator and add AI response
       setMessages(prev => {
@@ -138,15 +109,13 @@ export default function RoutePlannerPage() {
         }];
       });
 
-      // Handle suggestions if any
-      if (data.suggestions?.waypoints?.length > 0 && mapServiceRef.current) {
-        console.log('Processing suggestions:', data.suggestions.waypoints);
-        await mapServiceRef.current.visualizeSuggestions(data.suggestions.waypoints);
+      // If we have a suggestion, automatically generate the route
+      if (data.suggestion) {
+        await handleAddToRoute(data.suggestion);
       }
 
     } catch (error) {
       console.error('Chat error:', error);
-      // Remove typing indicator and add error message
       setMessages(prev => {
         const newMessages = prev.filter(msg => msg.content !== '...');
         return [...newMessages, {
@@ -250,12 +219,7 @@ export default function RoutePlannerPage() {
     
     const [lng, lat] = result.coordinates;
     const address = result.formatted_address || result.place_name;
-    const addressParts = address.split(',').map(part => part.trim());
-    const street = addressParts[0];
-    const city = addressParts[1];
-    const state = addressParts[2]?.split(' ')[0];
-    const displayAddress = `${street}, ${city}, ${state}`;
-
+    
     // Clear existing routes and markers
     if (mapServiceRef.current) {
       mapServiceRef.current.clearRoute();
@@ -268,7 +232,7 @@ export default function RoutePlannerPage() {
     // Update destination location
     setDestinationLocation({
       coordinates: [lng, lat],
-      address: displayAddress
+      address: address
     });
 
     // Generate new route if we have a start location
@@ -431,43 +395,98 @@ export default function RoutePlannerPage() {
   }, [messages]);
 
   const handleViewOnMap = async (suggestion: ChatSuggestion) => {
-    // Update destination with the suggestion
-    const destinationInfo: Location = {
+    if (!mapServiceRef.current) {
+      console.error('Map service not initialized');
+      return;
+    }
+
+    // Clear existing routes and markers
+    mapServiceRef.current.clearRoute();
+    mapServiceRef.current.clearDirectionsRenderer();
+
+    // Update map center and zoom to show the suggestion
+    setMapCenter([suggestion.location.lng, suggestion.location.lat]);
+    setMapZoom(15);
+
+    // Add marker for the suggestion
+    await mapServiceRef.current.addMarker(
+      { lat: suggestion.location.lat, lng: suggestion.location.lng },
+      {
+        type: 'end',
+        onClick: () => {
+          const map = mapServiceRef.current?.getMap();
+          if (!map) return;
+
+          const infoWindow = new google.maps.InfoWindow({
+            content: `
+              <div class="p-3">
+                <h3 class="font-medium text-lg">${suggestion.name}</h3>
+                <p class="text-sm text-gray-600">${suggestion.description}</p>
+              </div>
+            `
+          });
+          infoWindow.open(map);
+        }
+      }
+    );
+
+    // Update destination location state
+    setDestinationLocation({
       coordinates: [suggestion.location.lng, suggestion.location.lat],
       address: suggestion.name
-    };
-    
-    handleDestinationSelect({
-      coordinates: [suggestion.location.lng, suggestion.location.lat],
-      formatted_address: suggestion.name
     });
   };
 
   const handleAddToRoute = async (suggestion: ChatSuggestion) => {
-    if (!userLocation) {
-      // Show error or prompt to set start location
-      return;
-    }
-
     try {
-      if (!mapServiceRef.current) {
-        console.error('Map service not initialized');
+      if (!userLocation) {
+        setMessages(prev => [...prev, {
+          type: 'assistant',
+          content: 'Please set your starting location first.'
+        }]);
         return;
       }
 
-      // Generate route to the suggestion
-      const start = { lat: userLocation.coordinates[1], lng: userLocation.coordinates[0] };
-      const end = suggestion.location;
+      if (!mapServiceRef.current) {
+        throw new Error('Map service not initialized');
+      }
 
+      setIsLoading(true);
+
+      // Clear existing routes and markers
+      mapServiceRef.current.clearRoute();
+      mapServiceRef.current.clearDirectionsRenderer();
+
+      // Create a destination object that matches the search box format
+      const destinationInfo = {
+        coordinates: [suggestion.location.lng, suggestion.location.lat],
+        formatted_address: suggestion.name,
+        place_name: suggestion.name
+      };
+
+      try {
+        // Update the destination using the search box handler
+        await handleDestinationSelect(destinationInfo);
+      } catch (error) {
+        console.error('Failed to update destination:', error);
+        throw new Error('Failed to update destination');
+      }
+
+      // Generate route from current location to suggestion
       const routeVisualization = await mapServiceRef.current.generateRoute(
-        start,
-        end,
+        { lat: userLocation.coordinates[1], lng: userLocation.coordinates[0] },
+        suggestion.location,
         {
           activityType: 'car',
           alternatives: true
         }
       );
 
+      if (!routeVisualization || !routeVisualization.mainRoute) {
+        throw new Error('Failed to generate route visualization');
+      }
+
+      // Draw the route
       await mapServiceRef.current.drawRoute(routeVisualization, {
         activityType: 'car',
         showTraffic: true,
@@ -476,41 +495,45 @@ export default function RoutePlannerPage() {
       });
 
       // Update mainRoute state
-      if (routeVisualization.mainRoute) {
-        const route: Route = {
-          id: 'generated-route',
-          name: `Route to ${suggestion.name}`,
-          segments: [{
-            startPoint: {
-              latitude: start.lat,
-              longitude: start.lng
-            },
-            endPoint: {
-              latitude: end.lat,
-              longitude: end.lng
-            },
-            distance: routeVisualization.mainRoute.distance || 0,
-            duration: routeVisualization.mainRoute.duration || 0
-          }],
-          totalMetrics: {
-            distance: routeVisualization.mainRoute.distance || 0,
-            duration: routeVisualization.mainRoute.duration || 0
+      const route: Route = {
+        id: 'generated-route',
+        name: `Route to ${suggestion.name}`,
+        segments: [{
+          startPoint: {
+            latitude: userLocation.coordinates[1],
+            longitude: userLocation.coordinates[0]
           },
-          ...(routeVisualization.alternatives && {
-            alternatives: routeVisualization.alternatives
-          })
-        };
-        setMainRoute(route);
-      }
+          endPoint: {
+            latitude: suggestion.location.lat,
+            longitude: suggestion.location.lng
+          },
+          distance: routeVisualization.mainRoute.distance || 0,
+          duration: routeVisualization.mainRoute.duration || 0
+        }],
+        totalMetrics: {
+          distance: routeVisualization.mainRoute.distance || 0,
+          duration: routeVisualization.mainRoute.duration || 0
+        },
+        alternatives: routeVisualization.alternatives || []
+      };
+      setMainRoute(route);
 
-      // Update destination location state
-      setDestinationLocation({
-        coordinates: [suggestion.location.lng, suggestion.location.lat],
-        address: suggestion.name
-      });
+      // Add confirmation message to chat
+      setMessages(prev => [...prev, {
+        type: 'assistant',
+        content: `I've added ${suggestion.name} to your route. The journey will take approximately ${formatDuration(routeVisualization.mainRoute.duration || 0)} and cover ${formatDistance(routeVisualization.mainRoute.distance || 0)}.`
+      }]);
 
     } catch (error) {
       console.error('Failed to add suggestion to route:', error);
+      setMessages(prev => [...prev, {
+        type: 'assistant',
+        content: error instanceof Error ? 
+          `Sorry, I encountered an error: ${error.message}` : 
+          'Sorry, I encountered an error while adding this location to your route.'
+      }]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -519,18 +542,6 @@ export default function RoutePlannerPage() {
       <div className="grid grid-cols-[minmax(350px,_400px)_1fr] h-full w-full overflow-hidden">
         {/* Left Panel - Chat Interface */}
         <div className="flex flex-col h-full bg-stone-900 border-r border-stone-800 overflow-hidden">
-          <div className="flex-none flex items-center gap-2 p-4 border-b border-stone-800">
-            <Image
-              src="/routopia-logo.svg"
-              alt="Routopia"
-              width={32}
-              height={32}
-              className="w-8 h-8"
-              priority
-            />
-            <h1 className="text-lg font-semibold text-white">Route Planner</h1>
-          </div>
-          
           <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
             <AIChat
               messages={messages}
@@ -605,10 +616,11 @@ export default function RoutePlannerPage() {
                     <Map className="w-4 h-4" />
                     <span>{formatDistance(mainRoute.totalMetrics?.distance || 0)}</span>
                   </div>
-                  {mainRoute.alternatives?.length > 0 && (
+                  {mainRoute.alternatives && mainRoute.alternatives.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-stone-700">
                       <p className="text-sm text-stone-400">
-                        {mainRoute.alternatives.length} alternative {mainRoute.alternatives.length === 1 ? 'route' : 'routes'} available
+                        {mainRoute.alternatives.length} alternative{' '}
+                        {mainRoute.alternatives.length === 1 ? 'route' : 'routes'} available
                       </p>
                     </div>
                   )}

@@ -6,6 +6,8 @@ export interface ChatSuggestion {
     lng: number;
   };
   description: string;
+  distance?: string;
+  eta?: string;
 }
 
 export interface ChatMessage {
@@ -23,6 +25,7 @@ export interface RouteContext {
   end: string;
   mode: 'car' | 'bike' | 'walk';
   timeOfDay: string;
+  message?: string;
   weather: {
     temperature: number;
     conditions: string;
@@ -50,4 +53,14 @@ export interface EnhancedRoute {
   insights: string[];
   warnings: string[];
   suggestions: string[];
+  duration?: number;
+}
+
+export interface EnhancedRouteWithSuggestion extends EnhancedRoute {
+  suggestion?: ChatSuggestion;
+}
+
+export interface AIResponse {
+  message: string;
+  suggestion?: ChatSuggestion;
 } 

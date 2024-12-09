@@ -15,7 +15,7 @@ import GoogleMapsLoader from './GoogleMapsLoader';
 import { Route } from '@/types/route/types';
 
 export class GoogleMapsManager implements MapServiceInterface {
-  private map: google.maps.Map | null = null;
+  private _map: google.maps.Map | null = null;
   private markers: Map<string, google.maps.Marker> = new Map();
   private currentRoute: google.maps.Polyline | null = null;
   private trafficLayer: google.maps.TrafficLayer | null = null;
@@ -254,22 +254,22 @@ export class GoogleMapsManager implements MapServiceInterface {
       gestureHandling: 'greedy'
     };
 
-    this.map = new google.maps.Map(element, mapOptions);
+    this._map = new google.maps.Map(element, mapOptions);
 
     // Initialize services
-    if (this.map) {
+    if (this._map) {
       this.directionsService = new google.maps.DirectionsService();
-      this.placesService = new google.maps.places.PlacesService(this.map);
+      this.placesService = new google.maps.places.PlacesService(this._map);
     }
   }
 
-  getMap(): google.maps.Map | null {
-    return this.map;
+  public getMap(): google.maps.Map | null {
+    return this._map;
   }
 
   addClickListener(callback: (coords: Coordinates) => void): void {
-    if (!this.map) return;
-    this.map.addListener('click', (e: google.maps.MapMouseEvent) => {
+    if (!this._map) return;
+    this._map.addListener('click', (e: google.maps.MapMouseEvent) => {
       if (e.latLng) {
         callback({
           lat: e.latLng.lat(),
@@ -280,7 +280,7 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   async addUserLocationMarker(location: Coordinates): Promise<void> {
-    if (!this.map) return;
+    if (!this._map) return;
 
     // Remove existing marker and overlay
     if (this.userLocationMarker) {
@@ -295,7 +295,7 @@ export class GoogleMapsManager implements MapServiceInterface {
     // Create marker with a small transparent icon
     const marker = new google.maps.Marker({
       position: location,
-      map: this.map,
+      map: this._map,
       icon: {
         path: google.maps.SymbolPath.CIRCLE,
         scale: 0,
@@ -357,20 +357,20 @@ export class GoogleMapsManager implements MapServiceInterface {
 
     // Create and add the overlay
     const overlay = new UserLocationOverlay();
-    overlay.setMap(this.map);
+    overlay.setMap(this._map);
 
     this.userLocationMarker = marker;
     this.userLocationOverlay = overlay;
   }
 
   setCenter(coordinates: Coordinates): void {
-    if (!this.map) return;
-    this.map.setCenter(coordinates);
+    if (!this._map) return;
+    this._map.setCenter(coordinates);
   }
 
   setZoom(level: number): void {
-    if (!this.map) return;
-    this.map.setZoom(level);
+    if (!this._map) return;
+    this._map.setZoom(level);
   }
 
   async addMarker(
@@ -382,7 +382,7 @@ export class GoogleMapsManager implements MapServiceInterface {
       onDragEnd?: (coords: Coordinates) => void;
     }
   ): Promise<string> {
-    if (!this.map) throw new Error('Map not initialized');
+    if (!this._map) throw new Error('Map not initialized');
 
     // Clear existing marker of the same type
     if (options?.type === 'start' && this.currentMarkers.start) {
@@ -395,7 +395,7 @@ export class GoogleMapsManager implements MapServiceInterface {
 
     const marker = new google.maps.Marker({
       position: coordinates,
-      map: this.map,
+      map: this._map,
       icon: this.getMarkerIcon(options?.type),
       draggable: options?.draggable
     });
@@ -446,7 +446,7 @@ export class GoogleMapsManager implements MapServiceInterface {
     route: RouteVisualization,
     options: RouteOptions
   ): Promise<void> {
-    if (!this.map || !this.directionsService) return;
+    if (!this._map || !this.directionsService) return;
 
     this.clearRoute();
 
@@ -476,7 +476,7 @@ export class GoogleMapsManager implements MapServiceInterface {
       if (options.showAlternatives && result.routes.length > 1) {
         result.routes.slice(1).forEach((_, index) => {
           const alternativeRenderer = new google.maps.DirectionsRenderer({
-            map: this.map,
+            map: this._map,
             directions: result,
             routeIndex: index + 1,
             suppressMarkers: true,
@@ -493,7 +493,7 @@ export class GoogleMapsManager implements MapServiceInterface {
 
       // Then draw main route on top
       this.directionsRenderer = new google.maps.DirectionsRenderer({
-        map: this.map,
+        map: this._map,
         directions: result,
         routeIndex: 0,
         suppressMarkers: true,
@@ -512,7 +512,7 @@ export class GoogleMapsManager implements MapServiceInterface {
       // Fit bounds
       const bounds = new google.maps.LatLngBounds();
       result.routes[0].overview_path.forEach(point => bounds.extend(point));
-      this.map.fitBounds(bounds);
+      this._map.fitBounds(bounds);
 
     } catch (error) {
       console.error('Failed to draw route:', error);
@@ -521,7 +521,7 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   private async visualizeTrafficData(trafficData: TrafficData): Promise<void> {
-    if (!this.map) return;
+    if (!this._map) return;
 
     // Visualize traffic segments with color-coding
     trafficData.segments?.forEach(segment => {
@@ -534,7 +534,7 @@ export class GoogleMapsManager implements MapServiceInterface {
         strokeColor: color,
         strokeOpacity: 0.7,
         strokeWeight: 4,
-        map: this.map
+        map: this._map
       });
     });
 
@@ -569,7 +569,7 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   private showIncidentDetails(incident: TrafficData['incidents'][0]): void {
-    if (!this.map) return;
+    if (!this._map) return;
 
     const infoWindow = new google.maps.InfoWindow({
       content: `
@@ -584,15 +584,15 @@ export class GoogleMapsManager implements MapServiceInterface {
     });
 
     infoWindow.setPosition(incident.location);
-    infoWindow.open(this.map);
+    infoWindow.open(this._map);
   }
 
   private fitRouteBounds(path: google.maps.LatLngLiteral[]): void {
-    if (!this.map || !path.length) return;
+    if (!this._map || !path.length) return;
 
     const bounds = new google.maps.LatLngBounds();
     path.forEach(point => bounds.extend(point));
-    this.map.fitBounds(bounds, { padding: 50 });
+    this._map.fitBounds(bounds, { padding: 50 });
   }
 
   private async updateRouteWithWaypoint(newWaypoint: Coordinates): Promise<void> {
@@ -651,7 +651,7 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   public async setTrafficLayer(visible: boolean): Promise<void> {
-    if (!this.map) return;
+    if (!this._map) return;
 
     try {
       this.trafficLayerVisible = visible;
@@ -662,7 +662,7 @@ export class GoogleMapsManager implements MapServiceInterface {
             autoRefresh: true
           });
         }
-        this.trafficLayer.setMap(this.map);
+        this.trafficLayer.setMap(this._map);
         
         // Add a slight transparency to the route to make traffic more visible
         if (this.directionsRenderer) {
@@ -698,7 +698,7 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   async getTrafficData(bounds: MapBounds): Promise<TrafficData> {
-    if (!this.map) throw new Error('Map not initialized');
+    if (!this._map) throw new Error('Map not initialized');
 
     try {
       // Use Google Maps Traffic Layer instead of Roads API
@@ -774,7 +774,7 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   private visualizeIncidents(trafficData: { incidents: Array<{ location: Coordinates }> }): void {
-    if (!this.map) return;
+    if (!this._map) return;
 
     // Create heatmap data points from incidents
     const heatmapData = trafficData.incidents.map(incident => 
@@ -785,7 +785,7 @@ export class GoogleMapsManager implements MapServiceInterface {
     if (!this.trafficIncidentsLayer) {
       this.trafficIncidentsLayer = new google.maps.visualization.HeatmapLayer({
         data: heatmapData,
-        map: this.map,
+        map: this._map,
         radius: 50
       });
     } else {
@@ -884,7 +884,7 @@ export class GoogleMapsManager implements MapServiceInterface {
     }
 
     const overlay = new PulsingMarkerOverlay(coordinates);
-    overlay.setMap(this.map);
+    overlay.setMap(this._map);
     return overlay;
   }
 
@@ -903,7 +903,7 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   private visualizeTraffic(trafficData: TrafficData): void {
-    if (!this.map) return;
+    if (!this._map) return;
 
     // Create traffic segments
     trafficData.segments.forEach(segment => {
@@ -915,7 +915,7 @@ export class GoogleMapsManager implements MapServiceInterface {
         strokeColor: getTrafficStyle(segment.congestion).color,
         strokeOpacity: 0.8,
         strokeWeight: 4,
-        map: this.map
+        map: this._map
       });
     });
 
@@ -926,12 +926,12 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   private addInteractiveWaypoints(waypoints: RouteVisualization['waypoints']): void {
-    if (!this.map || !waypoints) return;
+    if (!this._map || !waypoints) return;
 
     // Add start marker
     const startMarker = new google.maps.Marker({
       position: waypoints.start,
-      map: this.map,
+      map: this._map,
       icon: this.getMarkerIcon('start'),
       draggable: true
     });
@@ -939,7 +939,7 @@ export class GoogleMapsManager implements MapServiceInterface {
     // Add end marker
     const endMarker = new google.maps.Marker({
       position: waypoints.end,
-      map: this.map,
+      map: this._map,
       icon: this.getMarkerIcon('end'),
       draggable: true
     });
@@ -948,7 +948,7 @@ export class GoogleMapsManager implements MapServiceInterface {
     waypoints.via.forEach((waypoint, index) => {
       const marker = new google.maps.Marker({
         position: waypoint,
-        map: this.map,
+        map: this._map,
         icon: this.getMarkerIcon('waypoint'),
         draggable: true
       });
@@ -1048,8 +1048,8 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   cleanup(): void {
-    if (this.map) {
-      google.maps.event.clearInstanceListeners(this.map);
+    if (this._map) {
+      google.maps.event.clearInstanceListeners(this._map);
     }
     if (this.userLocationMarker) {
       this.userLocationMarker.setMap(null);
@@ -1061,7 +1061,7 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   async generateDirectionsRoute(start: Coordinates, end: Coordinates): Promise<google.maps.DirectionsResult> {
-    if (!this.directionsService || !this.map) {
+    if (!this.directionsService || !this._map) {
       throw new Error('Map or DirectionsService not initialized');
     }
 
@@ -1076,7 +1076,7 @@ export class GoogleMapsManager implements MapServiceInterface {
         if (status === google.maps.DirectionsStatus.OK && result) {
           // Create DirectionsRenderer to display the route
           const directionsRenderer = new google.maps.DirectionsRenderer({
-            map: this.map,
+            map: this._map,
             suppressMarkers: true, // We'll handle markers ourselves
             polylineOptions: {
               strokeColor: '#10b981', // Teal color
@@ -1094,7 +1094,7 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   public showAlternativeRoutes(routes: RouteVisualization['alternatives']): void {
-    if (!this.map || !routes) return;
+    if (!this._map || !routes) return;
     
     routes.forEach((route, index) => {
       const path = route.coordinates.map(coord => ({
@@ -1108,7 +1108,7 @@ export class GoogleMapsManager implements MapServiceInterface {
         strokeColor: '#6b7280', // Gray color for alternatives
         strokeOpacity: 0.6,
         strokeWeight: 3,
-        map: this.map
+        map: this._map
       });
     });
   }
@@ -1124,9 +1124,9 @@ export class GoogleMapsManager implements MapServiceInterface {
     scale?: boolean;
     fullscreen?: boolean;
   }): void {
-    if (!this.map) return;
+    if (!this._map) return;
 
-    this.map.setOptions({
+    this._map.setOptions({
       zoomControl: options.navigation,
       scaleControl: options.scale,
       fullscreenControl: options.fullscreen
@@ -1134,29 +1134,29 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   public on(event: 'click' | 'move' | 'zoom' | 'dragend', callback: (e: any) => void): void {
-    if (!this.map) return;
-    this.map.addListener(event, callback);
+    if (!this._map) return;
+    this._map.addListener(event, callback);
   }
 
   public off(event: 'click' | 'move' | 'zoom' | 'dragend', callback: (e: any) => void): void {
-    if (!this.map) return;
+    if (!this._map) return;
     google.maps.event.removeListener(callback);
   }
 
   public fitBounds(bounds: MapBounds, options?: { padding?: number }): void {
-    if (!this.map) return;
+    if (!this._map) return;
     
     const googleBounds = new google.maps.LatLngBounds(
       new google.maps.LatLng(bounds.south, bounds.west),
       new google.maps.LatLng(bounds.north, bounds.east)
     );
     
-    this.map.fitBounds(googleBounds, options);
+    this._map.fitBounds(googleBounds, options);
   }
 
   public panTo(coordinates: Coordinates, options?: { duration?: number }): void {
-    if (!this.map) return;
-    this.map.panTo(coordinates);
+    if (!this._map) return;
+    this._map.panTo(coordinates);
   }
 
   public addLayer(layerId: string, options: any): void {
@@ -1172,8 +1172,8 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   public getBounds(): MapBounds {
-    if (!this.map) throw new Error('Map not initialized');
-    const bounds = this.map.getBounds();
+    if (!this._map) throw new Error('Map not initialized');
+    const bounds = this._map.getBounds();
     if (!bounds) throw new Error('Map bounds not available');
     
     return {
@@ -1185,8 +1185,8 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   public getCenter(): Coordinates {
-    if (!this.map) throw new Error('Map not initialized');
-    const center = this.map.getCenter();
+    if (!this._map) throw new Error('Map not initialized');
+    const center = this._map.getCenter();
     if (!center) throw new Error('Map center not available');
     
     return {
@@ -1196,8 +1196,8 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   public getZoom(): number {
-    if (!this.map) throw new Error('Map not initialized');
-    return this.map.getZoom() || 12;
+    if (!this._map) throw new Error('Map not initialized');
+    return this._map.getZoom() || 12;
   }
 
   public updateMarker(markerId: string, coordinates: Coordinates): void {
@@ -1208,7 +1208,7 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   public async visualizeRoute(route: Route): Promise<void> {
-    if (!this.map) throw new Error('Map not initialized');
+    if (!this._map) throw new Error('Map not initialized');
     
     // Clear existing route
     this.clearRoute();
@@ -1226,7 +1226,7 @@ export class GoogleMapsManager implements MapServiceInterface {
       strokeColor: '#10b981', // Teal color matching the theme
       strokeOpacity: 0.8,
       strokeWeight: 4,
-      map: this.map
+      map: this._map
     });
 
     // Add markers for start and end points if needed
@@ -1239,7 +1239,7 @@ export class GoogleMapsManager implements MapServiceInterface {
     // Fit bounds to show the entire route
     const bounds = new google.maps.LatLngBounds();
     path.forEach(point => bounds.extend(point));
-    this.map.fitBounds(bounds);
+    this._map.fitBounds(bounds);
   }
 
   public async generateRoute(
@@ -1251,7 +1251,7 @@ export class GoogleMapsManager implements MapServiceInterface {
       alternatives?: boolean;
     }
   ): Promise<RouteVisualization> {
-    if (!this.directionsService || !this.map) {
+    if (!this.directionsService || !this._map) {
       throw new Error('Map or DirectionsService not initialized');
     }
 
@@ -1330,13 +1330,13 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   public async handleToolAction(tool: 'ROUTE' | 'SEARCH' | 'TRAFFIC' | 'LAYERS'): Promise<void> {
-    if (!this.map) return;
+    if (!this._map) return;
 
     try {
       switch (tool) {
         case 'LAYERS':
           this.mapLayerDark = !this.mapLayerDark;
-          this.map.setOptions({
+          this._map.setOptions({
             styles: this.mapLayerDark ? this.mapStyles.dark : this.mapStyles.default
           });
           break;
@@ -1356,97 +1356,64 @@ export class GoogleMapsManager implements MapServiceInterface {
     }
   }
 
-  public async visualizeSuggestions(suggestions: Array<{
-    name: string;
-    location: { lat: number; lng: number };
-    type: 'attraction' | 'rest' | 'viewpoint';
-    description: string;
-  }>) {
-    // Clear existing suggestion markers
-    this.clearSuggestions();
+  public async visualizeSuggestions(suggestions: ChatSuggestion[]) {
+    // Clear any existing suggestion markers
+    this.clearSuggestionMarkers();
 
-    suggestions.forEach(async (suggestion) => {
-      const marker = await this.addMarker(
-        { lat: suggestion.location.lat, lng: suggestion.location.lng },
-        {
-          type: 'waypoint',
-          onClick: () => this.showSuggestionInfo(suggestion)
+    suggestions.forEach(suggestion => {
+      const marker = new google.maps.Marker({
+        position: suggestion.location,
+        map: this._map,
+        title: suggestion.name,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: this.getSuggestionColor(suggestion.type),
+          fillOpacity: 0.7,
+          strokeWeight: 2,
+          strokeColor: '#ffffff'
         }
-      );
+      });
+
+      // Add click listener
+      marker.addListener('click', () => {
+        const infoWindow = new google.maps.InfoWindow({
+          content: `
+            <div class="p-2">
+              <h3 class="font-medium text-lg">${suggestion.name}</h3>
+              <p class="text-sm text-gray-600">${suggestion.description}</p>
+            </div>
+          `
+        });
+        infoWindow.open(this._map, marker);
+      });
+
       this.suggestionMarkers.set(suggestion.name, marker);
     });
-  }
 
-  private showSuggestionInfo(suggestion: {
-    name: string;
-    description: string;
-    type: string;
-  }) {
-    const infoWindow = new google.maps.InfoWindow({
-      content: `
-        <div class="p-2">
-          <h3 class="font-semibold text-stone-900">${suggestion.name}</h3>
-          <p class="text-sm text-stone-600">${suggestion.description}</p>
-          <span class="text-xs text-emerald-600">${suggestion.type}</span>
-        </div>
-      `
-    });
-
-    const marker = this.suggestionMarkers.get(suggestion.name);
-    if (marker) {
-      infoWindow.open(this.map, marker);
+    // Fit bounds to include all markers
+    if (suggestions.length > 0) {
+      const bounds = new google.maps.LatLngBounds();
+      suggestions.forEach(s => bounds.extend(s.location));
+      this._map.fitBounds(bounds, 50); // 50px padding
     }
   }
 
-  private clearSuggestions() {
+  private getSuggestionColor(type: string): string {
+    switch (type) {
+      case 'attraction':
+        return '#10B981'; // Emerald
+      case 'rest':
+        return '#6366F1'; // Indigo
+      case 'viewpoint':
+        return '#F59E0B'; // Amber
+      default:
+        return '#6B7280'; // Gray
+    }
+  }
+
+  private clearSuggestionMarkers() {
     this.suggestionMarkers.forEach(marker => marker.setMap(null));
     this.suggestionMarkers.clear();
-    this.suggestionOverlays.forEach(overlay => overlay.setMap(null));
-    this.suggestionOverlays.clear();
-  }
-
-  public async optimizeRouteWithWaypoints(
-    route: RouteVisualization,
-    waypoints: Array<{ location: Coordinates; stopover: boolean }>
-  ): Promise<RouteVisualization> {
-    const request: google.maps.DirectionsRequest = {
-      origin: route.waypoints.start,
-      destination: route.waypoints.end,
-      waypoints: waypoints,
-      optimizeWaypoints: true,
-      travelMode: google.maps.TravelMode.DRIVING
-    };
-
-    // Calculate optimized route
-    const result = await this.directionsService?.route(request);
-    return this.processDirectionsResult(result);
-  }
-
-  private visualizeOptimizedRoute(
-    route: google.maps.DirectionsResult,
-    waypoints: Array<{ name: string; type: string }>
-  ): void {
-    // Clear existing route
-    this.clearRoute();
-
-    // Draw main route with waypoints
-    this.directionsRenderer = new google.maps.DirectionsRenderer({
-      map: this.map,
-      directions: route,
-      suppressMarkers: true,
-      polylineOptions: {
-        strokeColor: '#A78BFA',
-        strokeOpacity: 0.75,
-        strokeWeight: 4
-      }
-    });
-
-    // Add custom markers for waypoints
-    waypoints.forEach((waypoint, index) => {
-      this.addWaypointMarker(
-        route.routes[0].legs[index].start_location,
-        waypoint
-      );
-    });
   }
 } 
