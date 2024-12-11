@@ -1,4 +1,5 @@
 import '@/styles/main.css';
+import '@/styles/mapbox-gl.css';
 import { Providers } from '@/app/providers';
 import { Metadata, Viewport } from 'next';
 import { montserrat, inter } from './fonts';

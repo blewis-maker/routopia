@@ -1,6 +1,6 @@
 import { GoogleMapsManager } from '@/services/maps/GoogleMapsManager';
-import { Sun, Moon, Satellite } from 'lucide-react';
-import { useState } from 'react';
+import { Sun, Moon, Satellite, Layers } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 
 interface MapToolbarProps {
   mapIntegration: GoogleMapsManager | null;
@@ -15,69 +15,82 @@ export function MapToolbar({
   onToolSelect 
 }: MapToolbarProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeIcon, setActiveIcon] = useState<'light' | 'dark' | 'satellite'>('light');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Handle clicking outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleMapTypeChange = (mapType: string) => {
     const map = mapIntegration?.getMap();
-    if (!map) return;
+    if (!map) {
+      console.error('Map not initialized');
+      return;
+    }
     
-    map.setMapTypeId(mapType);
-    
-    // Update the active icon
-    if (mapType === google.maps.MapTypeId.ROADMAP) {
-      setActiveIcon('light');
-    } else if (mapType === 'dark_mode') {
-      setActiveIcon('dark');
-    } else if (mapType === google.maps.MapTypeId.HYBRID) {
-      setActiveIcon('satellite');
+    console.log('Changing map type to:', mapType); // Debug log
+
+    try {
+      switch (mapType) {
+        case 'dark_mode':
+          map.setMapTypeId('dark_mode');
+          break;
+        case google.maps.MapTypeId.ROADMAP:
+          map.setOptions({ styles: [] }); // Clear any custom styles
+          map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+          break;
+        case google.maps.MapTypeId.HYBRID:
+          map.setOptions({ styles: [] }); // Clear any custom styles
+          map.setMapTypeId(google.maps.MapTypeId.HYBRID);
+          break;
+        default:
+          console.error('Unknown map type:', mapType);
+      }
+      console.log('Map type changed successfully'); // Debug log
+    } catch (error) {
+      console.error('Error changing map type:', error);
     }
     
     setIsOpen(false);
   };
 
-  const renderActiveIcon = () => {
-    switch (activeIcon) {
-      case 'dark':
-        return <Moon className="w-5 h-5" />;
-      case 'satellite':
-        return <Satellite className="w-5 h-5" />;
-      default:
-        return <Sun className="w-5 h-5" />;
-    }
-  };
-
   return (
-    <div className="absolute top-4 right-4 z-10">
+    <div className="absolute top-4 right-4 z-10" ref={dropdownRef}>
       <div className="relative">
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="p-2 bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg border border-stone-800/50 text-stone-400 hover:text-stone-200 transition-colors"
         >
-          {renderActiveIcon()}
+          <Layers className="w-5 h-5" />
         </button>
 
         {isOpen && (
           <div className="absolute top-full right-0 mt-2 bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg border border-stone-800/50 overflow-hidden flex flex-col gap-1 p-1">
             <button
               onClick={() => handleMapTypeChange(google.maps.MapTypeId.ROADMAP)}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-stone-400 hover:bg-stone-800/50 hover:text-stone-200 rounded-md"
+              className="flex items-center justify-center px-3 py-2 text-sm text-stone-400 hover:bg-stone-800/50 hover:text-stone-200 rounded-md"
             >
-              <Sun className="w-4 h-4" />
-              <span>Light</span>
+              <Sun className="w-4 h-4 text-yellow-400" />
             </button>
             <button
               onClick={() => handleMapTypeChange('dark_mode')}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-stone-400 hover:bg-stone-800/50 hover:text-stone-200 rounded-md"
+              className="flex items-center justify-center px-3 py-2 text-sm text-stone-400 hover:bg-stone-800/50 hover:text-stone-200 rounded-md"
             >
-              <Moon className="w-4 h-4" />
-              <span>Dark</span>
+              <Moon className="w-4 h-4 text-white" />
             </button>
             <button
               onClick={() => handleMapTypeChange(google.maps.MapTypeId.HYBRID)}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-stone-400 hover:bg-stone-800/50 hover:text-stone-200 rounded-md"
+              className="flex items-center justify-center px-3 py-2 text-sm text-stone-400 hover:bg-stone-800/50 hover:text-stone-200 rounded-md"
             >
-              <Satellite className="w-4 h-4" />
-              <span>Satellite</span>
+              <Satellite className="w-4 h-4 text-emerald-500" />
             </button>
           </div>
         )}

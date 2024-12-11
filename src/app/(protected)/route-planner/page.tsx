@@ -36,6 +36,7 @@ import { getRouteColor } from '@/lib/utils/routeColors';
 import { MapVisualization } from '@/types/maps/visualization';
 import { convertRouteToVisualization } from '@/lib/utils/routeConversion';
 import { useGoogleMaps } from '@/contexts/GoogleMapsContext';
+import { MapErrorBoundary } from '@/components/error/MapErrorBoundary';
 
 interface WeatherInfo {
   location: string;
@@ -867,7 +868,7 @@ export default function RoutePlannerPage() {
 
           {/* Right Panel - Map & Controls */}
           <div className="relative h-full w-full overflow-hidden">
-            <RouteErrorBoundary>
+            <MapErrorBoundary>
               <MapView
                 options={{
                   center: mapCenter,
@@ -880,7 +881,7 @@ export default function RoutePlannerPage() {
                   mapServiceRef.current = service;
                 }}
               />
-            </RouteErrorBoundary>
+            </MapErrorBoundary>
 
             <MapToolbar 
               mapIntegration={mapServiceRef.current}
