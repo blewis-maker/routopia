@@ -28,11 +28,11 @@ export class HybridMapService {
     }
 
     try {
-      // Use direct Mapbox style URL
-      const initialStyle = options.darkMode 
-        ? 'mapbox://styles/mapbox/dark-v11'
-        : 'mapbox://styles/mapbox/light-v11';
+      // Use standard Mapbox dark style
+      const initialStyle = 'mapbox://styles/mapbox/dark-v11';
       
+      console.log('Initializing map with style:', initialStyle);
+
       this.mapbox = new mapboxgl.Map({
         container,
         style: initialStyle,
@@ -45,8 +45,14 @@ export class HybridMapService {
 
       // Wait for both map and style to be fully loaded
       await Promise.all([
-        new Promise<void>((resolve) => this.mapbox!.once('load', () => resolve())),
-        new Promise<void>((resolve) => this.mapbox!.once('style.load', () => resolve()))
+        new Promise<void>((resolve) => this.mapbox!.once('load', () => {
+          console.log('Map loaded');
+          resolve();
+        })),
+        new Promise<void>((resolve) => this.mapbox!.once('style.load', () => {
+          console.log('Style loaded');
+          resolve();
+        }))
       ]);
 
       this.styleManager = new MapboxStyleManager(this.mapbox);
@@ -54,6 +60,7 @@ export class HybridMapService {
       this.googleManager.setMapInstance(this.mapbox);
       
       this.isInitialized = true;
+      console.log('Map initialization complete');
 
       // Execute any pending operations
       while (this.pendingOperations.length > 0) {
@@ -194,14 +201,7 @@ export class HybridMapService {
   }
 
   isReady(): boolean {
-    return !!(
-      this.mapbox && 
-      this.isInitialized && 
-      this.mapbox.loaded() && 
-      this.mapbox.isStyleLoaded() &&
-      this.styleManager &&
-      this.googleManager
-    );
+    return !!(this.mapbox && this.isInitialized && this.mapbox.loaded());
   }
 
   async setTheme(theme: 'light' | 'dark' | 'satellite'): Promise<void> {
@@ -293,23 +293,30 @@ export class HybridMapService {
     this.mapbox.fitBounds(bounds, options);
   }
 
-  async setMapboxStyle(styleId: string) {
-    if (!this.mapbox || !this.isReady()) {
+  async setMapboxStyle(styleUrl: string) {
+    if (!this.mapbox || !this.isInitialized) {
       throw new Error('Map not initialized');
     }
 
     try {
+      console.log('Starting style change to:', styleUrl);
+      
       // Store current state
       const center = this.mapbox.getCenter();
       const zoom = this.mapbox.getZoom();
       const bearing = this.mapbox.getBearing();
       const pitch = this.mapbox.getPitch();
 
+      // Set the style and wait for it to load
       await new Promise<void>((resolve, reject) => {
-        const timeoutId = setTimeout(() => reject(new Error('Style change timeout')), 10000);
+        const timeoutId = setTimeout(() => {
+          reject(new Error('Style change timeout after 10s'));
+        }, 10000);
 
-        this.mapbox!.once('style.load', () => {
+        const handleStyleLoad = () => {
           clearTimeout(timeoutId);
+          console.log('New style loaded, restoring map state');
+          
           try {
             // Restore state
             this.mapbox!.setCenter(center);
@@ -325,13 +332,20 @@ export class HybridMapService {
           } catch (error) {
             reject(error);
           }
-        });
+        };
 
-        // Set the style directly using the Mapbox style URL
-        this.mapbox!.setStyle(styleId);
+        // Remove any existing listeners and add new one
+        this.mapbox!.off('style.load', handleStyleLoad);
+        this.mapbox!.once('style.load', handleStyleLoad);
+
+        // Apply the new style
+        console.log('Applying new style...');
+        this.mapbox!.setStyle(styleUrl, { diff: false });
       });
+
+      console.log('Style change completed successfully');
     } catch (error) {
-      console.error('Error setting Mapbox style:', error);
+      console.error('Error in setMapboxStyle:', error);
       throw error;
     }
   }

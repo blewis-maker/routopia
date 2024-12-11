@@ -17,24 +17,26 @@ const MAP_STYLES = {
     id: 'mapbox/light-v11',
     icon: Sun,
     label: 'Light mode',
-    activeColor: 'text-yellow-400',
-    hoverColor: 'hover:text-yellow-400'
+    activeColor: 'text-yellow-400 bg-stone-800/50',
+    hoverColor: 'hover:text-yellow-400 hover:bg-stone-800/30'
   },
   dark: {
     id: 'mapbox/dark-v11',
     icon: Moon,
     label: 'Dark mode',
-    activeColor: 'text-white',
-    hoverColor: 'hover:text-white'
+    activeColor: 'text-teal-400 bg-stone-800/50',
+    hoverColor: 'hover:text-teal-400 hover:bg-stone-800/30'
   },
   satellite: {
     id: 'mapbox/satellite-streets-v12',
     icon: Satellite,
     label: 'Satellite view',
-    activeColor: 'text-emerald-500',
-    hoverColor: 'hover:text-emerald-500'
+    activeColor: 'text-emerald-500 bg-stone-800/50',
+    hoverColor: 'hover:text-emerald-500 hover:bg-stone-800/30'
   }
 };
+
+console.log('MAP_STYLES:', MAP_STYLES);
 
 export function MapToolbar({ mapIntegration }: MapToolbarProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -45,14 +47,34 @@ export function MapToolbar({ mapIntegration }: MapToolbarProps) {
   useOnClickOutside(menuRef, () => setIsOpen(false));
 
   const handleStyleChange = async (style: keyof typeof MAP_STYLES) => {
-    if (!mapIntegration || isChangingStyle) return;
+    if (!mapIntegration) {
+      console.error('Map integration not available');
+      return;
+    }
+
+    if (isChangingStyle) {
+      console.log('Style change already in progress');
+      return;
+    }
 
     try {
       setIsChangingStyle(true);
-      await mapIntegration.setMapboxStyle(`mapbox://styles/${MAP_STYLES[style].id}`);
+      const styleUrl = `mapbox://styles/${MAP_STYLES[style].id}`;
+      console.log('Attempting style change to:', styleUrl);
+
+      await mapIntegration.setMapboxStyle(styleUrl);
       setCurrentStyle(style);
+      console.log('Style change completed successfully');
     } catch (error) {
       console.error('Error changing map style:', error);
+      if (mapIntegration.isReady()) {
+        try {
+          const prevStyleUrl = `mapbox://styles/${MAP_STYLES[currentStyle].id}`;
+          await mapIntegration.setMapboxStyle(prevStyleUrl);
+        } catch (revertError) {
+          console.error('Failed to revert style:', revertError);
+        }
+      }
     } finally {
       setIsChangingStyle(false);
       setIsOpen(false);
@@ -79,7 +101,7 @@ export function MapToolbar({ mapIntegration }: MapToolbarProps) {
             roundedStyles.lg,
             glassStyles.dark,
             'absolute top-full right-0 mt-2 p-1',
-            'w-10 flex flex-col gap-1'  // Match button width
+            'w-10 flex flex-col gap-1'
           )}>
             {Object.entries(MAP_STYLES).map(([type, { icon: Icon, activeColor, hoverColor, label }]) => (
               <Button
@@ -89,14 +111,17 @@ export function MapToolbar({ mapIntegration }: MapToolbarProps) {
                 onClick={() => handleStyleChange(type as keyof typeof MAP_STYLES)}
                 disabled={isChangingStyle}
                 className={cn(
-                  'flex items-center justify-center w-full p-2',
+                  'flex items-center justify-center w-full p-2 transition-all duration-200',
                   currentStyle === type 
-                    ? `${activeColor} bg-stone-800` 
+                    ? activeColor 
                     : `text-stone-400 ${hoverColor}`
                 )}
                 aria-label={label}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className={cn(
+                  'w-4 h-4',
+                  currentStyle === type && 'animate-pulse-subtle'
+                )} />
               </Button>
             ))}
           </div>

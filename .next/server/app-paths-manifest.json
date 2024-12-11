@@ -1,6 +1,5 @@
 {
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/weather/route": "app/api/weather/route.js",
   "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
+  "/api/weather/route": "app/api/weather/route.js",
   "/(protected)/route-planner/page": "app/(protected)/route-planner/page.js"
 }
