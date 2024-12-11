@@ -25,11 +25,12 @@ export class HybridMapService {
   ): Promise<void> {
     if (!mapboxgl.accessToken) {
       mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+      console.log('Setting Mapbox token:', mapboxgl.accessToken.substring(0, 10) + '...');
     }
 
     try {
-      // Use standard Mapbox dark style
-      const initialStyle = 'mapbox://styles/mapbox/dark-v11';
+      // Use your custom dark style as the initial style
+      const initialStyle = 'mapbox://styles/routopia-ai/cm4jwk0xv014s01rcdrkp68lr';
       
       console.log('Initializing map with style:', initialStyle);
 
@@ -43,16 +44,45 @@ export class HybridMapService {
         trackResize: true
       });
 
+      // Add comprehensive error handling
+      this.mapbox.on('error', (e) => {
+        console.error('Mapbox general error:', e);
+      });
+
+      this.mapbox.on('style.error', (e) => {
+        console.error('Style loading error:', e);
+      });
+
+      this.mapbox.on('style.load', () => {
+        console.log('Style loaded successfully');
+        const style = this.mapbox?.getStyle();
+        console.log('Current style:', {
+          name: style?.name,
+          version: style?.version,
+          sources: Object.keys(style?.sources || {})
+        });
+      });
+
       // Wait for both map and style to be fully loaded
       await Promise.all([
-        new Promise<void>((resolve) => this.mapbox!.once('load', () => {
-          console.log('Map loaded');
-          resolve();
-        })),
-        new Promise<void>((resolve) => this.mapbox!.once('style.load', () => {
-          console.log('Style loaded');
-          resolve();
-        }))
+        new Promise<void>((resolve, reject) => {
+          this.mapbox!.once('load', () => {
+            console.log('Map loaded');
+            resolve();
+          });
+          
+          // Add timeout for map load
+          setTimeout(() => reject(new Error('Map load timeout')), 10000);
+        }),
+        new Promise<void>((resolve, reject) => {
+          this.mapbox!.once('style.load', () => {
+            console.log('Style loaded');
+            resolve();
+          });
+          
+          // Add timeout for style load
+          setTimeout(() => reject(new Error('Style load timeout')), 10000);
+        })
       ]);
 
       this.styleManager = new MapboxStyleManager(this.mapbox);
@@ -61,14 +91,6 @@ export class HybridMapService {
       
       this.isInitialized = true;
       console.log('Map initialization complete');
-
-      // Execute any pending operations
-      while (this.pendingOperations.length > 0) {
-        const operation = this.pendingOperations.shift();
-        if (operation) {
-          await operation();
-        }
-      }
     } catch (error) {
       console.error('Failed to initialize map:', error);
       throw error;
@@ -334,13 +356,12 @@ export class HybridMapService {
           }
         };
 
-        // Remove any existing listeners and add new one
-        this.mapbox!.off('style.load', handleStyleLoad);
+        // Set up style load handler
         this.mapbox!.once('style.load', handleStyleLoad);
 
         // Apply the new style
         console.log('Applying new style...');
-        this.mapbox!.setStyle(styleUrl, { diff: false });
+        this.mapbox!.setStyle(styleUrl);
       });
 
       console.log('Style change completed successfully');

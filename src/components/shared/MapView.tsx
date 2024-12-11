@@ -93,7 +93,7 @@ export function MapView({
         wrapperRef.current.removeChild(mapContainer);
       }
     };
-  }, [isLoaded, options.center?.lat, options.center?.lng, options.zoom, darkMode, onMapInit]);
+  }, [isLoaded, options.center?.lat, options.center?.lng, options.zoom, onMapInit]);
 
   if (error) {
     return (

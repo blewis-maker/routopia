@@ -14,21 +14,21 @@ interface MapToolbarProps {
 
 const MAP_STYLES = {
   light: {
-    id: 'mapbox/light-v11',
+    id: 'routopia-ai/cm4jkcgd4001901so0byf3rnm',
     icon: Sun,
     label: 'Light mode',
     activeColor: 'text-yellow-400 bg-stone-800/50',
     hoverColor: 'hover:text-yellow-400 hover:bg-stone-800/30'
   },
   dark: {
-    id: 'mapbox/dark-v11',
+    id: 'routopia-ai/cm4jka4bk013q01rcb7cj8crr',
     icon: Moon,
     label: 'Dark mode',
     activeColor: 'text-teal-400 bg-stone-800/50',
     hoverColor: 'hover:text-teal-400 hover:bg-stone-800/30'
   },
   satellite: {
-    id: 'mapbox/satellite-streets-v12',
+    id: 'routopia-ai/cm4jkf5jc00h801ra3clwh88e',
     icon: Satellite,
     label: 'Satellite view',
     activeColor: 'text-emerald-500 bg-stone-800/50',

@@ -1,15 +1,8 @@
 import * as Sentry from '@sentry/nextjs';
 
 export function setupMonitoring() {
-  Sentry.init({
-    dsn: process.env.SENTRY_DSN,
-    environment: process.env.NODE_ENV,
-    tracesSampleRate: 1.0,
-    integrations: [
-      new Sentry.Integrations.Http({ tracing: true }),
-      new Sentry.Integrations.Prisma(),
-    ],
-  });
+  // Temporarily disabled Sentry
+  console.log('Monitoring setup disabled');
 }
 
 export function monitorPromise<T>(

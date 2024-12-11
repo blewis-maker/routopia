@@ -27,15 +27,15 @@
       "static/css/app/(protected)/route-planner/page.css",
       "static/chunks/app/(protected)/route-planner/page.js"
     ],
-    "/api/weather/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/weather/route.js"
-    ],
     "/api/auth/[...nextauth]/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/auth/[...nextauth]/route.js"
+    ],
+    "/api/weather/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/weather/route.js"
     ]
   }
 }
