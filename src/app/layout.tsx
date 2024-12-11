@@ -1,3 +1,4 @@
+import '@/styles/globals.css';
 import '@/styles/main.css';
 import '@/styles/mapbox-gl.css';
 import { Providers } from '@/app/providers';

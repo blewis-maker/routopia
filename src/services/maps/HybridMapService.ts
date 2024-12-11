@@ -9,7 +9,9 @@ export class HybridMapService {
   private googleManager: GoogleMapsManager | null = null;
   private styleManager: MapboxStyleManager | null = null;
   private isInitialized: boolean = false;
+  private initializationPromise: Promise<void> | null = null;
   private pendingOperations: (() => Promise<void>)[] = [];
+  private markers: Map<string, mapboxgl.Marker> = new Map();
 
   constructor() {
     // Remove the createOverlayContainer from constructor
@@ -23,78 +25,59 @@ export class HybridMapService {
       darkMode: boolean;
     }
   ): Promise<void> {
-    if (!mapboxgl.accessToken) {
-      mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
-      console.log('Setting Mapbox token:', mapboxgl.accessToken.substring(0, 10) + '...');
+    if (this.initializationPromise) {
+      return this.initializationPromise;
     }
 
-    try {
-      // Use your custom dark style as the initial style
-      const initialStyle = 'mapbox://styles/routopia-ai/cm4jwk0xv014s01rcdrkp68lr';
-      
-      console.log('Initializing map with style:', initialStyle);
+    this.initializationPromise = (async () => {
+      if (!mapboxgl.accessToken) {
+        mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+        console.log('Setting Mapbox token:', mapboxgl.accessToken.substring(0, 10) + '...');
+      }
 
-      this.mapbox = new mapboxgl.Map({
-        container,
-        style: initialStyle,
-        center: options.center,
-        zoom: options.zoom,
-        preserveDrawingBuffer: true,
-        antialias: true,
-        trackResize: true
-      });
+      try {
+        const initialStyle = 'mapbox://styles/routopia-ai/cm4jwk0xv014s01rcdrkp68lr';
+        console.log('Initializing map with style:', initialStyle);
 
-      // Add comprehensive error handling
-      this.mapbox.on('error', (e) => {
-        console.error('Mapbox general error:', e);
-      });
-
-      this.mapbox.on('style.error', (e) => {
-        console.error('Style loading error:', e);
-      });
-
-      this.mapbox.on('style.load', () => {
-        console.log('Style loaded successfully');
-        const style = this.mapbox?.getStyle();
-        console.log('Current style:', {
-          name: style?.name,
-          version: style?.version,
-          sources: Object.keys(style?.sources || {})
+        this.mapbox = new mapboxgl.Map({
+          container,
+          style: initialStyle,
+          center: options.center,
+          zoom: options.zoom,
+          preserveDrawingBuffer: true,
+          antialias: true,
+          trackResize: true
         });
-      });
 
-      // Wait for both map and style to be fully loaded
-      await Promise.all([
-        new Promise<void>((resolve, reject) => {
-          this.mapbox!.once('load', () => {
-            console.log('Map loaded');
-            resolve();
-          });
-          
-          // Add timeout for map load
-          setTimeout(() => reject(new Error('Map load timeout')), 10000);
-        }),
-        new Promise<void>((resolve, reject) => {
-          this.mapbox!.once('style.load', () => {
-            console.log('Style loaded');
-            resolve();
-          });
-          
-          // Add timeout for style load
-          setTimeout(() => reject(new Error('Style load timeout')), 10000);
-        })
-      ]);
+        // Wait for both map and style to be fully loaded
+        await Promise.all([
+          new Promise<void>((resolve, reject) => {
+            this.mapbox!.once('load', () => {
+              console.log('Map loaded');
+              resolve();
+            });
+            setTimeout(() => reject(new Error('Map load timeout')), 10000);
+          }),
+          new Promise<void>((resolve, reject) => {
+            this.mapbox!.once('style.load', () => {
+              console.log('Style loaded');
+              resolve();
+            });
+            setTimeout(() => reject(new Error('Style load timeout')), 10000);
+          })
+        ]);
 
-      this.styleManager = new MapboxStyleManager(this.mapbox);
-      this.googleManager = new GoogleMapsManager();
-      this.googleManager.setMapInstance(this.mapbox);
-      
-      this.isInitialized = true;
-      console.log('Map initialization complete');
-    } catch (error) {
-      console.error('Failed to initialize map:', error);
-      throw error;
-    }
+        this.isInitialized = true;
+        console.log('Map initialization complete');
+      } catch (error) {
+        this.isInitialized = false;
+        this.initializationPromise = null;
+        console.error('Failed to initialize map:', error);
+        throw error;
+      }
+    })();
+
+    return this.initializationPromise;
   }
 
   private getStyleUrl(theme: 'light' | 'dark' | 'satellite'): string {
@@ -170,30 +153,109 @@ export class HybridMapService {
     return this.googleManager?.drawRoute(route);
   }
 
-  async addUserLocationMarker(coordinates: Coordinates): Promise<void> {
+  async addUserLocationMarker(coordinates: { lat: number; lng: number }): Promise<void> {
+    console.log('Adding user location marker:', coordinates);
+    
     if (!this.isReady()) {
-      // Queue the operation instead of failing
-      return new Promise((resolve, reject) => {
-        this.pendingOperations.push(async () => {
-          try {
-            await this.addUserLocationMarker(coordinates);
-            resolve();
-          } catch (error) {
-            reject(error);
+      console.log('Map not ready, waiting for initialization...');
+      await new Promise<void>((resolve, reject) => {
+        let attempts = 0;
+        const maxAttempts = 10;
+        
+        const checkReady = () => {
+          if (this.isReady()) {
+            this.addUserLocationMarker(coordinates)
+              .then(resolve)
+              .catch(reject);
+          } else if (attempts >= maxAttempts) {
+            reject(new Error('Map failed to become ready after maximum attempts'));
+          } else {
+            attempts++;
+            setTimeout(checkReady, 500);
           }
-        });
+        };
+        
+        checkReady();
       });
+      return;
     }
 
     try {
-      await this.addMarker(coordinates, {
-        type: 'start',
-        draggable: false
+      // Remove existing user location marker if it exists
+      const existingMarker = this.markers.get('user-location');
+      if (existingMarker) {
+        existingMarker.remove();
+      }
+
+      // Create custom marker element with wrapper div
+      const el = document.createElement('div');
+      el.className = 'routopia-location-marker';
+      el.setAttribute('data-testid', 'location-marker');
+      
+      // Create SVG wrapper to handle animations properly
+      const svgWrapper = document.createElement('div');
+      svgWrapper.className = 'marker-icon-wrapper';
+      svgWrapper.setAttribute('data-testid', 'marker-wrapper');
+      
+      // Add debug logging to verify the classes are being applied
+      console.log('Creating marker with classes:', {
+        markerClass: el.className,
+        wrapperClass: svgWrapper.className
       });
+      
+      svgWrapper.innerHTML = `
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          width="32" 
+          height="32" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          stroke-width="2" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          class="marker-icon"
+          data-testid="marker-svg"
+        >
+          <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+      `;
+      
+      el.appendChild(svgWrapper);
+
+      // Create and add the new marker
+      const marker = new mapboxgl.Marker({
+        element: el,
+        anchor: 'bottom',
+        offset: [0, 0] // Adjust if needed based on your icon
+      })
+        .setLngLat([coordinates.lng, coordinates.lat])
+        .addTo(this.mapbox!);
+
+      // Store the marker reference
+      this.markers.set('user-location', marker);
+
+      console.log('User location marker added successfully');
     } catch (error) {
       console.error('Error adding user location marker:', error);
       throw error;
     }
+  }
+
+  // Add method to remove markers
+  removeMarker(markerId: string): void {
+    const marker = this.markers.get(markerId);
+    if (marker) {
+      marker.remove();
+      this.markers.delete(markerId);
+    }
+  }
+
+  // Add method to clear all markers
+  clearMarkers(): void {
+    this.markers.forEach(marker => marker.remove());
+    this.markers.clear();
   }
 
   async addMarker(coordinates: Coordinates, options?: MarkerOptions): Promise<string> {
@@ -223,7 +285,14 @@ export class HybridMapService {
   }
 
   isReady(): boolean {
-    return !!(this.mapbox && this.isInitialized && this.mapbox.loaded());
+    console.log('Checking map ready state:', {
+      hasMapbox: !!this.mapbox,
+      isInitialized: this.isInitialized,
+      isLoaded: this.mapbox?.loaded(),
+      hasGoogleManager: !!this.googleManager
+    });
+    
+    return this.isInitialized && !!this.mapbox && this.mapbox.loaded();
   }
 
   async setTheme(theme: 'light' | 'dark' | 'satellite'): Promise<void> {
@@ -429,6 +498,88 @@ export class HybridMapService {
 
       default:
         throw new Error(`Unknown custom style: ${styleId}`);
+    }
+  }
+
+  async setMapStyle(styleId: string): Promise<void> {
+    console.log('HybridMapService.setMapStyle called with:', styleId);
+    console.log('Map state:', {
+      isInitialized: this.isInitialized,
+      hasMapbox: !!this.mapbox,
+      mapboxMethods: this.mapbox ? Object.keys(this.mapbox) : []
+    });
+    
+    if (!this.mapbox || !this.isInitialized) {
+      throw new Error('Map not initialized');
+    }
+
+    const styleUrls: Record<string, string> = {
+      light: 'mapbox://styles/routopia-ai/cm4jx654z000001sy5zpghbfc',
+      dark: 'mapbox://styles/routopia-ai/cm4jwk0xv014s01rcdrkp68lr',
+      satellite: 'mapbox://styles/routopia-ai/cm4jx97ex00hx01rahmsp9rqu'
+    };
+
+    console.log('Style configuration:', {
+      requestedStyleId: styleId,
+      availableStyles: Object.keys(styleUrls),
+      matchingStyle: styleUrls[styleId]
+    });
+
+    const styleUrl = styleUrls[styleId];
+
+    if (!styleUrl) {
+      throw new Error(`Invalid style ID: ${styleId}`);
+    }
+
+    try {
+      console.log('Starting style change to:', styleUrl);
+      
+      // Store current state
+      const center = this.mapbox.getCenter();
+      const zoom = this.mapbox.getZoom();
+      const bearing = this.mapbox.getBearing();
+      const pitch = this.mapbox.getPitch();
+
+      // Set the style and wait for it to load
+      await new Promise<void>((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error('Style change timeout after 10s'));
+        }, 10000);
+
+        const handleStyleLoad = () => {
+          clearTimeout(timeoutId);
+          console.log('New style loaded, restoring map state');
+          
+          try {
+            // Restore state
+            this.mapbox!.setCenter(center);
+            this.mapbox!.setZoom(zoom);
+            this.mapbox!.setBearing(bearing);
+            this.mapbox!.setPitch(pitch);
+
+            if (this.googleManager) {
+              this.googleManager.redrawOverlays();
+            }
+
+            resolve();
+          } catch (error) {
+            console.error('Error restoring map state:', error);
+            reject(error);
+          }
+        };
+
+        // Set up style load handler
+        this.mapbox!.once('style.load', handleStyleLoad);
+
+        // Apply the new style
+        console.log('Applying new style...');
+        this.mapbox!.setStyle(styleUrl);
+      });
+
+      console.log('Style change completed successfully');
+    } catch (error) {
+      console.error('Error in setMapStyle:', error);
+      throw error;
     }
   }
 

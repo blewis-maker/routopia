@@ -14,23 +14,23 @@ interface MapToolbarProps {
 
 const MAP_STYLES = {
   light: {
-    id: 'routopia-ai/cm4jkcgd4001901so0byf3rnm',
     icon: Sun,
     label: 'Light mode',
+    styleId: 'light',
     activeColor: 'text-yellow-400 bg-stone-800/50',
     hoverColor: 'hover:text-yellow-400 hover:bg-stone-800/30'
   },
   dark: {
-    id: 'routopia-ai/cm4jka4bk013q01rcb7cj8crr',
     icon: Moon,
     label: 'Dark mode',
+    styleId: 'dark',
     activeColor: 'text-teal-400 bg-stone-800/50',
     hoverColor: 'hover:text-teal-400 hover:bg-stone-800/30'
   },
   satellite: {
-    id: 'routopia-ai/cm4jkf5jc00h801ra3clwh88e',
     icon: Satellite,
     label: 'Satellite view',
+    styleId: 'satellite',
     activeColor: 'text-emerald-500 bg-stone-800/50',
     hoverColor: 'hover:text-emerald-500 hover:bg-stone-800/30'
   }
@@ -47,8 +47,28 @@ export function MapToolbar({ mapIntegration }: MapToolbarProps) {
   useOnClickOutside(menuRef, () => setIsOpen(false));
 
   const handleStyleChange = async (style: keyof typeof MAP_STYLES) => {
+    console.log('Style change requested:', style);
+    console.log('Map integration available:', !!mapIntegration);
+    
     if (!mapIntegration) {
       console.error('Map integration not available');
+      return;
+    }
+
+    // Wait for map to be ready
+    let attempts = 0;
+    const maxAttempts = 20; // Increase max attempts
+    
+    while (attempts < maxAttempts) {
+      if (mapIntegration.isReady()) {
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 250));
+      attempts++;
+    }
+
+    if (!mapIntegration.isReady()) {
+      console.error('Map integration failed to become ready');
       return;
     }
 
@@ -59,22 +79,17 @@ export function MapToolbar({ mapIntegration }: MapToolbarProps) {
 
     try {
       setIsChangingStyle(true);
-      const styleUrl = `mapbox://styles/${MAP_STYLES[style].id}`;
-      console.log('Attempting style change to:', styleUrl);
-
-      await mapIntegration.setMapboxStyle(styleUrl);
+      const styleId = MAP_STYLES[style].styleId;
+      console.log('Style configuration:', {
+        requestedStyle: style,
+        styleId: styleId
+      });
+      
+      await mapIntegration.setMapStyle(styleId);
       setCurrentStyle(style);
       console.log('Style change completed successfully');
     } catch (error) {
-      console.error('Error changing map style:', error);
-      if (mapIntegration.isReady()) {
-        try {
-          const prevStyleUrl = `mapbox://styles/${MAP_STYLES[currentStyle].id}`;
-          await mapIntegration.setMapboxStyle(prevStyleUrl);
-        } catch (revertError) {
-          console.error('Failed to revert style:', revertError);
-        }
-      }
+      console.error('Error changing map style:', error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsChangingStyle(false);
       setIsOpen(false);

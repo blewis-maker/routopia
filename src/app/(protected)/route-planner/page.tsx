@@ -202,26 +202,72 @@ export default function RoutePlannerPage() {
   }, [isLoaded]); // Only depend on isLoaded
 
   // Update the map init handler
-  const handleMapInit = (service: HybridMapService) => {
+  const handleMapInit = async (service: HybridMapService) => {
+    console.log('Map init handler called');
     mapServiceRef.current = service;
-    initializationRef.current = true;
-    setIsMapInitialized(true);
+    
+    // Wait for the map to be fully ready
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    while (attempts < maxAttempts) {
+      if (service.isReady()) {
+        console.log('Map is ready');
+        setIsMapInitialized(true);
+        
+        // If we have a user location, add the marker now
+        if (userLocation) {
+          const [lng, lat] = userLocation.coordinates;
+          try {
+            await service.addUserLocationMarker({ lat, lng });
+            console.log('Initial user location marker added');
+          } catch (error) {
+            console.error('Failed to add initial user location marker:', error);
+          }
+        }
+        
+        return;
+      }
+      
+      console.log('Waiting for map to be ready...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      attempts++;
+    }
+    
+    console.warn('Map failed to become ready after maximum attempts');
   };
 
   // Separate effect for marker updates
   useEffect(() => {
-    if (!userLocation || !mapServiceRef.current) return;
+    if (!userLocation || !mapServiceRef.current) {
+      return;
+    }
 
-    const [lng, lat] = userLocation.coordinates;
-    
-    // Add user location marker
-    mapServiceRef.current.addUserLocationMarker({
-      lat,
-      lng
-    }).catch(error => {
-      console.error('Error adding user location marker:', error);
-    });
-  }, [userLocation]); // Remove isMapInitialized dependency
+    const addMarker = async () => {
+      try {
+        if (!mapServiceRef.current?.isReady()) {
+          console.log('Map not ready yet, waiting...');
+          return;
+        }
+
+        const [lng, lat] = userLocation.coordinates;
+        console.log('Adding location marker at:', { lng, lat });
+        
+        await mapServiceRef.current.addUserLocationMarker({
+          lat,
+          lng
+        });
+        
+        console.log('Location marker added successfully');
+      } catch (error) {
+        console.error('Failed to add location marker:', error);
+      }
+    };
+
+    // Add marker with a slight delay to ensure map is ready
+    const timer = setTimeout(addMarker, 1000);
+    return () => clearTimeout(timer);
+  }, [userLocation]);
 
   // 6. Effect for chat scrolling
   useEffect(() => {
