@@ -39,149 +39,40 @@ const THEME = {
 
 export class MapboxStyleManager {
   private map: mapboxgl.Map;
-  private currentTheme: 'light' | 'dark' | 'satellite' = 'light';
+  private currentStyle: string;
 
   constructor(map: mapboxgl.Map) {
     this.map = map;
+    this.currentStyle = 'mapbox://styles/mapbox/streets-v12';
   }
 
-  setTheme(theme: 'light' | 'dark' | 'satellite'): void {
-    if (theme === this.currentTheme) return;
+  setTheme(theme: 'light' | 'dark' | 'satellite') {
+    if (!this.map) return;
 
-    switch (theme) {
-      case 'light':
-      case 'dark':
-        this.map.setStyle(this.getCustomStyle(theme));
-        break;
-      case 'satellite':
-        this.map.setStyle('mapbox://styles/mapbox/satellite-streets-v12');
-        break;
-    }
+    const styles = {
+      light: 'mapbox://styles/mapbox/streets-v12',
+      dark: 'mapbox://styles/mapbox/dark-v11',
+      satellite: 'mapbox://styles/mapbox/satellite-streets-v12'
+    };
 
-    // Re-add any Google Maps overlays after style change
+    const newStyle = styles[theme];
+    if (newStyle === this.currentStyle) return;
+
+    // Store style state before change
+    const center = this.map.getCenter();
+    const zoom = this.map.getZoom();
+    const bearing = this.map.getBearing();
+    const pitch = this.map.getPitch();
+
     this.map.once('style.load', () => {
-      // Your event to notify GoogleMapsManager to re-add overlays
-      this.map.fire('routopia-style-loaded');
+      // Restore state after style change
+      this.map.setCenter(center);
+      this.map.setZoom(zoom);
+      this.map.setBearing(bearing);
+      this.map.setPitch(pitch);
     });
 
-    this.currentTheme = theme;
-  }
-
-  getCustomStyle(theme: 'light' | 'dark'): mapboxgl.Style {
-    const colors = THEME[theme];
-    
-    return {
-      version: 8,
-      name: `routopia-${theme}`,
-      sources: {
-        'mapbox-streets': {
-          type: 'vector',
-          url: 'mapbox://mapbox.mapbox-streets-v8'
-        }
-      },
-      layers: [
-        // Background
-        {
-          id: 'background',
-          type: 'background',
-          paint: {
-            'background-color': colors.background
-          }
-        },
-        // Water bodies
-        {
-          id: 'water',
-          type: 'fill',
-          source: 'mapbox-streets',
-          'source-layer': 'water',
-          paint: {
-            'fill-color': colors.water
-          }
-        },
-        // Landuse areas
-        {
-          id: 'landuse',
-          type: 'fill',
-          source: 'mapbox-streets',
-          'source-layer': 'landuse',
-          paint: {
-            'fill-color': colors.landuse
-          }
-        },
-        // Buildings
-        {
-          id: 'buildings',
-          type: 'fill',
-          source: 'mapbox-streets',
-          'source-layer': 'building',
-          paint: {
-            'fill-color': colors.buildings,
-            'fill-opacity': 0.8
-          }
-        },
-        // Roads - Highway
-        {
-          id: 'highway',
-          type: 'line',
-          source: 'mapbox-streets',
-          'source-layer': 'road',
-          filter: ['==', 'class', 'motorway'],
-          paint: {
-            'line-color': colors.accent,
-            'line-width': {
-              base: 1.4,
-              stops: [[6, 0.5], [20, 30]]
-            }
-          }
-        },
-        // Roads - Major
-        {
-          id: 'major-roads',
-          type: 'line',
-          source: 'mapbox-streets',
-          'source-layer': 'road',
-          filter: ['==', 'class', 'main'],
-          paint: {
-            'line-color': colors.secondary,
-            'line-width': {
-              base: 1.4,
-              stops: [[8, 1], [20, 20]]
-            }
-          }
-        },
-        // Roads - Minor
-        {
-          id: 'minor-roads',
-          type: 'line',
-          source: 'mapbox-streets',
-          'source-layer': 'road',
-          filter: ['==', 'class', 'street'],
-          paint: {
-            'line-color': colors.roads,
-            'line-width': {
-              base: 1.4,
-              stops: [[13, 0.5], [20, 10]]
-            }
-          }
-        },
-        // Labels
-        {
-          id: 'place-labels',
-          type: 'symbol',
-          source: 'mapbox-streets',
-          'source-layer': 'place_label',
-          layout: {
-            'text-field': ['get', 'name'],
-            'text-font': ['IBM Plex Mono Bold'],
-            'text-size': 12
-          },
-          paint: {
-            'text-color': colors.text,
-            'text-halo-color': colors.background,
-            'text-halo-width': 2
-          }
-        }
-      ]
-    };
+    this.map.setStyle(newStyle);
+    this.currentStyle = newStyle;
   }
 } 

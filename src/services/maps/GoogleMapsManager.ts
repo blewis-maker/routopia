@@ -81,18 +81,31 @@ export class GoogleMapsManager implements MapServiceInterface {
   }
 
   async addMarker(coordinates: Coordinates, options?: MarkerOptions): Promise<string> {
-    if (!this.map) throw new Error('Map not initialized');
+    if (!this.map) {
+      throw new Error('Map not initialized');
+    }
 
-    const markerId = `marker-${Date.now()}`;
-    const marker = new mapboxgl.Marker({
-      color: options?.type === 'start' ? '#00B2B2' : '#FF0000',
-      draggable: options?.draggable
-    })
-      .setLngLat([coordinates.lng, coordinates.lat])
-      .addTo(this.map);
+    try {
+      const markerId = `marker-${Date.now()}`;
+      const marker = new mapboxgl.Marker({
+        color: options?.type === 'start' ? '#00B2B2' : '#FF0000',
+        draggable: options?.draggable
+      })
+        .setLngLat([coordinates.lng, coordinates.lat]);
 
-    this.markers.set(markerId, marker);
-    return markerId;
+      // Wait for map to be ready before adding marker
+      if (this.map.loaded()) {
+        marker.addTo(this.map);
+      } else {
+        this.map.once('load', () => marker.addTo(this.map!));
+      }
+
+      this.markers.set(markerId, marker);
+      return markerId;
+    } catch (error) {
+      console.error('Error adding marker:', error);
+      throw error;
+    }
   }
 
   removeMarker(markerId: string): void {
@@ -112,5 +125,88 @@ export class GoogleMapsManager implements MapServiceInterface {
     if (this.map.getSource('route')) {
       this.map.removeSource('route');
     }
+  }
+
+  async generateRoute(start: Coordinates, end: Coordinates, waypoints?: Coordinates[]): Promise<RouteVisualization> {
+    const request: google.maps.DirectionsRequest = {
+      origin: { lat: start.lat, lng: start.lng },
+      destination: { lat: end.lat, lng: end.lng },
+      travelMode: google.maps.TravelMode.DRIVING,
+      waypoints: waypoints?.map(wp => ({
+        location: { lat: wp.lat, lng: wp.lng },
+        stopover: true
+      }))
+    };
+
+    try {
+      const result = await this.directionsService.route(request);
+      return this.convertToRouteVisualization(result);
+    } catch (error) {
+      console.error('Failed to generate route:', error);
+      throw error;
+    }
+  }
+
+  async addUserLocationMarker(coordinates: Coordinates): Promise<void> {
+    if (!this.map) return;
+
+    try {
+      await this.addMarker(coordinates, {
+        type: 'start',
+        title: 'Your Location',
+        draggable: false
+      });
+    } catch (error) {
+      console.error('Error adding user location marker:', error);
+    }
+  }
+
+  private convertToRouteVisualization(result: google.maps.DirectionsResult): RouteVisualization {
+    const route = result.routes[0];
+    const path = route.overview_path;
+
+    return {
+      coordinates: path.map(point => ({
+        lat: point.lat(),
+        lng: point.lng()
+      })),
+      distance: route.legs.reduce((total, leg) => total + (leg.distance?.value || 0), 0),
+      duration: route.legs.reduce((total, leg) => total + (leg.duration?.value || 0), 0),
+      bounds: {
+        north: route.bounds.getNorthEast().lat(),
+        south: route.bounds.getSouthWest().lat(),
+        east: route.bounds.getNorthEast().lng(),
+        west: route.bounds.getSouthWest().lng()
+      }
+    };
+  }
+
+  redrawOverlays() {
+    if (!this.map) return;
+
+    // Redraw route if exists
+    const routeSource = this.map.getSource('route');
+    if (routeSource) {
+      const routeData = (routeSource as mapboxgl.GeoJSONSource).serialize();
+      this.map.addSource('route', routeData);
+      this.map.addLayer({
+        id: 'route',
+        type: 'line',
+        source: 'route',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#00B2B2',
+          'line-width': 4
+        }
+      });
+    }
+
+    // Redraw markers
+    this.markers.forEach(marker => {
+      marker.addTo(this.map!);
+    });
   }
 } 

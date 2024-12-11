@@ -1,97 +1,105 @@
-import { GoogleMapsManager } from '@/services/maps/GoogleMapsManager';
+'use client';
+
+import { useState, useRef, useMemo } from 'react';
 import { Sun, Moon, Satellite, Layers } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useOnClickOutside } from '@/hooks/useOnClickOutside';
+import { HybridMapService } from '@/services/maps/HybridMapService';
 
 interface MapToolbarProps {
-  mapIntegration: GoogleMapsManager | null;
+  mapIntegration: HybridMapService | null;
   onToolSelect: (tool: 'ROUTE' | 'SEARCH' | 'TRAFFIC') => void;
   onPreferencesToggle: () => void;
   showPreferences: boolean;
-  activeTools?: string[];
 }
 
-export function MapToolbar({ 
-  mapIntegration,
-  onToolSelect 
-}: MapToolbarProps) {
+export function MapToolbar({ mapIntegration }: MapToolbarProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [currentStyle, setCurrentStyle] = useState<'light' | 'dark' | 'satellite'>('light');
+  const [isChangingStyle, setIsChangingStyle] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  // Handle clicking outside to close dropdown
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
+  useOnClickOutside(menuRef, () => setIsOpen(false));
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  // Check if map is ready
+  const isMapReady = useMemo(() => {
+    return mapIntegration?.isReady() ?? false;
+  }, [mapIntegration]);
 
-  const handleMapTypeChange = (mapType: string) => {
-    const map = mapIntegration?.getMap();
-    if (!map) {
-      console.error('Map not initialized');
-      return;
-    }
-    
-    console.log('Changing map type to:', mapType); // Debug log
+  const handleMapTypeChange = async (mapType: 'light' | 'dark' | 'satellite') => {
+    if (!mapIntegration || !isMapReady || isChangingStyle) return;
 
     try {
-      switch (mapType) {
-        case 'dark_mode':
-          map.setMapTypeId('dark_mode');
-          break;
-        case google.maps.MapTypeId.ROADMAP:
-          map.setOptions({ styles: [] }); // Clear any custom styles
-          map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
-          break;
-        case google.maps.MapTypeId.HYBRID:
-          map.setOptions({ styles: [] }); // Clear any custom styles
-          map.setMapTypeId(google.maps.MapTypeId.HYBRID);
-          break;
-        default:
-          console.error('Unknown map type:', mapType);
-      }
-      console.log('Map type changed successfully'); // Debug log
+      setIsChangingStyle(true);
+      await mapIntegration.setTheme(mapType);
+      setCurrentStyle(mapType);
     } catch (error) {
       console.error('Error changing map type:', error);
+    } finally {
+      setIsChangingStyle(false);
     }
-    
-    setIsOpen(false);
   };
 
+  const styleButtons = [
+    {
+      type: 'light' as const,
+      icon: Sun,
+      activeColor: 'text-yellow-400',
+      hoverColor: 'hover:text-yellow-400',
+      label: 'Light mode'
+    },
+    {
+      type: 'dark' as const,
+      icon: Moon,
+      activeColor: 'text-white',
+      hoverColor: 'hover:text-white',
+      label: 'Dark mode'
+    },
+    {
+      type: 'satellite' as const,
+      icon: Satellite,
+      activeColor: 'text-emerald-500',
+      hoverColor: 'hover:text-emerald-500',
+      label: 'Satellite view'
+    }
+  ];
+
   return (
-    <div className="absolute top-4 right-4 z-10" ref={dropdownRef}>
+    <div className="absolute top-4 right-4 z-10" ref={menuRef}>
       <div className="relative">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="p-2 bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg border border-stone-800/50 text-stone-400 hover:text-stone-200 transition-colors"
+          className={`p-2 bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg border border-stone-800/50 
+            text-stone-400 hover:text-stone-200 transition-all duration-200 hover:scale-105
+            ${isChangingStyle ? 'opacity-50' : ''}`}
+          aria-label="Map Style Options"
         >
           <Layers className="w-5 h-5" />
         </button>
 
         {isOpen && (
-          <div className="absolute top-full right-0 mt-2 bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg border border-stone-800/50 overflow-hidden flex flex-col gap-1 p-1">
-            <button
-              onClick={() => handleMapTypeChange(google.maps.MapTypeId.ROADMAP)}
-              className="flex items-center justify-center px-3 py-2 text-sm text-stone-400 hover:bg-stone-800/50 hover:text-stone-200 rounded-md"
-            >
-              <Sun className="w-4 h-4 text-yellow-400" />
-            </button>
-            <button
-              onClick={() => handleMapTypeChange('dark_mode')}
-              className="flex items-center justify-center px-3 py-2 text-sm text-stone-400 hover:bg-stone-800/50 hover:text-stone-200 rounded-md"
-            >
-              <Moon className="w-4 h-4 text-white" />
-            </button>
-            <button
-              onClick={() => handleMapTypeChange(google.maps.MapTypeId.HYBRID)}
-              className="flex items-center justify-center px-3 py-2 text-sm text-stone-400 hover:bg-stone-800/50 hover:text-stone-200 rounded-md"
-            >
-              <Satellite className="w-4 h-4 text-emerald-500" />
-            </button>
+          <div 
+            className="absolute top-full right-0 mt-2 bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg 
+              border border-stone-800/50 overflow-hidden flex flex-col gap-1 p-1"
+            role="menu"
+          >
+            {styleButtons.map(({ type, icon: Icon, activeColor, hoverColor, label }) => (
+              <button
+                key={type}
+                onClick={() => handleMapTypeChange(type)}
+                className={`flex items-center justify-center px-3 py-2 text-sm transition-all 
+                  duration-200 hover:scale-105 rounded-md 
+                  ${isChangingStyle ? 'opacity-50 cursor-wait' : ''} 
+                  ${currentStyle === type 
+                    ? `${activeColor} bg-stone-800/50` 
+                    : `text-stone-400 ${hoverColor}`
+                  }`}
+                aria-label={label}
+                role="menuitem"
+                aria-disabled={isChangingStyle}
+              >
+                <Icon className="w-4 h-4" />
+              </button>
+            ))}
           </div>
         )}
       </div>

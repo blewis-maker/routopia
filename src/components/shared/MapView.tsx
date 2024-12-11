@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useGoogleMaps } from '@/contexts/GoogleMapsContext';
 import { HybridMapService } from '@/services/maps/HybridMapService';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import * as mapboxgl from 'mapbox-gl';
 
 interface MapViewProps {
   options?: {
@@ -17,7 +16,7 @@ interface MapViewProps {
   showWeather?: boolean;
   showUserLocation?: boolean;
   darkMode?: boolean;
-  onMapInit?: (mapService: GoogleMapsManager) => void;
+  onMapInit?: (mapService: HybridMapService) => void;
 }
 
 export function MapView({
@@ -27,79 +26,75 @@ export function MapView({
   darkMode = false,
   onMapInit
 }: MapViewProps) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const hybridService = useRef<HybridMapService | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const serviceRef = useRef<HybridMapService | null>(null);
   const { isLoaded } = useGoogleMaps();
-  const [mapReady, setMapReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
 
   // Initialize map
   useEffect(() => {
-    let isMounted = true;
+    if (!wrapperRef.current || !isLoaded || serviceRef.current) return;
+
+    // Create a clean container for the map
+    const mapContainer = document.createElement('div');
+    mapContainer.style.position = 'absolute';
+    mapContainer.style.width = '100%';
+    mapContainer.style.height = '100%';
+    wrapperRef.current.appendChild(mapContainer);
 
     const initMap = async () => {
-      if (!mapRef.current || !isLoaded || hybridService.current) return;
-
       try {
-        // Convert center coordinates to the format Mapbox expects
         const center: [number, number] = [
           options.center?.lng ?? -74.0060,
           options.center?.lat ?? 40.7128
         ];
 
-        // Create and initialize the hybrid service
         const service = new HybridMapService();
         
-        // Initialize with explicit typing
-        await service.initialize(mapRef.current, {
+        await service.initialize(mapContainer, {
           center,
           zoom: options.zoom ?? 12,
           darkMode
         });
 
-        // Only update state if component is still mounted
-        if (isMounted) {
-          hybridService.current = service;
-          setMapReady(true);
+        // Wait for map to be fully loaded
+        await new Promise<void>((resolve) => {
+          const checkReady = () => {
+            if (service.isReady()) {
+              resolve();
+            } else {
+              setTimeout(checkReady, 100);
+            }
+          };
+          checkReady();
+        });
 
-          if (onMapInit) {
-            onMapInit(service.getGoogleManager());
-          }
+        serviceRef.current = service;
+        setIsMapReady(true);
+        
+        if (onMapInit) {
+          onMapInit(service);
         }
       } catch (error) {
         console.error('Failed to initialize map:', error);
-        if (isMounted) {
-          setError(error instanceof Error ? error : new Error('Failed to initialize map'));
-        }
+        setError(error instanceof Error ? error : new Error('Failed to initialize map'));
       }
     };
 
-    // Start initialization
     initMap();
 
-    // Cleanup function
     return () => {
-      isMounted = false;
-      if (hybridService.current) {
-        try {
-          const map = hybridService.current.getMap();
-          if (map) {
-            map.remove();
-          }
-        } catch (error) {
-          console.error('Error cleaning up map:', error);
-        }
+      if (serviceRef.current) {
+        serviceRef.current.cleanup();
+        serviceRef.current = null;
+      }
+      if (wrapperRef.current && mapContainer.parentNode === wrapperRef.current) {
+        wrapperRef.current.removeChild(mapContainer);
       }
     };
   }, [isLoaded, options.center?.lat, options.center?.lng, options.zoom, darkMode, onMapInit]);
 
-  // Handle theme changes
-  useEffect(() => {
-    if (!hybridService.current || !mapReady) return;
-    hybridService.current.setTheme(darkMode ? 'dark' : 'light');
-  }, [darkMode, mapReady]);
-
-  // Show error state if initialization failed
   if (error) {
     return (
       <div className="flex items-center justify-center h-full bg-stone-900 text-white p-4">
@@ -119,7 +114,15 @@ export function MapView({
 
   return (
     <div className="w-full h-full relative">
-      <div ref={mapRef} className="w-full h-full absolute inset-0" />
+      {/* Map wrapper */}
+      <div ref={wrapperRef} className="absolute inset-0" />
+      
+      {/* UI layer - only shown when map is ready */}
+      {isMapReady && (
+        <div className="absolute inset-0 pointer-events-none z-10">
+          {/* UI elements go here */}
+        </div>
+      )}
     </div>
   );
 }

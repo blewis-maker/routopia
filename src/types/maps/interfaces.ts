@@ -7,6 +7,9 @@ export interface MapServiceInterface {
   addMarker(coordinates: Coordinates, options?: MarkerOptions): Promise<string>;
   removeMarker(markerId: string): void;
   clearRoute(): void;
+  generateRoute(start: Coordinates, end: Coordinates, waypoints?: Coordinates[]): Promise<RouteVisualization>;
+  addUserLocationMarker(coordinates: Coordinates): Promise<void>;
+  isReady(): boolean;
 }
 
 export interface Coordinates {
@@ -17,7 +20,6 @@ export interface Coordinates {
 export interface MarkerOptions {
   type?: 'start' | 'end' | 'waypoint';
   title?: string;
-  onClick?: () => void;
   draggable?: boolean;
 }
 
@@ -26,4 +28,11 @@ export interface MapBounds {
   south: number;
   east: number;
   west: number;
+}
+
+export interface RouteVisualization {
+  coordinates: Coordinates[];
+  distance: number;
+  duration: number;
+  bounds: MapBounds;
 } 

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
 import { useGoogleMaps } from '@/contexts/GoogleMapsContext';
+import { Locate, LocateFixed } from 'lucide-react';
 
 interface SearchResult {
   coordinates: [number, number];
@@ -17,6 +18,7 @@ interface SearchBoxProps {
   initialValue?: string;
   useCurrentLocation?: boolean;
   className?: string;
+  isLocationSet?: boolean;
 }
 
 export function SearchBox({ 
@@ -24,7 +26,8 @@ export function SearchBox({
   placeholder = 'Search locations...', 
   useCurrentLocation = false,
   initialValue = '',
-  className = ''
+  className = '',
+  isLocationSet = false
 }: SearchBoxProps) {
   const [inputValue, setInputValue] = useState(initialValue);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -93,7 +96,9 @@ export function SearchBox({
 
       {useCurrentLocation && (
         <button
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-emerald-400 transition-colors"
+          className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${
+            isLocationSet ? 'text-emerald-500 hover:text-emerald-400' : 'text-stone-400 hover:text-stone-300'
+          }`}
           onClick={() => {
             if (navigator.geolocation) {
               navigator.geolocation.getCurrentPosition(
@@ -110,20 +115,11 @@ export function SearchBox({
             }
           }}
         >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
-            />
-          </svg>
+          {isLocationSet ? (
+            <LocateFixed className="w-4 h-4" />
+          ) : (
+            <Locate className="w-4 h-4" />
+          )}
         </button>
       )}
     </div>

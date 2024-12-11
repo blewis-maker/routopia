@@ -37,6 +37,7 @@ import { MapVisualization } from '@/types/maps/visualization';
 import { convertRouteToVisualization } from '@/lib/utils/routeConversion';
 import { useGoogleMaps } from '@/contexts/GoogleMapsContext';
 import { MapErrorBoundary } from '@/components/error/MapErrorBoundary';
+import { HybridMapService } from '@/services/maps/HybridMapService';
 
 interface WeatherInfo {
   location: string;
@@ -109,7 +110,7 @@ export default function RoutePlannerPage() {
   // 1. All refs
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const geocoder = useRef<google.maps.Geocoder | null>(null);
-  const mapServiceRef = useRef<GoogleMapsManager | null>(null);
+  const mapServiceRef = useRef<HybridMapService | null>(null);
   
   // 2. All state
   const [userLocation, setUserLocation] = useState<Location | null>(null);
@@ -124,6 +125,8 @@ export default function RoutePlannerPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [routeType, setRouteType] = useState<'drive' | 'bike' | 'run' | 'ski' | 'adventure'>('drive');
+  const [isMapInitialized, setIsMapInitialized] = useState(false);
+  const initializationRef = useRef<boolean>(false);
 
   // 3. All context hooks
   const { theme } = useTheme();
@@ -198,13 +201,27 @@ export default function RoutePlannerPage() {
     };
   }, [isLoaded]); // Only depend on isLoaded
 
+  // Update the map init handler
+  const handleMapInit = (service: HybridMapService) => {
+    mapServiceRef.current = service;
+    initializationRef.current = true;
+    setIsMapInitialized(true);
+  };
+
   // Separate effect for marker updates
   useEffect(() => {
     if (!userLocation || !mapServiceRef.current) return;
 
     const [lng, lat] = userLocation.coordinates;
-    mapServiceRef.current.addUserLocationMarker({ lat, lng });
-  }, [userLocation]);
+    
+    // Add user location marker
+    mapServiceRef.current.addUserLocationMarker({
+      lat,
+      lng
+    }).catch(error => {
+      console.error('Error adding user location marker:', error);
+    });
+  }, [userLocation]); // Remove isMapInitialized dependency
 
   // 6. Effect for chat scrolling
   useEffect(() => {
@@ -322,84 +339,28 @@ export default function RoutePlannerPage() {
     }
   };
 
-  const handleMapServiceInit = (service: GoogleMapsManager) => {
-    console.log('Map service initialized');
-    mapServiceRef.current = service;
-    
-    // If we have a user location, update the marker
-    if (userLocation) {
-      const [lng, lat] = userLocation.coordinates;
-      service.addUserLocationMarker({ lat, lng });
-    }
-  };
+  // Update location select handler
+  const handleLocationSelect = async (result: SearchResult) => {
+    if (!mapServiceRef.current?.isReady()) return;
 
-  // Generate route function
-  const generateRoute = async (start: [number, number], end: [number, number]) => {
-    if (!mapServiceRef.current) {
-      console.error('Map service not initialized');
-      return;
-    }
-
-    setIsLoading(true);
     try {
-      // Clear existing routes and markers
-      mapServiceRef.current.clearRoute();
-
-      const startCoords = { lat: start[1], lng: start[0] };
-      const endCoords = { lat: end[1], lng: end[0] };
-      
-      const googleActivityType = mapActivityTypeToGoogle(routeType);
-      
-      const routeVisualization = await mapServiceRef.current.generateRoute(
-        startCoords,
-        endCoords,
-        {
-          activityType: googleActivityType,
-          alternatives: true
-        }
-      );
-
-      if (!routeVisualization || !routeVisualization.mainRoute) {
-        throw new Error('Failed to generate route visualization');
-      }
-
-      await mapServiceRef.current.drawRoute(routeVisualization, {
-        activityType: googleActivityType,
-        alternatives: true
-      });
-
-      // Update mainRoute state
-      const route: Route = {
-        id: generateId(),
-        name: 'Generated Route',
-        segments: routeVisualization.mainRoute.coordinates.map((point, index, array) => ({
-          startPoint: {
-            latitude: point.lat,
-            longitude: point.lng
-          },
-          endPoint: index < array.length - 1 ? {
-            latitude: array[index + 1].lat,
-            longitude: array[index + 1].lng
-          } : undefined
-        })),
-        totalMetrics: {
-          distance: routeVisualization.mainRoute.distance,
-          duration: routeVisualization.mainRoute.duration
-        },
-        alternatives: routeVisualization.alternatives?.map(alt => ({
-          path: alt.path,
-          distance: alt.distance,
-          duration: alt.duration,
-          mode: alt.mode
-        }))
+      const location: Location = {
+        coordinates: result.coordinates,
+        address: result.formatted_address
       };
-      setMainRoute(route);
 
+      setUserLocation(location);
+      
+      if (isMapInitialized) { // Check if map is initialized
+        await mapServiceRef.current.addUserLocationMarker({
+          lat: location.coordinates[1],
+          lng: location.coordinates[0]
+        });
+
+        mapServiceRef.current.setCenter([location.coordinates[0], location.coordinates[1]]);
+      }
     } catch (error) {
-      console.error('Failed to generate route:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
+      console.error('Error handling location select:', error);
     }
   };
 
@@ -446,41 +407,6 @@ export default function RoutePlannerPage() {
     if (tool === 'TRAFFIC' && mapServiceRef.current) {
       mapServiceRef.current.setTrafficLayer(true);
     }
-  };
-
-  const handleLocationSelect = async (result: any) => {
-    if (!('coordinates' in result)) return;
-    
-    const [lng, lat] = result.coordinates;
-    const displayAddress = result.formatted_address || result.place_name;
-    
-    // Update map center first
-    setMapCenter([lng, lat]);
-    setMapZoom(14);
-    
-    // Update marker if map service is available
-    if (mapServiceRef.current) {
-      try {
-        await mapServiceRef.current.addUserLocationMarker({ lat, lng });
-      } catch (error) {
-        console.error('Error updating marker:', error);
-      }
-    }
-    
-    // Update state with address
-    setUserLocation({
-      coordinates: [lng, lat],
-      address: displayAddress
-    });
-    
-    // Update weather info
-    setWeatherInfo({
-      location: displayAddress,
-      coordinates: [lng, lat]
-    });
-    
-    // Fetch weather data
-    fetchWeatherData(lat, lng, displayAddress);
   };
 
   const fetchWeatherData = async (lat: number, lng: number, location?: string) => {
@@ -877,47 +803,50 @@ export default function RoutePlannerPage() {
                 showWeather={false}
                 showUserLocation={true}
                 darkMode={theme === 'dark'}
-                onMapInit={(service) => {
-                  mapServiceRef.current = service;
-                }}
+                onMapInit={handleMapInit}
               />
             </MapErrorBoundary>
 
-            <MapToolbar 
-              mapIntegration={mapServiceRef.current}
-              onToolSelect={handleToolSelect}
-              onPreferencesToggle={() => {}}
-              showPreferences={false}
-            />
-
-            {/* Search Box Overlay */}
-            <div className="absolute top-4 left-4 z-10 w-96 max-w-[calc(100%-2rem)] space-y-2">
-              <ErrorBoundary>
-                <SearchBox 
-                  onSelect={handleLocationSelect}
-                  placeholder="Set your starting point..."
-                  useCurrentLocation={true}
-                  initialValue={userLocation?.address || ''}
-                  key={`start-${userLocation?.coordinates?.join(',')}-${Date.now()}`}
-                  className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
+            {isMapInitialized && ( // Only show UI when map is initialized
+              <>
+                <MapToolbar 
+                  mapIntegration={mapServiceRef.current}
+                  onToolSelect={handleToolSelect}
+                  onPreferencesToggle={() => {}}
+                  showPreferences={false}
                 />
-              </ErrorBoundary>
-              <ErrorBoundary>
-                <SearchBox 
-                  onSelect={handleDestinationSelect}
-                  placeholder="Choose destination..."
-                  initialValue={destinationLocation?.address || ''}
-                  key={`end-${destinationLocation?.coordinates?.join(',')}-${Date.now()}`}
-                  className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
-                />
-              </ErrorBoundary>
-            </div>
 
-            {/* Weather Widget */}
-            {weatherData && (
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-                <WeatherWidget data={weatherData} />
-              </div>
+                {/* Search Box Overlay */}
+                <div className="absolute top-4 left-4 z-10 w-96 max-w-[calc(100%-2rem)] space-y-2">
+                  <ErrorBoundary>
+                    <SearchBox 
+                      onSelect={handleLocationSelect}
+                      placeholder="Set your starting point..."
+                      useCurrentLocation={true}
+                      initialValue={userLocation?.address || ''}
+                      key={`start-${userLocation?.coordinates?.join(',')}-${Date.now()}`}
+                      className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
+                      isLocationSet={!!userLocation}
+                    />
+                  </ErrorBoundary>
+                  <ErrorBoundary>
+                    <SearchBox 
+                      onSelect={handleDestinationSelect}
+                      placeholder="Choose destination..."
+                      initialValue={destinationLocation?.address || ''}
+                      key={`end-${destinationLocation?.coordinates?.join(',')}-${Date.now()}`}
+                      className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
+                    />
+                  </ErrorBoundary>
+                </div>
+
+                {/* Weather Widget */}
+                {weatherData && (
+                  <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+                    <WeatherWidget data={weatherData} />
+                  </div>
+                )}
+              </>
             )}
 
             {/* Loading Overlay */}
