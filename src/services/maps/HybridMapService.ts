@@ -28,11 +28,14 @@ export class HybridMapService {
     }
 
     try {
-      const initialStyle = options.darkMode ? 'dark' : 'light';
+      // Use direct Mapbox style URL
+      const initialStyle = options.darkMode 
+        ? 'mapbox://styles/mapbox/dark-v11'
+        : 'mapbox://styles/mapbox/light-v11';
       
       this.mapbox = new mapboxgl.Map({
         container,
-        style: this.getStyleUrl(initialStyle),
+        style: initialStyle,
         center: options.center,
         zoom: options.zoom,
         preserveDrawingBuffer: true,
@@ -66,12 +69,64 @@ export class HybridMapService {
   }
 
   private getStyleUrl(theme: 'light' | 'dark' | 'satellite'): string {
-    const styles = {
-      light: 'mapbox://styles/mapbox/streets-v12',
-      dark: 'mapbox://styles/mapbox/dark-v11',
-      satellite: 'mapbox://styles/mapbox/satellite-streets-v12'
+    const THEME = {
+      light: {
+        primary: '#2A2B2E',
+        secondary: '#494B50',
+        accent: '#00B2B2',
+        text: '#2A2B2E',
+        background: '#F8F9FA',
+        roads: '#FFFFFF',
+        water: '#BFEFFF',
+        landuse: '#E6E8E6',
+        buildings: '#FFFFFF'
+      },
+      dark: {
+        primary: '#F8F9FA',
+        secondary: '#B4B6BA',
+        accent: '#00B2B2',
+        text: '#F8F9FA',
+        background: '#2A2B2E',
+        roads: '#494B50',
+        water: '#193C3C',
+        landuse: '#363839',
+        buildings: '#494B50'
+      }
     };
-    return styles[theme];
+
+    // Use our custom styles
+    switch (theme) {
+      case 'light':
+        return {
+          version: 8,
+          name: 'Routopia Light',
+          sprite: 'mapbox://sprites/mapbox/light-v11',
+          glyphs: 'mapbox://fonts/mapbox/{fontstack}/{range}.pbf',
+          sources: {
+            // ... sources configuration
+          },
+          layers: [
+            // ... layers with THEME.light colors
+          ]
+        };
+      case 'dark':
+        return {
+          version: 8,
+          name: 'Routopia Dark',
+          sprite: 'mapbox://sprites/mapbox/dark-v11',
+          glyphs: 'mapbox://fonts/mapbox/{fontstack}/{range}.pbf',
+          sources: {
+            // ... sources configuration
+          },
+          layers: [
+            // ... layers with THEME.dark colors
+          ]
+        };
+      case 'satellite':
+        return 'mapbox://styles/mapbox/satellite-streets-v12';
+      default:
+        return 'mapbox://styles/mapbox/dark-v11';
+    }
   }
 
   getGoogleManager(): GoogleMapsManager {
@@ -236,6 +291,110 @@ export class HybridMapService {
   fitBounds(bounds: mapboxgl.LngLatBoundsLike, options?: mapboxgl.FitBoundsOptions) {
     if (!this.mapbox) return;
     this.mapbox.fitBounds(bounds, options);
+  }
+
+  async setMapboxStyle(styleId: string) {
+    if (!this.mapbox || !this.isReady()) {
+      throw new Error('Map not initialized');
+    }
+
+    try {
+      // Store current state
+      const center = this.mapbox.getCenter();
+      const zoom = this.mapbox.getZoom();
+      const bearing = this.mapbox.getBearing();
+      const pitch = this.mapbox.getPitch();
+
+      await new Promise<void>((resolve, reject) => {
+        const timeoutId = setTimeout(() => reject(new Error('Style change timeout')), 10000);
+
+        this.mapbox!.once('style.load', () => {
+          clearTimeout(timeoutId);
+          try {
+            // Restore state
+            this.mapbox!.setCenter(center);
+            this.mapbox!.setZoom(zoom);
+            this.mapbox!.setBearing(bearing);
+            this.mapbox!.setPitch(pitch);
+
+            if (this.googleManager) {
+              this.googleManager.redrawOverlays();
+            }
+
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        });
+
+        // Set the style directly using the Mapbox style URL
+        this.mapbox!.setStyle(styleId);
+      });
+    } catch (error) {
+      console.error('Error setting Mapbox style:', error);
+      throw error;
+    }
+  }
+
+  private getCustomStyle(styleId: string): mapboxgl.Style {
+    const THEME = {
+      light: {
+        primary: '#2A2B2E',
+        secondary: '#494B50',
+        accent: '#00B2B2',
+        text: '#2A2B2E',
+        background: '#F8F9FA',
+        roads: '#FFFFFF',
+        water: '#BFEFFF',
+        landuse: '#E6E8E6',
+        buildings: '#FFFFFF'
+      },
+      dark: {
+        primary: '#F8F9FA',
+        secondary: '#B4B6BA',
+        accent: '#00B2B2',
+        text: '#F8F9FA',
+        background: '#2A2B2E',
+        roads: '#494B50',
+        water: '#193C3C',
+        landuse: '#363839',
+        buildings: '#494B50'
+      }
+    };
+
+    // Return the appropriate custom style based on styleId
+    switch (styleId) {
+      case 'routopia-light':
+        return {
+          version: 8,
+          name: 'Routopia Light',
+          sprite: 'mapbox://sprites/mapbox/light-v11',
+          glyphs: 'mapbox://fonts/mapbox/{fontstack}/{range}.pbf',
+          sources: {
+            // Add your sources here
+          },
+          layers: [
+            // Add your layers here with THEME.light colors
+          ]
+        } as mapboxgl.Style;
+
+      case 'routopia-dark':
+        return {
+          version: 8,
+          name: 'Routopia Dark',
+          sprite: 'mapbox://sprites/mapbox/dark-v11',
+          glyphs: 'mapbox://fonts/mapbox/{fontstack}/{range}.pbf',
+          sources: {
+            // Add your sources here
+          },
+          layers: [
+            // Add your layers here with THEME.dark colors
+          ]
+        } as mapboxgl.Style;
+
+      default:
+        throw new Error(`Unknown custom style: ${styleId}`);
+    }
   }
 
   // ... add other necessary methods

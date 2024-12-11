@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef } from 'react';
 import { Sun, Moon, Satellite, Layers } from 'lucide-react';
 import { useOnClickOutside } from '@/hooks/useOnClickOutside';
 import { HybridMapService } from '@/services/maps/HybridMapService';
@@ -10,61 +10,54 @@ import { baseStyles, roundedStyles, glassStyles } from '@/styles/components';
 
 interface MapToolbarProps {
   mapIntegration: HybridMapService | null;
-  onToolSelect: (tool: 'ROUTE' | 'SEARCH' | 'TRAFFIC') => void;
-  onPreferencesToggle: () => void;
-  showPreferences: boolean;
 }
+
+const MAP_STYLES = {
+  light: {
+    id: 'mapbox/light-v11',
+    icon: Sun,
+    label: 'Light mode',
+    activeColor: 'text-yellow-400',
+    hoverColor: 'hover:text-yellow-400'
+  },
+  dark: {
+    id: 'mapbox/dark-v11',
+    icon: Moon,
+    label: 'Dark mode',
+    activeColor: 'text-white',
+    hoverColor: 'hover:text-white'
+  },
+  satellite: {
+    id: 'mapbox/satellite-streets-v12',
+    icon: Satellite,
+    label: 'Satellite view',
+    activeColor: 'text-emerald-500',
+    hoverColor: 'hover:text-emerald-500'
+  }
+};
 
 export function MapToolbar({ mapIntegration }: MapToolbarProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [currentStyle, setCurrentStyle] = useState<'light' | 'dark' | 'satellite'>('light');
+  const [currentStyle, setCurrentStyle] = useState<keyof typeof MAP_STYLES>('dark');
   const [isChangingStyle, setIsChangingStyle] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useOnClickOutside(menuRef, () => setIsOpen(false));
 
-  // Check if map is ready
-  const isMapReady = useMemo(() => {
-    return mapIntegration?.isReady() ?? false;
-  }, [mapIntegration]);
-
-  const handleMapTypeChange = async (mapType: 'light' | 'dark' | 'satellite') => {
-    if (!mapIntegration || !isMapReady || isChangingStyle) return;
+  const handleStyleChange = async (style: keyof typeof MAP_STYLES) => {
+    if (!mapIntegration || isChangingStyle) return;
 
     try {
       setIsChangingStyle(true);
-      await mapIntegration.setTheme(mapType);
-      setCurrentStyle(mapType);
+      await mapIntegration.setMapboxStyle(`mapbox://styles/${MAP_STYLES[style].id}`);
+      setCurrentStyle(style);
     } catch (error) {
-      console.error('Error changing map type:', error);
+      console.error('Error changing map style:', error);
     } finally {
       setIsChangingStyle(false);
+      setIsOpen(false);
     }
   };
-
-  const styleButtons = [
-    {
-      type: 'light' as const,
-      icon: Sun,
-      activeColor: 'text-yellow-400',
-      hoverColor: 'hover:text-yellow-400',
-      label: 'Light mode'
-    },
-    {
-      type: 'dark' as const,
-      icon: Moon,
-      activeColor: 'text-white',
-      hoverColor: 'hover:text-white',
-      label: 'Dark mode'
-    },
-    {
-      type: 'satellite' as const,
-      icon: Satellite,
-      activeColor: 'text-emerald-500',
-      hoverColor: 'hover:text-emerald-500',
-      label: 'Satellite view'
-    }
-  ];
 
   return (
     <div className="absolute top-4 right-4 z-10" ref={menuRef}>
@@ -75,6 +68,7 @@ export function MapToolbar({ mapIntegration }: MapToolbarProps) {
           onClick={() => setIsOpen(!isOpen)}
           disabled={isChangingStyle}
           aria-label="Map Style Options"
+          className="w-10 h-10 p-2"
         >
           <Layers className="w-5 h-5" />
         </Button>
@@ -84,17 +78,18 @@ export function MapToolbar({ mapIntegration }: MapToolbarProps) {
             baseStyles.card,
             roundedStyles.lg,
             glassStyles.dark,
-            'absolute top-full right-0 mt-2 p-1 flex flex-col gap-1 w-10'
+            'absolute top-full right-0 mt-2 p-1',
+            'w-10 flex flex-col gap-1'  // Match button width
           )}>
-            {styleButtons.map(({ type, icon: Icon, activeColor, hoverColor, label }) => (
+            {Object.entries(MAP_STYLES).map(([type, { icon: Icon, activeColor, hoverColor, label }]) => (
               <Button
                 key={type}
                 variant="ghost"
                 size="sm"
-                onClick={() => handleMapTypeChange(type)}
+                onClick={() => handleStyleChange(type as keyof typeof MAP_STYLES)}
                 disabled={isChangingStyle}
                 className={cn(
-                  'flex items-center justify-center w-full',
+                  'flex items-center justify-center w-full p-2',
                   currentStyle === type 
                     ? `${activeColor} bg-stone-800` 
                     : `text-stone-400 ${hoverColor}`
