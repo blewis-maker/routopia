@@ -183,3 +183,18 @@
 .animate-logo-blink {
   animation: logo-blink-analog 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+@keyframes weather-blink {
+  0%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 2px currentColor);
+  }
+  50% {
+    opacity: 0.7;
+    filter: none;
+  }
+}
+
+.animate-weather-blink {
+  animation: weather-blink 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

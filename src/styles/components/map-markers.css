@@ -7,7 +7,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid red;
 }
 
 /* Wrapper for SVG to handle animations */
@@ -24,63 +23,31 @@
 .marker-icon {
   width: 32px;
   height: 32px;
-  color: #00B2B2;
-  filter: drop-shadow(0 0 8px rgba(0, 178, 178, 0.3));
-  transition: all 0.2s ease;
-  will-change: transform, filter, color;
-  transform-origin: center bottom;
-  animation: 
-    marker-glow 3s ease-in-out infinite,
-    marker-float 3s ease-in-out infinite;
-  background-color: rgba(0, 178, 178, 0.1);
+  color: #10F0F0;
+  transition: color 0.2s ease;
+  animation: marker-blink 2s steps(2, start) infinite;
 }
 
-/* Glow animation */
-@keyframes marker-glow {
-  0%, 100% {
-    color: #00B2B2;
-    filter: drop-shadow(0 0 8px rgba(0, 178, 178, 0.3));
+/* Crisp blink animation */
+@keyframes marker-blink {
+  0%, 49% {
+    color: #10F0F0;
+    filter: drop-shadow(0 0 2px rgba(16, 240, 240, 0.5));
   }
-  50% {
-    color: #00D6D6;
-    filter: drop-shadow(0 0 12px rgba(0, 214, 214, 0.5));
+  50%, 100% {
+    color: #008F8F;
+    filter: none;
   }
 }
 
-/* Float animation */
-@keyframes marker-float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
-}
-
-/* Ping effect */
-.marker-icon-wrapper::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 16px;
-  height: 16px;
-  background: rgba(0, 178, 178, 0.2);
-  border-radius: 50%;
-  transform: translate(-50%, 0);
-  animation: marker-ping 3s cubic-bezier(0, 0, 0.2, 1) infinite;
-  z-index: -1;
-}
-
-@keyframes marker-ping {
-  75%, 100% {
-    transform: translate(-50%, 0) scale(2);
-    opacity: 0;
-  }
-}
-
-/* Hover effects */
+/* Hover effect - more digital feel */
 .routopia-location-marker:hover .marker-icon {
-  color: #00E6E6;
-  filter: drop-shadow(0 0 16px rgba(0, 230, 230, 0.6));
+  color: #40FFFF;
+  animation: none;
+  filter: drop-shadow(0 0 1px rgba(64, 255, 255, 0.8));
+}
+
+/* Remove old animations and effects */
+.marker-icon-wrapper::after {
+  display: none;
 } 

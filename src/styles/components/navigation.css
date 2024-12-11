@@ -1,0 +1,16 @@
+.nav-bar__logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-bar__logo-text {
+  font-weight: 500;
+  color: currentColor;
+}
+
+/* Add specific animation overrides if needed */
+.nav-bar__logo svg {
+  transform-origin: center;
+  will-change: transform, filter;
+} 

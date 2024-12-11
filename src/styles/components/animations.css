@@ -1,0 +1,55 @@
+/* Retro blink animation system */
+@keyframes retro-blink {
+  0%, 49% {
+    opacity: 1;
+    filter: drop-shadow(0 0 2px currentColor);
+  }
+  50%, 100% {
+    opacity: 0.6;
+    filter: none;
+  }
+}
+
+/* Animation utility classes */
+.animate-retro-blink {
+  animation: retro-blink 2s steps(2, start) infinite;
+}
+
+.animate-retro-blink-slow {
+  animation: retro-blink 3s steps(2, start) infinite;
+}
+
+.animate-retro-blink-fast {
+  animation: retro-blink 1s steps(2, start) infinite;
+}
+
+/* Pause animation on hover */
+.animate-pause-on-hover:hover {
+  animation-play-state: paused;
+}
+
+/* Alert variations */
+.animate-alert {
+  animation: retro-blink 0.5s steps(2, start) infinite;
+}
+
+.animate-warning {
+  animation: retro-blink 1s steps(2, start) infinite;
+}
+
+/* Color variations with animation */
+.text-retro-teal {
+  color: #10F0F0;
+}
+
+.text-retro-green {
+  color: #00FF66;
+}
+
+.text-retro-amber {
+  color: #FFB000;
+}
+
+.text-retro-red {
+  color: #FF4040;
+} 

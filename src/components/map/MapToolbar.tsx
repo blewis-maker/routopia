@@ -4,9 +4,8 @@ import { useState, useRef } from 'react';
 import { Sun, Moon, Satellite, Layers } from 'lucide-react';
 import { useOnClickOutside } from '@/hooks/useOnClickOutside';
 import { HybridMapService } from '@/services/maps/HybridMapService';
-import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import { baseStyles, roundedStyles, glassStyles } from '@/styles/components';
+import { styleGuide as sg } from '@/styles/theme/styleGuide';
 
 interface MapToolbarProps {
   mapIntegration: HybridMapService | null;
@@ -17,26 +16,24 @@ const MAP_STYLES = {
     icon: Sun,
     label: 'Light mode',
     styleId: 'light',
-    activeColor: 'text-yellow-400 bg-stone-800/50',
-    hoverColor: 'hover:text-yellow-400 hover:bg-stone-800/30'
+    activeColor: `${sg.colors.text.accent} ${sg.colors.background.secondary}`,
+    hoverColor: sg.colors.hover.text,
   },
   dark: {
     icon: Moon,
     label: 'Dark mode',
     styleId: 'dark',
-    activeColor: 'text-teal-400 bg-stone-800/50',
-    hoverColor: 'hover:text-teal-400 hover:bg-stone-800/30'
+    activeColor: `${sg.colors.text.accent} ${sg.colors.background.secondary}`,
+    hoverColor: sg.colors.hover.text,
   },
   satellite: {
     icon: Satellite,
     label: 'Satellite view',
     styleId: 'satellite',
-    activeColor: 'text-emerald-500 bg-stone-800/50',
-    hoverColor: 'hover:text-emerald-500 hover:bg-stone-800/30'
-  }
+    activeColor: `${sg.colors.text.accent} ${sg.colors.background.secondary}`,
+    hoverColor: sg.colors.hover.text,
+  },
 };
-
-console.log('MAP_STYLES:', MAP_STYLES);
 
 export function MapToolbar({ mapIntegration }: MapToolbarProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -97,47 +94,56 @@ export function MapToolbar({ mapIntegration }: MapToolbarProps) {
   };
 
   return (
-    <div className="absolute top-4 right-4 z-10" ref={menuRef}>
+    <div className="absolute bottom-6 left-6 z-10" ref={menuRef}>
       <div className="relative">
-        <Button
-          variant="glass"
-          size="md"
+        <button
           onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            "p-2 rounded-md",
+            sg.colors.background.primary,
+            sg.colors.border.primary,
+            "border",
+            sg.effects.shadow,
+            "transition-all duration-200",
+            isOpen && sg.colors.border.accent
+          )}
           disabled={isChangingStyle}
-          aria-label="Map Style Options"
-          className="w-10 h-10 p-2"
         >
-          <Layers className="w-5 h-5" />
-        </Button>
+          <Layers className={cn(
+            "w-5 h-5",
+            sg.colors.text.secondary,
+            !isChangingStyle && sg.colors.hover.text
+          )} />
+        </button>
 
         {isOpen && (
           <div className={cn(
-            baseStyles.card,
-            roundedStyles.lg,
-            glassStyles.dark,
-            'absolute top-full right-0 mt-2 p-1',
-            'w-10 flex flex-col gap-1'
+            "absolute bottom-full mb-2 left-0",
+            "rounded-md overflow-hidden",
+            sg.colors.background.primary,
+            sg.colors.border.primary,
+            "border",
+            sg.effects.shadow
           )}>
-            {Object.entries(MAP_STYLES).map(([type, { icon: Icon, activeColor, hoverColor, label }]) => (
-              <Button
+            {Object.entries(MAP_STYLES).map(([type, { icon: Icon, label, activeColor, hoverColor }]) => (
+              <button
                 key={type}
-                variant="ghost"
-                size="sm"
                 onClick={() => handleStyleChange(type as keyof typeof MAP_STYLES)}
                 disabled={isChangingStyle}
                 className={cn(
-                  'flex items-center justify-center w-full p-2 transition-all duration-200',
+                  "flex items-center justify-center w-full p-2",
+                  sg.effects.transition,
                   currentStyle === type 
                     ? activeColor 
-                    : `text-stone-400 ${hoverColor}`
+                    : `${sg.colors.text.secondary} ${hoverColor}`
                 )}
                 aria-label={label}
               >
                 <Icon className={cn(
-                  'w-4 h-4',
-                  currentStyle === type && 'animate-pulse-subtle'
+                  "w-4 h-4",
+                  currentStyle === type && "animate-pulse-subtle"
                 )} />
-              </Button>
+              </button>
             ))}
           </div>
         )}
