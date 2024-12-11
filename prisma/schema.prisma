@@ -398,3 +398,15 @@ model ProviderWebhook {
   @@index([userId])
   @@index([verifyToken])
 }
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  routeId   String
+  content   String
+  timestamp DateTime @default(now())
+  userId    String
+  type      String
+
+  @@index([routeId])
+  @@index([userId])
+}

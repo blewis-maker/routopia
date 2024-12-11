@@ -4,6 +4,11 @@ import { Cloud, CloudRain, CloudSnow, Sun, Wind, Droplets } from 'lucide-react';
 import { WeatherData } from '@/types/weather';
 import { cn } from '@/lib/utils';
 import { styleGuide as sg } from '@/styles/theme/styleGuide';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/Tooltip";
 
 interface WeatherWidgetProps {
   data: WeatherData;
@@ -83,19 +88,31 @@ export function WeatherWidget({ data }: WeatherWidgetProps) {
       sg.effects.glass,
       sg.effects.shadow
     )}>
-      <div className="flex items-center gap-1.5">
-        {getWeatherIcon()}
-        <span className={cn(
-          sg.typography.base,
-          sg.typography.sizes.sm,
-          sg.colors.text.primary
-        )}>
-          {data.temperature > 0 ? `${Math.round(data.temperature)}°F` : '--°F'}
-        </span>
-      </div>
+      <Tooltip>
+        <TooltipTrigger className="flex items-center gap-1.5">
+          {getWeatherIcon()}
+          <span className={cn(
+            sg.typography.base,
+            sg.typography.sizes.sm,
+            sg.colors.text.primary
+          )}>
+            {data.temperature > 0 ? `${Math.round(data.temperature)}°F` : '--°F'}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          {data.conditions}
+        </TooltipContent>
+      </Tooltip>
 
       <div className="flex items-center gap-1.5">
-        <Droplets className={cn("w-4 h-4", "text-blue-400")} />
+        <Droplets className={cn(
+          "w-4 h-4", 
+          data.humidity > 75 
+            ? cn("text-blue-400", "animate-weather-blink")
+            : data.humidity > 50 
+              ? "text-blue-400"
+              : "text-blue-300"
+        )} />
         <span className={cn(
           sg.typography.base,
           sg.typography.sizes.sm,
@@ -105,16 +122,28 @@ export function WeatherWidget({ data }: WeatherWidgetProps) {
         </span>
       </div>
 
-      <div className="flex items-center gap-1.5">
-        <Wind className={cn("w-4 h-4", sg.colors.text.secondary)} />
-        <span className={cn(
-          sg.typography.base,
-          sg.typography.sizes.sm,
-          sg.colors.text.primary
-        )}>
-          {data.windSpeed ? `${Math.round(data.windSpeed)} mph` : '--'}
-        </span>
-      </div>
+      <Tooltip>
+        <TooltipTrigger className="flex items-center gap-1.5">
+          <Wind className={cn(
+            "w-4 h-4",
+            data.windSpeed > 15
+              ? cn("text-stone-100", "animate-weather-blink")
+              : data.windSpeed > 8
+                ? "text-stone-100"
+                : sg.colors.text.secondary
+          )} />
+          <span className={cn(
+            sg.typography.base,
+            sg.typography.sizes.sm,
+            data.windSpeed > 15 ? "text-stone-100" : sg.colors.text.primary
+          )}>
+            {data.windSpeed ? `${Math.round(data.windSpeed)} mph` : '--'}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          <span>{data.windDirection}° · gusts {Math.round(data.windGust || data.windSpeed)} mph</span>
+        </TooltipContent>
+      </Tooltip>
 
       <span className={cn(
         "ml-2 px-2 py-0.5 rounded",

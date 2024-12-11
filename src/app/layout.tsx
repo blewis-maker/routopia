@@ -10,6 +10,8 @@ import { SessionProvider } from 'next-auth/react';
 import { headers } from 'next/headers';
 import { ThemeProvider } from 'next-themes'
 import { Inter } from 'next/font/google';
+import { TooltipProvider } from '@/components/ui/Tooltip';
+import { serviceInitializer } from '@/lib/services/initServices';
 
 export const viewport: Viewport = {
   themeColor: '#0F172A',
@@ -60,6 +62,20 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
 }
 
+export async function generateMetadata() {
+  try {
+    await serviceInitializer.initialize();
+  } catch (error) {
+    console.error('Failed to initialize services:', error);
+    // You might want to show an error page here
+  }
+  
+  return {
+    title: 'Routopia',
+    description: 'AI-Powered Route Planning'
+  };
+}
+
 export default async function RootLayout({
   children,
 }: {
@@ -89,9 +105,11 @@ export default async function RootLayout({
           enableSystem={true}
           disableTransitionOnChange
         >
-          <Providers session={session}>
-            {children}
-          </Providers>
+          <TooltipProvider>
+            <Providers session={session}>
+              {children}
+            </Providers>
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -1,69 +1,56 @@
-import { Route } from '@/types/route/types';
-
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  expiresAt: number;
-}
+import { redis } from '@/lib/redis';
+import { PerformanceMetrics } from '@/services/monitoring/PerformanceMetrics';
 
 export class RouteCache {
-  private cache: Map<string, CacheEntry<Route>>;
-  private readonly defaultTTL: number = 1000 * 60 * 60; // 1 hour
+  private metrics: PerformanceMetrics;
+  private readonly PREFIX = 'route:';
+  private readonly TTL = 3600; // 1 hour
 
   constructor() {
-    this.cache = new Map();
-    this.startCleanupInterval();
+    this.metrics = new PerformanceMetrics();
   }
 
-  set(key: string, data: Route, ttl: number = this.defaultTTL): void {
-    const now = Date.now();
-    this.cache.set(key, {
-      data,
-      timestamp: now,
-      expiresAt: now + ttl
-    });
-  }
+  async get<T>(key: string): Promise<T | null> {
+    const startTime = performance.now();
+    try {
+      const data = await redis?.get(this.PREFIX + key);
+      const duration = performance.now() - startTime;
+      
+      this.metrics.record('cache.get', duration, {
+        success: !!data,
+        key
+      });
 
-  get(key: string): Route | null {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-
-    if (Date.now() > entry.expiresAt) {
-      this.cache.delete(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      this.metrics.record('cache.error', performance.now() - startTime, {
+        operation: 'get',
+        key,
+        error: error.message
+      });
       return null;
     }
-
-    return entry.data;
   }
 
-  has(key: string): boolean {
-    const entry = this.cache.get(key);
-    if (!entry) return false;
-
-    if (Date.now() > entry.expiresAt) {
-      this.cache.delete(key);
-      return false;
+  async set(key: string, value: any, ttl = this.TTL): Promise<void> {
+    const startTime = performance.now();
+    try {
+      await redis?.setex(this.PREFIX + key, ttl, JSON.stringify(value));
+      this.metrics.record('cache.set', performance.now() - startTime, { key });
+    } catch (error) {
+      this.metrics.record('cache.error', performance.now() - startTime, {
+        operation: 'set',
+        key,
+        error: error.message
+      });
     }
-
-    return true;
   }
 
-  delete(key: string): void {
-    this.cache.delete(key);
+  async invalidate(key: string): Promise<void> {
+    await redis?.del(this.PREFIX + key);
   }
 
-  clear(): void {
-    this.cache.clear();
-  }
-
-  private startCleanupInterval(): void {
-    setInterval(() => {
-      const now = Date.now();
-      for (const [key, entry] of this.cache.entries()) {
-        if (now > entry.expiresAt) {
-          this.cache.delete(key);
-        }
-      }
-    }, 1000 * 60 * 5); // Clean up every 5 minutes
+  getMetrics() {
+    return this.metrics.getSummary();
   }
 } 

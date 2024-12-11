@@ -6,6 +6,8 @@ import { ProgressProvider } from '@/contexts/ProgressContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { authOptions } from '@/lib/auth';
 import { GoogleMapsProvider } from '@/contexts/GoogleMapsContext';
+import { SavedRoutes } from '@/components/route-planner/SavedRoutes';
+
 interface RoutePlannerLayoutProps {
   children: ReactNode;
 }
@@ -24,7 +26,12 @@ export default async function RoutePlannerLayout({ children }: RoutePlannerLayou
         <GoogleMapsProvider>
           <ProgressProvider>
             <div className="fixed inset-0 top-16 overflow-hidden">
-              {children}
+              <div className="flex h-full">
+                <div className="flex-1 relative">
+                  {children}
+                </div>
+                <SavedRoutes />
+              </div>
             </div>
           </ProgressProvider>
         </GoogleMapsProvider>

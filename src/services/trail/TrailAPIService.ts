@@ -55,23 +55,16 @@ export class TrailAPIService {
 
   async getTrailConditions(trailId: string): Promise<TrailConditions> {
     try {
-      const response = await axios.get(`${this.baseUrl}/trails/${trailId}/conditions`, {
-        headers: this.headers
-      });
-
-      return {
-        lastUpdated: new Date(response.data.last_updated),
-        status: this.mapConditionStatus(response.data.status),
-        surface: response.data.surface_condition,
-        weather: {
-          temperature: response.data.temp,
-          conditions: response.data.condition
-        },
-        hazards: response.data.hazards || []
-      };
+      const response = await fetch(`/api/trails/${trailId}/conditions`);
+      if (!response.ok) throw new Error('Trail service error');
+      return await response.json();
     } catch (error) {
-      console.error('Trail API conditions error:', error);
-      throw new Error('Failed to get trail conditions');
+      console.error('Failed to fetch trail conditions:', error);
+      return {
+        status: 'warning',
+        surface: 'unknown',
+        hazards: ['Conditions unavailable']
+      };
     }
   }
 

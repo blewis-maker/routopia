@@ -3,6 +3,7 @@ import { WeatherData, WeatherForecast, WeatherAlert } from '@/types/weather';
 import { LatLng } from '@/types/shared';
 import { redis } from '@/lib/redis';
 import { WeatherServiceError, WeatherAPIError, WeatherRateLimitError } from '@/lib/utils/errors/weatherErrors';
+import type { WeatherConditions } from '@/types/services';
 
 export class WeatherService implements ServiceInterface, CacheableService, RateLimitedService {
   private initialized = false;
@@ -202,6 +203,21 @@ export class WeatherService implements ServiceInterface, CacheableService, RateL
       await redis.setex(`weather:${location}`, 1800, JSON.stringify(data));
     } catch (error) {
       console.error('Weather cache error:', error);
+    }
+  }
+
+  async getCurrentConditions(location: LatLng): Promise<WeatherConditions> {
+    try {
+      const response = await fetch(`/api/weather?lat=${location.lat}&lng=${location.lng}`);
+      if (!response.ok) throw new Error('Weather service error');
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to fetch weather:', error);
+      return {
+        temperature: 0,
+        conditions: 'unavailable',
+        alerts: ['Weather data unavailable']
+      };
     }
   }
 } 

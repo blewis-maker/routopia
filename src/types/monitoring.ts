@@ -1,3 +1,5 @@
+import type { WeatherConditions, TrailConditions } from './services';
+
 export interface MetricPoint {
   value: number;
   timestamp: number;
@@ -45,4 +47,21 @@ export interface RedisInfo {
   used_memory: number;
   connected_clients: number;
   uptime_in_seconds: number;
+}
+
+export interface RouteProgress {
+  routeId: string;
+  currentSegmentIndex: number;
+  distanceCovered: number;
+  timeElapsed: number;
+  estimatedTimeRemaining: number;
+  completionPercentage: number;
+  conditions?: {
+    weather?: WeatherConditions;
+    trail?: TrailConditions;
+    traffic?: {
+      congestion: number;
+      incidents: string[];
+    };
+  };
 } 

@@ -1,9 +1,11 @@
-export interface WeatherConditions {
+export interface WeatherData {
   temperature: number;
-  conditions: string;
+  feelsLike: number;
+  humidity: number;
   windSpeed: number;
-  precipitation: number;
-  visibility: number;
-  humidity?: number;
-  recommendations?: string[];
+  windDirection: number;
+  windGust?: number;
+  conditions: string;
+  location: string;
+  timestamp: number;
 } 
