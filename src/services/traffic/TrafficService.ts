@@ -1,66 +1,111 @@
-import { GeoPoint } from '@/types/geo';
-import { TrafficConditions, TrafficIncident, TrafficUpdate } from '@/types/traffic/types';
-import { WeatherService } from '../weather/WeatherService';
-import { TimeService } from '../utils/TimeService';
-import logger from '@/utils/logger';
+import { ServiceInterface, CacheableService } from '../interfaces/ServiceInterface';
+import { LatLng } from '@/types/shared';
+import { MapBounds, TrafficData, TrafficFlow } from '@/types/traffic';
+import { redis } from '@/lib/redis';
+import { GoogleMapsManager } from '../maps/GoogleMapsManager';
 
-export class TrafficService {
-  constructor(
-    private weatherService: WeatherService,
-    private timeService: TimeService
-  ) {}
+export class TrafficService implements ServiceInterface, CacheableService {
+  private initialized = false;
+  private readonly CACHE_TTL = 300; // 5 minutes
+  private mapsManager: GoogleMapsManager;
 
-  async getCurrentConditions(location: GeoPoint): Promise<TrafficConditions> {
-    try {
-      const weather = await this.weatherService.getWeatherForLocation(location);
-      const isPeakHour = this.timeService.isPeakHour();
-      const isWeekend = this.timeService.isWeekend();
+  constructor(mapsManager: GoogleMapsManager) {
+    this.mapsManager = mapsManager;
+  }
 
-      // Base traffic level calculation
-      let level = isPeakHour ? 0.8 : 0.4;
-      level *= isWeekend ? 0.7 : 1.0;
+  async initialize(): Promise<void> {
+    if (!this.mapsManager.isInitialized()) {
+      throw new Error('Maps service must be initialized first');
+    }
+    this.initialized = true;
+  }
 
-      // Weather impact
-      if (weather.conditions.includes('rain')) level += 0.2;
-      if (weather.conditions.includes('snow')) level += 0.4;
-      if (weather.visibility < 5000) level += 0.3;
+  isInitialized(): boolean {
+    return this.initialized;
+  }
 
-      return {
-        timestamp: new Date(),
-        level: Math.min(level, 1.0),
-        speed: Math.max(30, 100 * (1 - level)),
-        density: level * 100,
-        confidence: 0.85
-      };
-    } catch (error) {
-      logger.error('Error getting traffic conditions:', error);
-      throw error;
+  async healthCheck(): Promise<boolean> {
+    return this.mapsManager.isInitialized();
+  }
+
+  async getCurrentTraffic(bounds: MapBounds): Promise<TrafficData> {
+    const cacheKey = this.getCacheKey({ type: 'current', bounds });
+    const cached = await redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const trafficData = await this.mapsManager.getTrafficData(bounds);
+    await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(trafficData));
+    
+    return trafficData;
+  }
+
+  async getTrafficFlow(location: LatLng, radius: number): Promise<TrafficFlow> {
+    const cacheKey = this.getCacheKey({ type: 'flow', location, radius });
+    const cached = await redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const flow = await this.mapsManager.getTrafficFlow(location, radius);
+    await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(flow));
+    
+    return flow;
+  }
+
+  async getAlternativeRoutes(start: LatLng, end: LatLng, options?: {
+    departureTime?: Date;
+    avoidTolls?: boolean;
+    avoidHighways?: boolean;
+  }): Promise<Array<{
+    route: LatLng[];
+    duration: number;
+    distance: number;
+    trafficDensity: number;
+  }>> {
+    const cacheKey = this.getCacheKey({ 
+      type: 'alternatives', 
+      start, 
+      end, 
+      options 
+    });
+    
+    const cached = await redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const alternatives = await this.mapsManager.getAlternativeRoutes(
+      start, 
+      end, 
+      options
+    );
+    
+    await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(alternatives));
+    return alternatives;
+  }
+
+  // CacheableService implementation
+  getCacheKey(params: any): string {
+    const { type } = params;
+    switch (type) {
+      case 'current':
+        const { bounds } = params;
+        return `traffic:current:${bounds.north},${bounds.south},${bounds.east},${bounds.west}`;
+      case 'flow':
+        const { location, radius } = params;
+        return `traffic:flow:${location.lat},${location.lng}:${radius}`;
+      case 'alternatives':
+        const { start, end, options } = params;
+        return `traffic:alt:${start.lat},${start.lng}:${end.lat},${end.lng}:${JSON.stringify(options)}`;
+      default:
+        throw new Error(`Invalid traffic cache key type: ${type}`);
     }
   }
 
-  async getActiveIncidents(location: GeoPoint, radius: number): Promise<TrafficIncident[]> {
-    // Implement real incident fetching logic here
-    return [];
+  getCacheTTL(): number {
+    return this.CACHE_TTL;
   }
 
-  async getTrafficUpdate(location: GeoPoint): Promise<TrafficUpdate> {
-    const conditions = await this.getCurrentConditions(location);
-    const incidents = await this.getActiveIncidents(location, 5000);
-
-    return {
-      timestamp: new Date(),
-      location,
-      conditions,
-      incidents,
-      predictions: [
-        {
-          timestamp: new Date(Date.now() + 30 * 60 * 1000),
-          conditions: {
-            ...conditions,
-            confidence: conditions.confidence * 0.9
-          }
-        }
-      ]
-    };
+  async clearCache(): Promise<void> {
+    const keys = await redis.keys('traffic:*');
+    if (keys.length) {
+      await Promise.all(keys.map(key => redis.del(key)));
+    }
   }
 } 

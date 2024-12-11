@@ -1,150 +1,188 @@
-import { createClient } from 'redis';
-import { RouteContext, RouteSuggestions, EnhancedRoute } from '@/types/chat/types';
+import Redis from 'ioredis';
+import { RedisConfig, RedisConnectionOptions } from '@/types/redis';
+import { getRedisConfig } from '@/config/redis';
 
-export class RedisService {
-  private client;
-  private readonly TTL = 60 * 60 * 24; // 24 hours in seconds
+// Simple in-memory cache for fallback
+class MemoryCache {
+  private cache: Map<string, { value: string; expires?: number }>;
 
   constructor() {
-    // Format Redis URL based on environment
-    const redisUrl = this.getRedisUrl();
-    console.log('Initializing Redis with URL:', this.maskSensitiveInfo(redisUrl));
+    this.cache = new Map();
+  }
 
-    this.client = createClient({
-      url: redisUrl,
-      socket: {
-        tls: true, // Enable TLS for Upstash
-        rejectUnauthorized: false, // Required for some Redis services
-        reconnectStrategy: (retries) => {
-          if (retries > 10) return new Error('Max reconnection attempts reached');
-          return Math.min(retries * 100, 3000);
+  get(key: string): string | null {
+    const item = this.cache.get(key);
+    if (!item) return null;
+    
+    if (item.expires && item.expires < Date.now()) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return item.value;
+  }
+
+  set(key: string, value: string, ttl?: number): void {
+    this.cache.set(key, {
+      value,
+      expires: ttl ? Date.now() + (ttl * 1000) : undefined
+    });
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+export class RedisService {
+  private static instance: RedisService;
+  private client: Redis | null = null;
+  private memoryCache: MemoryCache;
+  private isInitialized = false;
+  private isInitializing = false;
+
+  private constructor() {
+    this.memoryCache = new MemoryCache();
+  }
+
+  static getInstance(): RedisService {
+    if (!RedisService.instance) {
+      RedisService.instance = new RedisService();
+    }
+    return RedisService.instance;
+  }
+
+  isAvailable(): boolean {
+    return this.client !== null && this.isInitialized;
+  }
+
+  private getConfig(): RedisConfig | null {
+    const config = getRedisConfig();
+
+    // Skip Redis if disabled or in browser
+    if (!config.enabled || typeof window !== 'undefined') {
+      return null;
+    }
+
+    // Skip if no Redis configuration
+    if (!config.url && !config.endpoint) {
+      return null;
+    }
+
+    return {
+      url: config.url,
+      host: config.endpoint?.split(':')[0],
+      port: parseInt(config.endpoint?.split(':')[1] || '6379'),
+      password: config.token,
+      tls: process.env.NODE_ENV === 'production'
+    };
+  }
+
+  private createConnectionOptions(config: RedisConfig): RedisConnectionOptions {
+    const redisConfig = getRedisConfig();
+
+    return {
+      host: config.host,
+      port: config.port,
+      password: config.password,
+      maxRetriesPerRequest: redisConfig.retryAttempts,
+      retryStrategy: (times) => {
+        if (times > redisConfig.retryAttempts) return null;
+        return Math.min(times * redisConfig.retryDelay, 2000);
+      },
+      enableReadyCheck: false,
+      connectTimeout: redisConfig.timeout,
+      enableAutoPipelining: true,
+      lazyConnect: true,
+      tls: config.tls ? { rejectUnauthorized: false } : undefined
+    };
+  }
+
+  async initialize(): Promise<void> {
+    if (this.isInitialized || this.isInitializing) return;
+    this.isInitializing = true;
+
+    try {
+      if (typeof window !== 'undefined') {
+        this.isInitialized = true;
+        return;
+      }
+
+      const config = this.getConfig();
+      if (!config) {
+        console.log('Redis disabled or not configured, using memory cache');
+        this.isInitialized = true;
+        return;
+      }
+
+      const options = this.createConnectionOptions(config);
+      this.client = new Redis(options);
+
+      this.client.on('error', (error: Error & { code?: string }) => {
+        if (!['ECONNRESET', 'EPERM'].includes(error.code || '')) {
+          console.error('Redis connection error:', error);
+        }
+      });
+
+      await new Promise<void>((resolve) => {
+        if (!this.client) {
+          resolve();
+          return;
+        }
+
+        this.client.once('ready', () => {
+          console.log('Redis connected successfully');
+          resolve();
+        });
+
+        this.client.once('error', () => {
+          console.log('Redis connection failed, falling back to memory cache');
+          this.client = null;
+          resolve();
+        });
+      });
+
+      this.isInitialized = true;
+    } catch (error) {
+      console.error('Redis initialization error:', error);
+      this.client = null;
+      this.isInitialized = true;
+    } finally {
+      this.isInitializing = false;
+    }
+  }
+
+  async get(key: string): Promise<string | null> {
+    try {
+      if (this.client) {
+        return await this.client.get(key);
+      }
+      return this.memoryCache.get(key);
+    } catch (error) {
+      console.error('Cache get error:', error);
+      return this.memoryCache.get(key);
+    }
+  }
+
+  async set(key: string, value: string, ttl?: number): Promise<void> {
+    try {
+      if (this.client) {
+        if (ttl) {
+          await this.client.setex(key, ttl, value);
+        } else {
+          await this.client.set(key, value);
         }
       }
-    });
-
-    this.client.on('error', (err) => {
-      console.error('Redis Client Error:', err);
-    });
-
-    this.client.on('connect', () => {
-      console.log('Connected to Redis successfully');
-    });
-
-    // Connect immediately
-    this.connect();
-  }
-
-  private getRedisUrl(): string {
-    // Use Upstash Redis URL with correct format
-    if (process.env.UPSTASH_REDIS_URL && process.env.UPSTASH_REDIS_TOKEN) {
-      // Format: redis://default:token@hostname:port
-      const url = new URL(process.env.UPSTASH_REDIS_URL);
-      return `redis://default:${process.env.UPSTASH_REDIS_TOKEN}@${url.hostname}:${url.port || 6379}`;
-    }
-
-    // Fallback to local Redis
-    return 'redis://localhost:6379';
-  }
-
-  private maskSensitiveInfo(url: string): string {
-    return url.replace(/default:([^@]+)@/, 'default:***@');
-  }
-
-  private async connect() {
-    try {
-      await this.client.connect();
+      this.memoryCache.set(key, value, ttl);
     } catch (error) {
-      console.error('Failed to connect to Redis:', error);
+      console.error('Cache set error:', error);
+      this.memoryCache.set(key, value, ttl);
     }
   }
 
-  private generateKey(prefix: string, context: RouteContext): string {
-    // Include more context in the key for better caching
-    const weatherKey = context.weather ? 
-      `${context.weather.temperature}-${context.weather.conditions}` : 'no-weather';
-    
-    const key = `${prefix}:${context.start}:${context.end}:${context.mode}:${weatherKey}:${context.timeOfDay}`;
-    return key.toLowerCase().replace(/\s+/g, '-').slice(0, 512); // Redis key length limit
+  getClient(): Redis | null {
+    return this.client;
   }
+}
 
-  async getCachedRoute(context: RouteContext): Promise<EnhancedRoute | null> {
-    try {
-      if (!this.client.isOpen) {
-        await this.client.connect();
-      }
-      const key = this.generateKey('route', context);
-      const cached = await this.client.get(key);
-      if (cached) {
-        console.log('Cache hit for route:', key);
-        return JSON.parse(cached);
-      }
-      console.log('Cache miss for route:', key);
-      return null;
-    } catch (error) {
-      console.error('Redis get error:', error);
-      return null;
-    }
-  }
-
-  async setCachedRoute(context: RouteContext, data: EnhancedRoute): Promise<void> {
-    try {
-      if (!this.client.isOpen) {
-        await this.client.connect();
-      }
-      const key = this.generateKey('route', context);
-      await this.client.setEx(key, this.TTL, JSON.stringify(data));
-      console.log('Cached route:', key);
-    } catch (error) {
-      console.error('Redis set error:', error);
-    }
-  }
-
-  async getCachedSuggestions(context: RouteContext): Promise<RouteSuggestions | null> {
-    try {
-      if (!this.client.isOpen) {
-        await this.client.connect();
-      }
-      const key = this.generateKey('suggestions', context);
-      const cached = await this.client.get(key);
-      if (cached) {
-        console.log('Cache hit for suggestions:', key);
-        return JSON.parse(cached);
-      }
-      console.log('Cache miss for suggestions:', key);
-      return null;
-    } catch (error) {
-      console.error('Redis get error:', error);
-      return null;
-    }
-  }
-
-  async setCachedSuggestions(context: RouteContext, data: RouteSuggestions): Promise<void> {
-    try {
-      if (!this.client.isOpen) {
-        await this.client.connect();
-      }
-      const key = this.generateKey('suggestions', context);
-      await this.client.setEx(key, this.TTL, JSON.stringify(data));
-      console.log('Cached suggestions:', key);
-    } catch (error) {
-      console.error('Redis set error:', error);
-    }
-  }
-
-  async invalidateCache(context: RouteContext): Promise<void> {
-    try {
-      if (!this.client.isOpen) {
-        await this.client.connect();
-      }
-      const routeKey = this.generateKey('route', context);
-      const suggestionsKey = this.generateKey('suggestions', context);
-      await Promise.all([
-        this.client.del(routeKey),
-        this.client.del(suggestionsKey)
-      ]);
-      console.log('Invalidated cache for:', routeKey, suggestionsKey);
-    } catch (error) {
-      console.error('Redis invalidate error:', error);
-    }
-  }
-} 
+export const redisService = RedisService.getInstance(); 

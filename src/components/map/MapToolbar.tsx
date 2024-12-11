@@ -9,64 +9,18 @@ interface MapToolbarProps {
   activeTools?: string[];
 }
 
-export const MapToolbar: React.FC<MapToolbarProps> = ({
+export function MapToolbar({ 
   mapIntegration,
-  onToolSelect,
-  onPreferencesToggle,
-  showPreferences,
-  activeTools = []
-}) => {
+  onToolSelect 
+}: MapToolbarProps) {
   return (
-    <div className="absolute top-4 right-4 bg-stone-900/75 backdrop-blur-sm p-2 rounded-lg shadow-lg">
-      <div className="flex gap-2">
-        <button
-          onClick={() => onToolSelect('ROUTE')}
-          className={`p-2 rounded text-stone-100 transition-colors ${
-            activeTools.includes('ROUTE') 
-              ? 'bg-emerald-600 hover:bg-emerald-700' 
-              : 'hover:bg-stone-700'
-          }`}
-          title="Plan Route"
-        >
-          <Navigation className="w-5 h-5" />
-        </button>
-        <button
-          onClick={() => onToolSelect('SEARCH')}
-          className={`p-2 rounded text-stone-100 transition-colors ${
-            activeTools.includes('SEARCH')
-              ? 'bg-emerald-600 hover:bg-emerald-700'
-              : 'hover:bg-stone-700'
-          }`}
-          title="Search Places"
-        >
-          <MapIcon className="w-5 h-5" />
-        </button>
-        <button
-          onClick={() => {
-            mapIntegration?.setTrafficLayer(!activeTools.includes('TRAFFIC'));
-            onToolSelect('TRAFFIC');
-          }}
-          className={`p-2 rounded text-stone-100 transition-colors ${
-            activeTools.includes('TRAFFIC')
-              ? 'bg-emerald-600 hover:bg-emerald-700'
-              : 'hover:bg-stone-700'
-          }`}
-          title="Traffic Layer"
-        >
-          <Car className="w-5 h-5" />
-        </button>
-        <button
-          onClick={() => onToolSelect('LAYERS')}
-          className={`p-2 rounded text-stone-100 transition-colors ${
-            activeTools.includes('LAYERS')
-              ? 'bg-emerald-600 hover:bg-emerald-700'
-              : 'hover:bg-stone-700'
-          }`}
-          title="Map Layers"
-        >
-          <Layers className="w-5 h-5" />
-        </button>
-      </div>
+    <div className="absolute top-4 right-4 z-10">
+      <button
+        onClick={() => onToolSelect('LAYERS')}
+        className="p-2 bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg border border-stone-800/50 text-stone-400 hover:text-stone-200 transition-colors"
+      >
+        <Layers className="w-5 h-5" />
+      </button>
     </div>
   );
-}; 
+} 

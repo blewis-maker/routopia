@@ -31,7 +31,11 @@
     "test:visual": "npm run test:percy && npm run test:chromatic",
     "test:percy": "percy storybook ./storybook-static",
     "test:chromatic": "npx chromatic --project-token=chpt_adf0229281cc802",
-    "test:visual:parallel": "concurrently \"npm run test:percy\" \"npm run test:chromatic\""
+    "test:visual:parallel": "concurrently \"npm run test:percy\" \"npm run test:chromatic\"",
+    "migrate": "node scripts/migrate.ts",
+    "migrate:retry": "npx prisma migrate reset --force && npx prisma migrate dev --name update_activity_schema",
+    "migrate:reset": "npx prisma migrate reset --force",
+    "migrate:status": "npx prisma migrate status"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -42,11 +46,14 @@
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.2.0",
     "@modelcontextprotocol/sdk": "^1.0.3",
+    "@pinecone-database/pinecone": "^4.0.0",
     "@radix-ui/react-slot": "^1.0.2",
+    "@react-google-maps/api": "^2.20.3",
     "@react-spring/web": "^9.7.5",
     "@tailwindcss/forms": "^0.5.9",
     "@tailwindcss/typography": "^0.5.15",
     "@types/bcryptjs": "^2.4.6",
+    "@types/google-maps": "^3.2.6",
     "@types/google.maps": "^3.58.1",
     "@types/ioredis": "^4.28.10",
     "@types/nodemailer": "^6.4.17",

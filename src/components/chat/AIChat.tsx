@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChatMessage, RouteContext, ChatSuggestion } from '@/types/chat/types';
 import { Location } from '@/types';
+import { CoreActivityType } from '@/types/activities';
+import { useActivityContext } from '@/contexts/ActivityContext';
+import { MapVisualization } from '@/types/maps/visualization';
 
 interface AIChatProps {
   messages: ChatMessage[];
@@ -15,6 +18,7 @@ interface AIChatProps {
   onViewSuggestion: (suggestion: ChatSuggestion) => void;
   onAddToRoute: (suggestion: ChatSuggestion) => void;
   isGenerating: boolean;
+  onRouteVisualization?: (visualization: MapVisualization) => void;
 }
 
 export function AIChat({
@@ -25,11 +29,12 @@ export function AIChat({
   weatherData,
   onViewSuggestion,
   onAddToRoute,
-  isGenerating
+  isGenerating,
+  onRouteVisualization
 }: AIChatProps) {
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [routeType, setRouteType] = useState<'Drive' | 'Bike' | 'Run' | 'Ski' | 'Adventure'>('Drive');
+  const { currentActivity, setCurrentActivity } = useActivityContext();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +48,11 @@ export function AIChat({
       e.preventDefault();
       handleSubmit(e);
     }
+  };
+
+  const handleRouteTypeChange = (type: CoreActivityType) => {
+    setCurrentActivity(type);
+    // This will automatically update the prompt context through the provider
   };
 
   return (
@@ -63,7 +73,7 @@ export function AIChat({
           {messages.map((message, index) => (
             <div
               key={index}
-              className={`px-2 py-1 rounded ${
+              className={`px-2 py-1 rounded text-[13px] font-medium ${
                 message.type === 'user'
                   ? 'text-emerald-200'
                   : 'text-stone-200'
@@ -92,9 +102,9 @@ export function AIChat({
             {(['Drive', 'Bike', 'Run', 'Ski', 'Adventure'] as const).map((type) => (
               <button
                 key={type}
-                onClick={() => setRouteType(type)}
+                onClick={() => handleRouteTypeChange(type)}
                 className={`text-xs px-2 py-1 rounded ${
-                  routeType === type
+                  currentActivity.activityType === type
                     ? 'bg-stone-700/50 text-stone-200'
                     : 'text-stone-400 hover:text-stone-300'
                 }`}
@@ -114,17 +124,27 @@ export function AIChat({
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Where would you like to go?"
-              className="w-full px-4 py-3 bg-stone-900/90 text-stone-100 rounded-lg border border-stone-700/50 focus:outline-none focus:border-emerald-500/30 focus:ring-1 focus:ring-emerald-500/30 resize-none placeholder-stone-500"
+              className="w-full px-4 py-3 pr-12 bg-stone-900/90 text-stone-100 rounded-lg border border-stone-700/50 focus:outline-none focus:border-emerald-500/30 focus:ring-1 focus:ring-emerald-500/30 resize-none placeholder-stone-500 text-[13px] font-medium"
               rows={1}
             />
             <button
               type="submit"
               onClick={handleSubmit}
               disabled={!inputValue.trim() || isGenerating}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-stone-400 hover:text-emerald-400 disabled:opacity-30 disabled:hover:text-stone-400 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-stone-400 hover:text-stone-300 disabled:opacity-30 disabled:hover:text-stone-400 transition-colors"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              <svg
+                className="w-4 h-4 rotate-90"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M5 10l7-7m0 0l7 7m-7-7v18"
+                />
               </svg>
             </button>
           </div>

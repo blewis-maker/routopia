@@ -1,37 +1,28 @@
-import { CacheAnalytics } from '@/services/cache/CacheAnalytics';
+import { Redis } from '@upstash/redis';
+import { Metrics } from '@/lib/metrics';
 
 export class CacheMonitor {
-  private analytics: CacheAnalytics;
-  private readonly ALERT_THRESHOLD = 0.6; // Alert if hit rate drops below 60%
-  private readonly LOG_INTERVAL = 5 * 60 * 1000; // Log every 5 minutes
+  private redis: Redis;
+  private metrics: Metrics;
 
-  constructor(analytics: CacheAnalytics) {
-    this.analytics = analytics;
-    this.startMonitoring();
-  }
-
-  private startMonitoring(): void {
-    setInterval(() => this.checkMetrics(), this.LOG_INTERVAL);
-  }
-
-  private checkMetrics(): void {
-    ['route', 'traffic', 'tile'].forEach(cacheType => {
-      const metrics = this.analytics.getMetrics(cacheType);
-      const hitRate = this.analytics.getHitRate(cacheType);
-
-      // Log metrics
-      console.info(`Cache metrics for ${cacheType}:`, {
-        hitRate: `${(hitRate * 100).toFixed(1)}%`,
-        hits: metrics?.hits,
-        misses: metrics?.misses,
-        size: `${(metrics?.size || 0 / 1024 / 1024).toFixed(2)}MB`,
-        evictions: metrics?.evictions
-      });
-
-      // Alert on low hit rate
-      if (hitRate < this.ALERT_THRESHOLD) {
-        console.warn(`Low cache hit rate for ${cacheType}: ${(hitRate * 100).toFixed(1)}%`);
-      }
+  constructor() {
+    this.redis = new Redis({
+      url: process.env.UPSTASH_REDIS_URL!,
+      token: process.env.UPSTASH_REDIS_TOKEN!
     });
+    this.metrics = new Metrics('cache');
+  }
+
+  async getStats() {
+    const info = await this.redis.info();
+    const metrics = await this.metrics.getLatest();
+
+    return {
+      hits: metrics.hits || 0,
+      misses: metrics.misses || 0,
+      latency: metrics.latency?.avg || 0,
+      errorRate: metrics.errors / (metrics.hits + metrics.misses) || 0,
+      size: info.used_memory || 0
+    };
   }
 } 

@@ -41,7 +41,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${
         isLandingPage ? 'bg-transparent' : 'bg-[#1B1B1B]/95 backdrop-blur-sm border-b border-stone-800/50'
       } ${className}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-full mx-4 px-4">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <Link href="/" className="group flex items-center gap-3 hover:opacity-80 transition-opacity duration-300">
@@ -72,9 +72,6 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
               )}
               {user ? (
                 <div className="flex items-center gap-4">
-                  <span className="text-sm text-stone-400">
-                    {user.name}
-                  </span>
                   {user.image ? (
                     <div className="relative w-8 h-8 rounded-full overflow-hidden border border-stone-700/50">
                       <Image

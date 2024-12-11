@@ -28,4 +28,21 @@ export interface ReportConfig {
   metrics: string[];
   format: 'json' | 'csv';
   destination: 'storage' | 'email' | 'api';
+}
+
+export interface CacheMetrics {
+  hits: number;
+  misses: number;
+  latency: {
+    avg: number;
+    p95: number;
+    p99: number;
+  };
+  errors: number;
+}
+
+export interface RedisInfo {
+  used_memory: number;
+  connected_clients: number;
+  uptime_in_seconds: number;
 } 

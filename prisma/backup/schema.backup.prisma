@@ -1,0 +1,373 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model User {
+  id                   String                @id @default(cuid())
+  name                 String?
+  email                String                @unique
+  password             String?
+  emailVerified        DateTime?
+  image                String?
+  lastLogin            DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  accounts             Account[]
+  Activity             Activity[]
+  activityHistory      ActivityHistory[]
+  activityPrefs        ActivityPreferences?
+  groupMemberships     GroupMember[]
+  createdTrips         GroupTrip[]
+  notificationSettings NotificationSettings?
+  packingLists         PackingList[]
+  passwordResetTokens  PasswordResetToken[]
+  routePrefs           RoutePreferences?
+  sessions             Session[]
+  syncLogs             SyncLog[]
+  preferences          UserPreferences?
+  verificationTokens   VerificationToken[]
+}
+
+model VerificationToken {
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expires   DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model UserPreferences {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  theme              String   @default("light")
+  emailNotifications Boolean  @default(true)
+  pushNotifications  Boolean  @default(true)
+  language           String   @default("en")
+  timezone           String   @default("UTC")
+  activityPrefs      Json?
+  comfortPrefs       Json?
+  createdAt          DateTime @default(now())
+  defaultActivity    String?
+  groupTrips         Json?
+  maxDistance        Int?
+  packingLists       Json?
+  preferredTimes     String[]
+  skillLevel         String?
+  updatedAt          DateTime @updatedAt
+  weatherPrefs       Json?
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model RoutePreferences {
+  id                   String  @id @default(cuid())
+  userId               String  @unique
+  defaultTransportMode String  @default("WALK")
+  avoidHighways        Boolean @default(false)
+  avoidTolls           Boolean @default(false)
+  preferScenic         Boolean @default(false)
+  maxWalkingDistance   Int     @default(5000)
+  maxBikingDistance    Int     @default(20000)
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ActivityPreferences {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  preferredActivities String[] @default(["WALK", "BIKE"])
+  weeklyGoals         Json?
+  difficultyLevel     String   @default("MODERATE")
+  shareActivity       Boolean  @default(false)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotificationSettings {
+  id                String  @id @default(cuid())
+  userId            String  @unique
+  routeUpdates      Boolean @default(true)
+  weatherAlerts     Boolean @default(true)
+  achievementAlerts Boolean @default(true)
+  socialUpdates     Boolean @default(true)
+  dailyReminders    Boolean @default(true)
+  emailDigest       Boolean @default(true)
+  digestFrequency   String  @default("WEEKLY")
+  quietHoursStart   Int     @default(22)
+  quietHoursEnd     Int     @default(7)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RouteHistory {
+  id           String   @id @default(cuid())
+  userId       String
+  startPoint   Json
+  endPoint     Json
+  activityType String
+  distance     Float
+  duration     Int
+  weather      Json?
+  rating       Int?
+  timestamp    DateTime @default(now())
+
+  @@index([userId])
+  @@index([timestamp])
+}
+
+model ActivityHistory {
+  id           String   @id @default(cuid())
+  userId       String
+  activityType String
+  choices      Json
+  preferences  Json
+  created      DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model GroupTrip {
+  id          String   @id @default(cuid())
+  name        String
+  createdBy   String
+  members     Json
+  preferences Json
+  packingList Json
+  created     DateTime @default(now())
+  updated     DateTime @updatedAt
+  user        User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([createdBy])
+}
+
+model Group {
+  id              String        @id @default(cuid())
+  name            String
+  description     String?
+  startDate       DateTime
+  endDate         DateTime
+  status          String
+  routeId         String?
+  routeVersion    Int?
+  visibility      String
+  joinPolicy      String
+  maxMembers      Int?
+  requireLocation Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  lastActivity    DateTime?
+  members         GroupMember[]
+
+  @@index([status])
+  @@index([visibility])
+}
+
+model GroupMember {
+  id            String   @id @default(cuid())
+  userId        String
+  groupId       String
+  role          String
+  joinedAt      DateTime @default(now())
+  notifications Boolean  @default(true)
+  shareLocation Boolean  @default(false)
+  group         Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@index([groupId])
+}
+
+model PackingList {
+  id          String            @id @default(cuid())
+  name        String
+  description String?
+  userId      String
+  version     Int               @default(1)
+  isTemplate  Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  categories  PackingCategory[]
+  items       PackingItem[]
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isTemplate])
+}
+
+model PackingCategory {
+  id            String        @id @default(cuid())
+  name          String
+  description   String?
+  packingListId String
+  order         Int           @default(0)
+  packingList   PackingList   @relation(fields: [packingListId], references: [id], onDelete: Cascade)
+  items         PackingItem[]
+
+  @@index([packingListId])
+}
+
+model PackingItem {
+  id            String          @id @default(cuid())
+  name          String
+  quantity      Int             @default(1)
+  isRequired    Boolean         @default(false)
+  isPacked      Boolean         @default(false)
+  notes         String?
+  categoryId    String
+  packingListId String
+  category      PackingCategory @relation(fields: [categoryId], references: [id])
+  packingList   PackingList     @relation(fields: [packingListId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+  @@index([packingListId])
+}
+
+model Achievement {
+  id               String            @id @default(cuid())
+  name             String
+  description      String
+  type             String
+  criteria         Json
+  icon             String
+  points           Int
+  createdAt        DateTime          @default(now())
+  userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  earnedAt      DateTime
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+}
+
+model ErrorLog {
+  id         String    @id @default(cuid())
+  name       String
+  message    String
+  stack      String?
+  userId     String?
+  activityId String?
+  provider   String?
+  operation  String?
+  metadata   Json?
+  timestamp  DateTime  @default(now())
+  severity   String    @default("error")
+  resolved   Boolean   @default(false)
+  resolvedAt DateTime?
+  resolution String?
+
+  @@index([userId])
+  @@index([activityId])
+  @@index([provider])
+  @@index([timestamp])
+}
+
+model SyncLog {
+  id            String    @id @default(cuid())
+  userId        String
+  provider      String
+  status        String
+  activityCount Int       @default(0)
+  error         String?
+  timestamp     DateTime  @default(now())
+  processedAt   DateTime?
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider])
+}
+
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String
+  eventType   String
+  payload     Json
+  status      String
+  error       String?
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([provider, eventType])
+}
+
+model Activity {
+  id                 String    @id
+  userId             String
+  provider           String
+  providerActivityId String
+  type               String
+  name               String
+  description        String?
+  status             String
+  startTime          DateTime
+  endTime            DateTime?
+  duration           Int?
+  distance           Float?
+  elevation          Float?
+  averageSpeed       Float?
+  maxSpeed           Float?
+  metrics            Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime
+  User               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerActivityId])
+  @@index([userId])
+}

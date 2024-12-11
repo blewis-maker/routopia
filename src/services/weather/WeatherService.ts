@@ -1,330 +1,207 @@
-import { MCPIntegrationService } from '@/services/integration/MCPIntegrationService';
-import { WeatherConditions, WeatherPattern, MicroClimate } from '@/types/weather';
-import { GeoPoint } from '@/types/geo';
-import logger from '@/utils/logger';
+import { ServiceInterface, CacheableService, RateLimitedService } from '../interfaces/ServiceInterface';
+import { WeatherData, WeatherForecast, WeatherAlert } from '@/types/weather';
+import { LatLng } from '@/types/shared';
+import { redis } from '@/lib/redis';
+import { WeatherServiceError, WeatherAPIError, WeatherRateLimitError } from '@/lib/utils/errors/weatherErrors';
 
-export class WeatherService {
-  constructor(private readonly mcpService: MCPIntegrationService) {}
+export class WeatherService implements ServiceInterface, CacheableService, RateLimitedService {
+  private initialized = false;
+  private apiKey: string;
+  private requestCount = 0;
+  private lastReset = Date.now();
+  private readonly RATE_LIMIT = 60; // requests per minute
+  private readonly CACHE_TTL = 900; // 15 minutes
 
-  async getForecast(startPoint: GeoPoint, endPoint: GeoPoint): Promise<WeatherConditions> {
+  constructor() {
+    this.apiKey = process.env.WEATHER_API_KEY!;
+  }
+
+  async initialize(): Promise<void> {
+    if (!this.apiKey) {
+      throw new Error('Weather API key not configured');
+    }
+    this.initialized = true;
+  }
+
+  isInitialized(): boolean {
+    return this.initialized;
+  }
+
+  async healthCheck(): Promise<boolean> {
     try {
-      const forecast = await this.mcpService.getWeatherForecast(startPoint, endPoint);
-      return this.enrichForecastWithMicroClimate(forecast);
-    } catch (error) {
-      logger.error('Failed to get weather forecast:', error);
-      throw error;
+      const response = await fetch(
+        `https://api.weatherapi.com/v1/current.json?key=${this.apiKey}&q=London`
+      );
+      return response.ok;
+    } catch {
+      return false;
     }
   }
 
-  async getPointWeather(location: GeoPoint): Promise<WeatherConditions> {
+  async getCurrentWeather(location: LatLng): Promise<WeatherData> {
+    if (this.isRateLimited()) {
+      throw new WeatherRateLimitError();
+    }
+
     try {
-      return await this.mcpService.getWeatherForecast(location, location);
+      const cacheKey = this.getCacheKey({ type: 'current', location });
+      const cached = await redis.get(cacheKey);
+      if (cached) return JSON.parse(cached);
+
+      const response = await fetch(
+        `https://api.weatherapi.com/v1/current.json?key=${this.apiKey}&q=${location.lat},${location.lng}`
+      );
+      
+      if (!response.ok) {
+        throw new WeatherAPIError(response.statusText, response.status);
+      }
+
+      const data = await response.json();
+      const weather = this.transformWeatherData(data);
+      
+      await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(weather));
+      this.requestCount++;
+      return weather;
     } catch (error) {
-      logger.error('Failed to get point weather:', error);
-      throw error;
+      if (error instanceof WeatherServiceError) throw error;
+      throw new WeatherServiceError(`Failed to fetch weather: ${error.message}`);
     }
   }
 
-  async getWeatherForLocation(location: GeoPoint): Promise<WeatherConditions> {
-    try {
-      return await this.getPointWeather(location);
-    } catch (error) {
-      logger.error('Failed to get weather for location:', error);
-      throw error;
+  async getForecast(location: LatLng, days: number = 3): Promise<WeatherForecast> {
+    const cacheKey = this.getCacheKey({ type: 'forecast', location, days });
+    const cached = await redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const response = await fetch(
+      `https://api.weatherapi.com/v1/forecast.json?key=${this.apiKey}&q=${location.lat},${location.lng}&days=${days}`
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Weather API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const forecast = this.transformForecastData(data);
+    
+    await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(forecast));
+    return forecast;
+  }
+
+  async getAlerts(location: LatLng): Promise<WeatherAlert[]> {
+    const cacheKey = this.getCacheKey({ type: 'alerts', location });
+    const cached = await redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const response = await fetch(
+      `https://api.weatherapi.com/v1/alerts.json?key=${this.apiKey}&q=${location.lat},${location.lng}`
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Weather API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const alerts = this.transformAlertData(data);
+    
+    await redis.setex(cacheKey, 300, JSON.stringify(alerts));
+    return alerts;
+  }
+
+  // CacheableService implementation
+  getCacheKey(params: { type: string; location: LatLng; days?: number }): string {
+    const { type, location, days } = params;
+    return `weather:${type}:${location.lat},${location.lng}${days ? `:${days}` : ''}`;
+  }
+
+  getCacheTTL(): number {
+    return this.CACHE_TTL;
+  }
+
+  async clearCache(): Promise<void> {
+    const keys = await redis.keys('weather:*');
+    if (keys.length) {
+      await Promise.all(keys.map(key => redis.del(key)));
     }
   }
 
-  async analyzeMicroClimate(location: GeoPoint): Promise<MicroClimate> {
-    try {
-      const terrain = await this.mcpService.getTerrainData(location);
-      const localWeather = await this.mcpService.getLocalWeather(location);
-      const historicalData = await this.mcpService.getHistoricalWeather(location);
-
-      return {
-        temperature: {
-          current: localWeather.temperature,
-          variation: this.calculateTemperatureVariation(historicalData),
-          microEffects: this.analyzeMicroTemperatureEffects(terrain, localWeather)
-        },
-        wind: {
-          speed: localWeather.windSpeed,
-          direction: localWeather.windDirection || 0,
-          patterns: this.analyzeWindPatterns(terrain, historicalData),
-          tunnelEffects: this.calculateWindTunnelEffects(terrain)
-        },
-        precipitation: {
-          intensity: localWeather.precipitation,
-          localized: this.analyzeLocalizedPrecipitation(terrain, historicalData),
-          accumulation: this.calculatePrecipitationAccumulation(terrain)
-        },
-        sunExposure: this.calculateSunExposure(terrain, location),
-        terrainEffects: this.analyzeTerrainWeatherEffects(terrain)
-      };
-    } catch (error) {
-      logger.error('Failed to analyze micro-climate:', error);
-      throw error;
-    }
+  // RateLimitedService implementation
+  getRateLimit(): number {
+    return this.RATE_LIMIT;
   }
 
-  async predictWeatherPatterns(location: GeoPoint): Promise<WeatherPattern[]> {
-    try {
-      const historicalData = await this.mcpService.getHistoricalWeather(location);
-      const forecast = await this.mcpService.getWeatherForecast(location, location);
-      const terrain = await this.mcpService.getTerrainData(location);
-
-      return this.analyzeWeatherPatterns(historicalData, forecast, terrain);
-    } catch (error) {
-      logger.error('Failed to predict weather patterns:', error);
-      throw error;
-    }
+  getRateLimitWindow(): number {
+    return 60000; // 1 minute in milliseconds
   }
 
-  private enrichForecastWithMicroClimate(forecast: WeatherConditions): WeatherConditions {
+  isRateLimited(): boolean {
+    const now = Date.now();
+    if (now - this.lastReset > this.getRateLimitWindow()) {
+      this.requestCount = 0;
+      this.lastReset = now;
+    }
+    return this.requestCount >= this.RATE_LIMIT;
+  }
+
+  private transformWeatherData(data: any): WeatherData {
+    // Implementation of weather data transformation
     return {
-      ...forecast,
-      microClimates: forecast.locations?.map(location => ({
-        point: location.point,
-        localEffects: this.calculateLocalEffects(location, forecast)
+      temperature: data.current.temp_c,
+      condition: data.current.condition.text,
+      windSpeed: data.current.wind_kph,
+      humidity: data.current.humidity,
+      feelsLike: data.current.feelslike_c,
+      visibility: data.current.vis_km,
+      precipitation: data.current.precip_mm,
+      updatedAt: new Date(data.current.last_updated)
+    };
+  }
+
+  private transformForecastData(data: any): WeatherForecast {
+    // Implementation of forecast data transformation
+    return {
+      daily: data.forecast.forecastday.map((day: any) => ({
+        date: new Date(day.date),
+        maxTemp: day.day.maxtemp_c,
+        minTemp: day.day.mintemp_c,
+        condition: day.day.condition.text,
+        chanceOfRain: day.day.daily_chance_of_rain,
+        sunrise: day.astro.sunrise,
+        sunset: day.astro.sunset
       }))
     };
   }
 
-  private calculateTemperatureVariation(historicalData: any): number {
-    const temperatures = historicalData.temperatures || [];
-    if (temperatures.length === 0) return 0;
-
-    const mean = temperatures.reduce((sum, temp) => sum + temp, 0) / temperatures.length;
-    const variance = temperatures.reduce((sum, temp) => sum + Math.pow(temp - mean, 2), 0) / temperatures.length;
-    return Math.sqrt(variance);
+  private transformAlertData(data: any): WeatherAlert[] {
+    // Implementation of alert data transformation
+    return data.alerts.alert.map((alert: any) => ({
+      title: alert.headline,
+      severity: alert.severity,
+      message: alert.desc,
+      issued: new Date(alert.effective),
+      expires: new Date(alert.expires)
+    }));
   }
 
-  private analyzeMicroTemperatureEffects(terrain: any, weather: any): any[] {
-    const effects = [];
-
-    if (terrain.type === 'urban') {
-      effects.push({
-        type: 'urban_heat',
-        impact: 2.0,
-        confidence: 0.8
-      });
-    }
-
-    if (terrain.features?.includes('water')) {
-      effects.push({
-        type: 'water_cooling',
-        impact: -1.0,
-        confidence: 0.7
-      });
-    }
-
-    return effects;
-  }
-
-  private analyzeWindPatterns(terrain: any, historicalData: any): any[] {
-    const patterns = [];
-
-    if (terrain.elevation > 500) {
-      patterns.push({
-        type: 'mountain_valley_breeze',
-        probability: 0.7,
-        timing: {
-          start: 'sunrise',
-          peak: 'midday',
-          end: 'sunset'
-        }
-      });
-    }
-
-    if (terrain.type === 'urban') {
-      patterns.push({
-        type: 'urban_corridor',
-        direction: this.calculatePredominantWindDirection(historicalData),
-        intensity: this.calculateWindIntensification(terrain)
-      });
-    }
-
-    return patterns;
-  }
-
-  private calculateWindTunnelEffects(terrain: any): any[] {
-    const effects = [];
-
-    if (terrain.type === 'urban' && terrain.buildings) {
-      effects.push(...this.analyzeUrbanWindTunnels(terrain.buildings));
-    }
-
-    if (terrain.features?.includes('valley')) {
-      effects.push({
-        type: 'valley_tunnel',
-        intensification: 1.5,
-        direction: terrain.valleyOrientation || 0
-      });
-    }
-
-    return effects;
-  }
-
-  private analyzeUrbanWindTunnels(buildings: any[]): any[] {
-    return buildings
-      .filter(building => building.height > 50)
-      .map(building => ({
-        type: 'building_tunnel',
-        location: building.location,
-        intensification: this.calculateBuildingWindEffect(building),
-        direction: building.orientation || 0
-      }));
-  }
-
-  private calculateBuildingWindEffect(building: any): number {
-    const baseEffect = 1.2;
-    const heightFactor = Math.log10(building.height / 50);
-    return baseEffect * heightFactor;
-  }
-
-  private analyzeLocalizedPrecipitation(terrain: any, historicalData: any): any {
-    return {
-      orographicEffect: this.calculateOrographicEffect(terrain),
-      urbanEffect: this.calculateUrbanPrecipitationEffect(terrain),
-      patterns: this.analyzePrecipitationPatterns(historicalData)
-    };
-  }
-
-  private calculateOrographicEffect(terrain: any): number {
-    if (!terrain.elevation) return 1.0;
+  private async getCachedWeather(location: string) {
+    if (!redis) return null;
     
-    const baseEffect = 1.0;
-    const elevationFactor = terrain.elevation / 1000;
-    return baseEffect + (elevationFactor * 0.2);
+    try {
+      const cached = await redis.get(`weather:${location}`);
+      return cached ? JSON.parse(cached) : null;
+    } catch (error) {
+      console.error('Weather cache error:', error);
+      return null;
+    }
   }
 
-  private calculatePrecipitationAccumulation(terrain: any): any {
-    return {
-      rate: this.calculateAccumulationRate(terrain),
-      drainage: this.analyzeDrainagePatterns(terrain),
-      retention: this.calculateWaterRetention(terrain)
-    };
-  }
-
-  private calculateSunExposure(terrain: any, location: GeoPoint): any {
-    return {
-      dailyPattern: this.calculateDailySunPattern(terrain, location),
-      shadingEffects: this.analyzeShadingEffects(terrain),
-      seasonalVariation: this.calculateSeasonalSunExposure(location)
-    };
-  }
-
-  private analyzeTerrainWeatherEffects(terrain: any): any {
-    return {
-      elevation: this.analyzeElevationEffects(terrain),
-      slope: this.analyzeSlopeEffects(terrain),
-      vegetation: this.analyzeVegetationEffects(terrain),
-      urbanization: this.analyzeUrbanEffects(terrain)
-    };
-  }
-
-  private calculateLocalEffects(location: any, forecast: WeatherConditions): any {
-    return {
-      temperature: this.adjustTemperatureForLocal(location, forecast),
-      wind: this.adjustWindForLocal(location, forecast),
-      precipitation: this.adjustPrecipitationForLocal(location, forecast)
-    };
-  }
-
-  private analyzeWeatherPatterns(historicalData: any, forecast: any, terrain: any): WeatherPattern[] {
-    const patterns: WeatherPattern[] = [];
-
-    patterns.push(...this.analyzeSeasonalPatterns(historicalData));
-    patterns.push(...this.analyzeDailyPatterns(historicalData, terrain));
-    patterns.push(...this.analyzeTerrainPatterns(terrain, historicalData));
-    patterns.push(...this.predictUpcomingPatterns(forecast, historicalData));
-
-    return patterns;
-  }
-
-  private analyzeSeasonalPatterns(historicalData: any): WeatherPattern[] {
-    return [];
-  }
-
-  private analyzeDailyPatterns(historicalData: any, terrain: any): WeatherPattern[] {
-    return [];
-  }
-
-  private analyzeTerrainPatterns(terrain: any, historicalData: any): WeatherPattern[] {
-    return [];
-  }
-
-  private predictUpcomingPatterns(forecast: any, historicalData: any): WeatherPattern[] {
-    return [];
-  }
-
-  private calculatePredominantWindDirection(historicalData: any): number {
-    return 0;
-  }
-
-  private calculateWindIntensification(terrain: any): number {
-    return 1.0;
-  }
-
-  private calculateAccumulationRate(terrain: any): number {
-    return 0;
-  }
-
-  private analyzeDrainagePatterns(terrain: any): any {
-    return {};
-  }
-
-  private calculateWaterRetention(terrain: any): number {
-    return 0;
-  }
-
-  private calculateDailySunPattern(terrain: any, location: GeoPoint): any {
-    return {};
-  }
-
-  private analyzeShadingEffects(terrain: any): any {
-    return {};
-  }
-
-  private calculateSeasonalSunExposure(location: GeoPoint): any {
-    return {};
-  }
-
-  private analyzeElevationEffects(terrain: any): any {
-    return {};
-  }
-
-  private analyzeSlopeEffects(terrain: any): any {
-    return {};
-  }
-
-  private analyzeVegetationEffects(terrain: any): any {
-    return {};
-  }
-
-  private analyzeUrbanEffects(terrain: any): any {
-    return {};
-  }
-
-  private adjustTemperatureForLocal(location: any, forecast: WeatherConditions): number {
-    return forecast.temperature;
-  }
-
-  private adjustWindForLocal(location: any, forecast: WeatherConditions): any {
-    return {
-      speed: forecast.windSpeed,
-      direction: 0
-    };
-  }
-
-  private adjustPrecipitationForLocal(location: any, forecast: WeatherConditions): number {
-    return forecast.precipitation;
-  }
-
-  private analyzePrecipitationPatterns(historicalData: any): any[] {
-    return [];
-  }
-
-  private calculateUrbanPrecipitationEffect(terrain: any): number {
-    return 1.0;
+  private async cacheWeather(location: string, data: any) {
+    if (!redis) return;
+    
+    try {
+      await redis.setex(`weather:${location}`, 1800, JSON.stringify(data));
+    } catch (error) {
+      console.error('Weather cache error:', error);
+    }
   }
 } 

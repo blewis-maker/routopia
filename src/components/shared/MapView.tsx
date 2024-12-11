@@ -1,109 +1,85 @@
+'use client';
+
 import { useEffect, useRef, useState } from 'react';
+import { useGoogleMaps } from '@/contexts/GoogleMapsContext';
 import { GoogleMapsManager } from '@/services/maps/GoogleMapsManager';
-import { MapIntegrationLayer } from '@/services/maps/MapIntegrationLayer';
-import { SearchBox } from '@/components/navigation/SearchBox';
-import { Route } from '@/types/route/types';
-import { Coordinates } from '@/services/maps/MapServiceInterface';
 
 interface MapViewProps {
-  center: [number, number];
-  zoom: number;
-  route?: Route;
-  onMapClick?: (coordinates: Coordinates) => void;
+  options?: google.maps.MapOptions;
   showWeather?: boolean;
-  showElevation?: boolean;
   showUserLocation?: boolean;
   darkMode?: boolean;
-  onMapInit?: (service: GoogleMapsManager) => void;
+  onMapInit?: (mapService: GoogleMapsManager) => void;
 }
 
+const darkMapStyle = [
+  {
+    featureType: 'all',
+    elementType: 'geometry',
+    stylers: [{ color: '#242f3e' }]
+  },
+  // ... rest of dark styles
+] as google.maps.MapTypeStyle[];
+
+const lightMapStyle = [
+  {
+    featureType: 'all',
+    elementType: 'geometry',
+    stylers: [{ color: '#f5f5f5' }]
+  },
+  // ... rest of light styles
+] as google.maps.MapTypeStyle[];
+
 export function MapView({
-  center,
-  zoom,
-  route,
-  onMapClick,
+  options = {},
   showWeather = false,
-  showElevation = false,
-  showUserLocation = true,
-  darkMode = true,
+  showUserLocation = false,
+  darkMode = false,
   onMapInit
 }: MapViewProps) {
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const [mapService, setMapService] = useState<GoogleMapsManager | null>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const { isLoaded } = useGoogleMaps();
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Initialize map
   useEffect(() => {
-    let isMounted = true;
+    if (!isLoaded || !mapRef.current || isInitialized) return;
 
-    const initMap = async () => {
-      if (!mapContainerRef.current || !isMounted) return;
+    try {
+      const mapInstance = new google.maps.Map(mapRef.current, {
+        zoom: 12,
+        center: { lat: 40.7128, lng: -74.0060 },
+        mapTypeControl: false,
+        fullscreenControl: true,
+        streetViewControl: false,
+        styles: darkMode ? darkMapStyle : lightMapStyle,
+        ...options
+      });
 
-      try {
-        const service = new GoogleMapsManager();
-        await service.initialize('map-container', {
-          center: { lat: center[1], lng: center[0] },
-          zoom,
-          darkMode
-        });
+      mapInstanceRef.current = mapInstance;
+      setIsInitialized(true);
 
-        if (!isMounted) return;
-
-        setMapService(service);
-        setIsInitialized(true);
-        onMapInit?.(service);
-
-        // Add click handler
-        if (onMapClick) {
-          service.addClickListener((coords: Coordinates) => {
-            onMapClick(coords);
-          });
-        }
-      } catch (error) {
-        if (isMounted) {
-          console.error('Map initialization error:', error);
-        }
+      if (onMapInit) {
+        const mapService = new GoogleMapsManager();
+        mapService.setMap(mapInstance);
+        onMapInit(mapService);
       }
-    };
+    } catch (err) {
+      console.error('Failed to initialize map:', err);
+    }
+  }, [isLoaded, options, darkMode, onMapInit, isInitialized]);
 
-    initMap();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Handle center and zoom updates
+  // Update map styles when dark mode changes
   useEffect(() => {
-    if (!mapService || !isInitialized) return;
-
-    console.log('Updating map center:', { lat: center[1], lng: center[0] });
-    mapService.setCenter({ lat: center[1], lng: center[0] });
-    mapService.setZoom(zoom);
-  }, [mapService, isInitialized, center, zoom]);
-
-  // Update map when route changes
-  useEffect(() => {
-    const visualizeRoute = async () => {
-      if (!mapService || !route || !isInitialized) return;
-
-      try {
-        await mapService.visualizeRoute(route);
-      } catch (error) {
-        console.error('Failed to visualize route:', error);
-      }
-    };
-
-    visualizeRoute();
-  }, [mapService, route, isInitialized]);
+    if (!mapInstanceRef.current) return;
+    mapInstanceRef.current.setOptions({
+      styles: darkMode ? darkMapStyle : lightMapStyle
+    });
+  }, [darkMode]);
 
   return (
-    <div className="w-full h-full relative">
-      <div
-        ref={mapContainerRef}
-        className="w-full h-full"
-        id="map-container"
-      />
+    <div className="w-full h-full">
+      <div ref={mapRef} className="w-full h-full" />
     </div>
   );
 } 

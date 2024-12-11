@@ -1,0 +1,181 @@
+# Cursor Implementation Task: Routopia Activity-Based AI Integration
+
+Implement an OpenAI integration for Routopia's activity-based route planning system that handles the core activities (Drive, Bike, Run, Ski, Adventure) with sub-activity modifiers.
+
+## Project Structure
+
+```typescript
+src/
+  services/
+    ai/
+      prompts/
+        ActivityPromptBuilder.ts    // Main prompt builder
+        activities/                 // Activity-specific handlers
+          DriveActivity.ts
+          BikeActivity.ts
+          RunActivity.ts
+          SkiActivity.ts
+          AdventureActivity.ts
+        modifiers/                  // Sub-activity modifiers
+          FoodieModifier.ts
+          FamilyModifier.ts
+      types/
+        activities.ts              // Activity type definitions
+        prompts.ts                // Prompt-related types
+      utils/
+        contextEnricher.ts        // Context enrichment
+        responseParser.ts         // OpenAI response handling
+```
+
+## Core Types to Implement
+
+Start with these core type definitions:
+
+```typescript
+type CoreActivityType = 'Drive' | 'Bike' | 'Run' | 'Ski' | 'Adventure';
+
+interface ActivityContext {
+  activityType: CoreActivityType;
+  subActivities?: {
+    type: 'foodie' | 'family' | 'training' | 'photography';
+    parameters: SubActivityParameters;
+  };
+  transitMode?: 'car' | 'public_transit' | 'self_powered';
+}
+
+interface RoutePromptContext {
+  activity: ActivityContext;
+  userProfile: UserProfile;
+  environmentalFactors: EnvironmentalFactors;
+  routeConstraints: RouteConstraints;
+}
+```
+
+## Implementation Steps
+
+1. Create ActivityPromptBuilder Class:
+   - Initialize with required services
+   - Implement prompt building logic
+   - Add activity-specific handlers
+   - Include sub-activity modifiers
+   - Add error handling
+
+2. Implement Activity Handlers:
+   - Create base activity class/interface
+   - Implement specific activity handlers
+   - Add activity-specific prompt templates
+   - Include activity-specific functions
+
+3. Add Context Enrichment:
+   - Weather data integration
+   - Traffic conditions
+   - Local events
+   - Operating hours
+
+4. Create OpenAI Functions:
+   - Route generation
+   - Transition planning
+   - Waypoint optimization
+   - Safety considerations
+
+## Key Requirements
+
+1. Strong Typing:
+   - Use TypeScript strict mode
+   - Define comprehensive interfaces
+   - Implement proper error types
+   - Add type guards where needed
+
+2. Error Handling:
+   - Handle API failures
+   - Manage service timeouts
+   - Validate input data
+   - Provide fallback options
+
+3. Testing Coverage:
+   - Unit tests for each component
+   - Integration tests for services
+   - Mock external dependencies
+   - Test error scenarios
+
+4. Performance:
+   - Implement response caching
+   - Add request debouncing
+   - Monitor token usage
+   - Optimize prompt length
+
+## Example Usage to Support
+
+```typescript
+const promptBuilder = new ActivityPromptBuilder(
+  new WeatherService(),
+  new TrafficService(),
+  new EventService()
+);
+
+// Adventure mode example
+const adventurePrompt = await promptBuilder.buildPrompt({
+  activity: {
+    activityType: 'Adventure',
+    subActivities: {
+      type: 'foodie',
+      parameters: {
+        cuisineTypes: ['local'],
+        photoOpportunities: true
+      }
+    }
+  },
+  userProfile: {
+    preferences: {
+      preferred_activities: ['hiking', 'photography'],
+      skill_level: 'intermediate'
+    }
+  },
+  // ... other context
+});
+
+// Bike mode with family modifier
+const bikePrompt = await promptBuilder.buildPrompt({
+  activity: {
+    activityType: 'Bike',
+    subActivities: {
+      type: 'family',
+      parameters: {
+        childrenAges: [8, 10],
+        safetyPriority: 'high'
+      }
+    }
+  },
+  // ... other context
+});
+```
+
+## Implementation Notes
+
+1. Activity Specifics:
+   - Adventure mode combines multiple activities
+   - All activities can include transit to start/end
+   - Foodie integrates with Drive/Adventure
+   - Family modifies primarily Bike routes
+
+2. Context Requirements:
+   - Weather conditions affect all activities
+   - Traffic impacts transit portions
+   - Operating hours for facilities
+   - Local events and conditions
+
+3. Safety Considerations:
+   - Emergency access points
+   - Weather warnings
+   - Difficulty ratings
+   - Family-safe options
+
+4. Technical Constraints:
+   - Maximum token limits
+   - Response time targets
+   - Cache invalidation rules
+   - Rate limiting handling
+
+Start with the ActivityPromptBuilder implementation and its core interfaces. Focus on maintainability and extensibility.
+
+Would you like me to start with any specific component?

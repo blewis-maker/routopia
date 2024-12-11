@@ -7,7 +7,8 @@ import { WeatherWidget } from '@/components/route-planner/WeatherWidget';
 import { SearchBox } from '@/components/navigation/SearchBox';
 import ChatWindow from '@/components/chat/ChatWindow';
 import Image from 'next/image';
-import { Coordinates } from '@/services/maps/MapServiceInterface';
+import { LatLng } from '@/types/shared';
+import { MapServiceInterface, MapBounds } from '@/services/maps/MapServiceInterface';
 import { useTheme } from 'next-themes';
 import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
 import { GoogleMapsManager } from '@/services/maps/GoogleMapsManager';
@@ -20,6 +21,21 @@ import { AIChat } from '@/components/chat/AIChat';
 import { ChatMessage } from '@/types/chat/types';
 import { ChatSuggestion } from '@/types/chat/types';
 import { GoogleActivityType, UIActivityType } from '@/services/maps/MapServiceInterface';
+import { generateId } from '@/lib/utils/index';
+import { 
+  RouteVisualization, 
+  RouteVisualizationResponse, 
+  LegacyRouteVisualization 
+} from '@/types/route/visualization';
+import { RouteErrorBoundary } from '@/components/error/RouteErrorBoundary';
+import { MonitoringErrorBoundary } from '@/components/error/MonitoringErrorBoundary';
+import { RouteMonitorPanel } from '@/components/route-planner/RouteMonitorPanel';
+import { ProgressProvider } from '@/contexts/ProgressContext';
+import { ProgressOverview } from '@/components/progress/ProgressOverview';
+import { getRouteColor } from '@/lib/utils/routeColors';
+import { MapVisualization } from '@/types/maps/visualization';
+import { convertRouteToVisualization } from '@/lib/utils/routeConversion';
+import { useGoogleMaps } from '@/contexts/GoogleMapsContext';
 
 interface WeatherInfo {
   location: string;
@@ -33,6 +49,12 @@ interface WeatherData {
   humidity: number;
   icon: string;
   location?: string;
+}
+
+interface RouteGenerationOptions {
+  activityType?: 'car' | 'bike' | 'walk';
+  alternatives?: boolean;
+  waypoints?: LatLng[];
 }
 
 const formatDuration = (seconds: number): string => {
@@ -73,24 +95,145 @@ const mapActivityTypeToGoogle = (type: UIActivityType): GoogleActivityType => {
   }
 };
 
+const mapPoint = (point: LatLng, index: number, array: LatLng[]): RouteSegment => ({
+  type: 'road',
+  path: [point],
+  details: {
+    distance: 0,
+    duration: 0
+  }
+});
+
 export default function RoutePlannerPage() {
+  // 1. All refs
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const geocoder = useRef<google.maps.Geocoder | null>(null);
+  const mapServiceRef = useRef<GoogleMapsManager | null>(null);
+  
+  // 2. All state
   const [userLocation, setUserLocation] = useState<Location | null>(null);
   const [destinationLocation, setDestinationLocation] = useState<Location | null>(null);
   const [weatherInfo, setWeatherInfo] = useState<WeatherInfo | null>(null);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([-105.0749801, 40.5852602]);
+  const [mapCenter, setMapCenter] = useState<LatLng>({ lat: 40.5852602, lng: -105.0749801 });
   const [mapZoom, setMapZoom] = useState(12);
-  const geocoder = useRef<google.maps.Geocoder | null>(null);
-  const mapServiceRef = useRef<GoogleMapsManager | null>(null);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [activeLayer, setActiveLayer] = useState<'ROUTE' | 'SEARCH' | 'TRAFFIC' | 'LAYERS' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { theme } = useTheme();
   const [mainRoute, setMainRoute] = useState<Route | null>(null);
-
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [routeType, setRouteType] = useState<'drive' | 'bike' | 'run' | 'ski' | 'adventure'>('drive');
+
+  // 3. All context hooks
+  const { theme } = useTheme();
+  const { isLoaded, error } = useGoogleMaps();
+
+  // 4. Single useEffect for initialization
+  useEffect(() => {
+    let mounted = true;
+
+    const initGoogleServices = async () => {
+      if (!isLoaded || !mounted) return;
+
+      try {
+        if (!geocoder.current) {
+          geocoder.current = new google.maps.Geocoder();
+        }
+
+        // Get user's location
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 10000,
+            maximumAge: 0,
+            enableHighAccuracy: true
+          });
+        });
+
+        if (!mounted) return;
+
+        const { latitude: lat, longitude: lng } = position.coords;
+
+        // Reverse geocode to get address
+        const result = await geocoder.current.geocode({
+          location: { lat, lng }
+        });
+
+        if (!mounted) return;
+
+        if (result.results[0]) {
+          const address = result.results[0].formatted_address;
+          const addressParts = address.split(',').map(part => part.trim());
+          const street = addressParts[0];
+          const city = addressParts[1];
+          const state = addressParts[2]?.split(' ')[0];
+          const displayAddress = `${street}, ${city}, ${state}`;
+
+          if (mounted) {
+            setUserLocation({
+              coordinates: [lng, lat],
+              address: displayAddress
+            });
+
+            setMapCenter({ lat, lng });
+            setMapZoom(14);
+            
+            setWeatherInfo({
+              location: address,
+              coordinates: [lng, lat]
+            });
+
+            await fetchWeatherData(lat, lng, address);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing services:', error);
+      }
+    };
+
+    initGoogleServices();
+
+    return () => {
+      mounted = false;
+    };
+  }, [isLoaded]); // Only depend on isLoaded
+
+  // Separate effect for marker updates
+  useEffect(() => {
+    if (!userLocation || !mapServiceRef.current) return;
+
+    const [lng, lat] = userLocation.coordinates;
+    mapServiceRef.current.addUserLocationMarker({ lat, lng });
+  }, [userLocation]);
+
+  // 6. Effect for chat scrolling
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  // Loading and error states
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-t-teal-500 border-stone-700 rounded-full animate-spin mb-4" />
+          <p>Loading map services...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center text-red-500">
+          <p>Error loading map services</p>
+          <p className="text-sm">{error.message}</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleChatMessage = async (message: string) => {
     const abortController = new AbortController();
@@ -129,13 +272,23 @@ export default function RoutePlannerPage() {
       // If we have a suggestion, update the destination and generate route
       if (data.suggestion) {
         try {
-          // First update the destination location state
+          // Format the full address
+          const fullAddress = `${data.suggestion.name}, ${data.suggestion.location.address || ''}`;
+          
+          // Update the destination location state
           setDestinationLocation({
             coordinates: [data.suggestion.location.lng, data.suggestion.location.lat],
-            address: data.suggestion.name
+            address: fullAddress // Use the full address
           });
 
-          // Then generate the route
+          // Update weather for the suggested location
+          await fetchWeatherData(
+            data.suggestion.location.lat,
+            data.suggestion.location.lng,
+            fullAddress
+          );
+
+          // Generate route
           if (userLocation) {
             await generateRoute(
               userLocation.coordinates,
@@ -216,25 +369,28 @@ export default function RoutePlannerPage() {
 
       // Update mainRoute state
       const route: Route = {
-        id: 'generated-route',
-        name: `Route to ${destinationLocation?.address || 'destination'}`,
-        segments: [{
+        id: generateId(),
+        name: 'Generated Route',
+        segments: routeVisualization.mainRoute.coordinates.map((point, index, array) => ({
           startPoint: {
-            latitude: start[1],
-            longitude: start[0]
+            latitude: point.lat,
+            longitude: point.lng
           },
-          endPoint: {
-            latitude: end[1],
-            longitude: end[0]
-          },
-          distance: routeVisualization.mainRoute.distance || 0,
-          duration: routeVisualization.mainRoute.duration || 0
-        }],
+          endPoint: index < array.length - 1 ? {
+            latitude: array[index + 1].lat,
+            longitude: array[index + 1].lng
+          } : undefined
+        })),
         totalMetrics: {
-          distance: routeVisualization.mainRoute.distance || 0,
-          duration: routeVisualization.mainRoute.duration || 0
+          distance: routeVisualization.mainRoute.distance,
+          duration: routeVisualization.mainRoute.duration
         },
-        alternatives: routeVisualization.alternatives || []
+        alternatives: routeVisualization.alternatives?.map(alt => ({
+          path: alt.path,
+          distance: alt.distance,
+          duration: alt.duration,
+          mode: alt.mode
+        }))
       };
       setMainRoute(route);
 
@@ -246,23 +402,14 @@ export default function RoutePlannerPage() {
     }
   };
 
-  const handleMapClick = async (coordinates: Coordinates) => {
-    if (!userLocation) {
-      setUserLocation({
-        coordinates: [coordinates.lng, coordinates.lat],
-        address: 'Selected Location'
-      });
-    } else {
-      const end: [number, number] = [coordinates.lng, coordinates.lat];
-      await generateRoute(userLocation.coordinates, end);
-    }
-  };
-
   const handleDestinationSelect = async (result: any) => {
     if (!('coordinates' in result)) return;
     
     const [lng, lat] = result.coordinates;
-    const address = result.formatted_address || result.place_name;
+    // Format the full address including business name if available
+    const fullAddress = result.business_name 
+      ? `${result.business_name}, ${result.formatted_address}`
+      : result.formatted_address;
     
     // Clear existing routes and markers
     if (mapServiceRef.current) {
@@ -273,11 +420,14 @@ export default function RoutePlannerPage() {
     // Reset main route state
     setMainRoute(null);
 
-    // Update destination location
+    // Update destination location with full address
     setDestinationLocation({
       coordinates: [lng, lat],
-      address: address
+      address: fullAddress
     });
+
+    // Update weather for new destination
+    await fetchWeatherData(lat, lng, fullAddress);
 
     // Generate new route if we have a start location
     if (userLocation) {
@@ -334,109 +484,43 @@ export default function RoutePlannerPage() {
 
   const fetchWeatherData = async (lat: number, lng: number, location?: string) => {
     try {
+      console.log('Fetching weather for:', { lat, lng, location });
+      
       const response = await fetch(`/api/weather?lat=${lat}&lng=${lng}`);
-      if (!response.ok) throw new Error('Failed to fetch weather');
       const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Weather API error response:', data);
+        throw new Error(data.error || 'Failed to fetch weather');
+      }
+
+      if (!data.temperature) {
+        console.error('Invalid weather data received:', data);
+        throw new Error('Invalid weather data received');
+      }
+
       setWeatherData({
-        ...data,
+        temperature: data.temperature,
+        conditions: data.conditions,
+        windSpeed: data.windSpeed,
+        humidity: data.humidity,
+        icon: data.icon,
         location: location
       });
+
     } catch (error) {
       console.error('Error fetching weather:', error);
+      // Set a default state instead of null
+      setWeatherData({
+        temperature: 0,
+        conditions: 'Weather unavailable',
+        windSpeed: 0,
+        humidity: 0,
+        icon: '01d',
+        location: location
+      });
     }
   };
-
-  // Initialize geocoder
-  useEffect(() => {
-    const initGoogleServices = async () => {
-      try {
-        await GoogleMapsLoader.getInstance().load();
-        if (!geocoder.current) {
-          geocoder.current = new google.maps.Geocoder();
-        }
-      } catch (error) {
-        console.error('Failed to initialize Google services:', error);
-      }
-    };
-
-    initGoogleServices();
-  }, []);
-
-  // Get user's location on page load
-  useEffect(() => {
-    const getUserLocation = async () => {
-      if (!geocoder.current) {
-        await GoogleMapsLoader.getInstance().load();
-        geocoder.current = new google.maps.Geocoder();
-      }
-
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject);
-        });
-
-        const { latitude: lat, longitude: lng } = position.coords;
-
-        // Reverse geocode to get address
-        const result = await geocoder.current.geocode({
-          location: { lat, lng }
-        });
-
-        if (result.results[0]) {
-          const address = result.results[0].formatted_address;
-          const addressParts = address.split(',').map(part => part.trim());
-          const street = addressParts[0];
-          const city = addressParts[1];
-          const state = addressParts[2]?.split(' ')[0];
-          const displayAddress = `${street}, ${city}, ${state}`;
-
-          setUserLocation({
-            coordinates: [lng, lat],
-            address: displayAddress
-          });
-          setMapCenter([lng, lat]);
-          setMapZoom(14);
-          setWeatherInfo({
-            location: address,
-            coordinates: [lng, lat]
-          });
-
-          if (mapServiceRef.current) {
-            mapServiceRef.current.addUserLocationMarker({ lat, lng });
-          }
-
-          // Fetch weather data for initial location
-          await fetchWeatherData(lat, lng, address);
-        }
-      } catch (error) {
-        console.error('Error getting user location:', error);
-      }
-    };
-
-    getUserLocation();
-  }, []);
-
-  // Update marker when user location changes
-  useEffect(() => {
-    if (userLocation && mapServiceRef.current) {
-      const [lng, lat] = userLocation.coordinates;
-      mapServiceRef.current.addUserLocationMarker({ lat, lng });
-    }
-  }, [userLocation]);
-
-  // Update map center when user location changes
-  useEffect(() => {
-    if (userLocation) {
-      setMapCenter(userLocation.coordinates);
-    }
-  }, [userLocation]);
-
-  // Auto-scroll chat to bottom when new messages arrive
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [messages]);
 
   const handleViewOnMap = async (suggestion: ChatSuggestion) => {
     if (!mapServiceRef.current) {
@@ -500,11 +584,15 @@ export default function RoutePlannerPage() {
       // Clear existing routes and markers
       mapServiceRef.current.clearRoute();
 
+      // Format the full address with business name and location
+      const fullAddress = `${suggestion.name}, ${suggestion.location.address}`;
+
       // Create a destination object that matches the search box format
       const destinationInfo = {
         coordinates: [suggestion.location.lng, suggestion.location.lat],
-        formatted_address: suggestion.name,
-        place_name: suggestion.name
+        formatted_address: suggestion.location.address,
+        business_name: suggestion.name,
+        place_name: fullAddress
       };
 
       try {
@@ -574,131 +662,287 @@ export default function RoutePlannerPage() {
     }
   };
 
+  // Update the route conversion logic
+  const convertRouteVisualization = (
+    routeVisualization: RouteVisualizationResponse | LegacyRouteVisualization
+  ): Route => {
+    // Handle legacy format
+    if ('coordinates' in routeVisualization) {
+      const routeType = 'road' as RouteSegmentType;
+      return {
+        id: generateId(),
+        name: 'Legacy Route',
+        type: routeType,
+        segments: [{
+          type: routeType,
+          path: routeVisualization.coordinates.map(([lng, lat]) => ({ lat, lng })),
+          details: {
+            distance: routeVisualization.distance || 0,
+            duration: routeVisualization.duration || 0,
+            color: getRouteColor(routeType)
+          }
+        }],
+        metrics: {
+          distance: routeVisualization.distance || 0,
+          duration: routeVisualization.duration || 0,
+          elevation: { gain: 0, loss: 0, max: 0, min: 0 }
+        },
+        waypoints: [],
+        metadata: {
+          totalDistance: routeVisualization.distance || 0,
+          difficulty: 'moderate',
+          conditions: [],
+          recommendations: [],
+          terrain: ['road', 'paved'],
+          skillRequirements: {
+            technical: ['basic-navigation'],
+            physical: ['walking'],
+            minimum: 'beginner',
+            recommended: 'beginner'
+          },
+          dining: {
+            preferences: {
+              cuisineTypes: [],
+              priceRange: [],
+              dietaryRestrictions: []
+            }
+          },
+          recreation: {
+            preferences: {
+              activityTypes: [],
+              intensity: 'moderate',
+              duration: { 
+                min: 0, 
+                max: routeVisualization.duration || 0 
+              }
+            }
+          },
+          scheduling: {
+            preferredStopFrequency: 60,
+            restStopDuration: 15
+          },
+          social: {
+            groupSize: 1,
+            familyFriendly: true,
+            accessibility: []
+          }
+        }
+      };
+    }
+
+    // Handle modern format
+    return convertVisualizationToRoute(routeVisualization.mainRoute);
+  };
+
+  function convertVisualizationToRoute(
+    routeVisualization: RouteVisualization,
+    destinationLocation?: Location | null
+  ): Route {
+    const routeType = 'road' as RouteSegmentType;
+
+    return {
+      id: generateId(),
+      name: `Route to ${destinationLocation?.address || 'destination'}`,
+      type: routeType,
+      segments: [{
+        type: routeType,
+        path: routeVisualization.mainRoute.coordinates,
+        details: {
+          distance: routeVisualization.distance,
+          duration: routeVisualization.duration,
+          color: getRouteColor(routeType)
+        }
+      }],
+      metrics: {
+        distance: routeVisualization.distance,
+        duration: routeVisualization.duration,
+        elevation: {
+          gain: 0,
+          loss: 0,
+          max: 0,
+          min: 0
+        }
+      },
+      waypoints: generateWaypoints(routeVisualization, destinationLocation),
+      metadata: {
+        totalDistance: routeVisualization.distance,
+        difficulty: 'moderate',
+        conditions: [],
+        recommendations: [],
+        terrain: ['road', 'paved'],
+        skillRequirements: {
+          technical: ['basic-navigation'],
+          physical: ['walking'],
+          minimum: 'beginner',
+          recommended: 'beginner'
+        },
+        dining: {
+          preferences: {
+            cuisineTypes: [],
+            priceRange: [],
+            dietaryRestrictions: []
+          }
+        },
+        recreation: {
+          preferences: {
+            activityTypes: [],
+            intensity: 'moderate',
+            duration: { min: 0, max: routeVisualization.duration }
+          }
+        },
+        scheduling: {
+          preferredStopFrequency: 60,
+          restStopDuration: 15
+        },
+        social: {
+          groupSize: 1,
+          familyFriendly: true,
+          accessibility: []
+        }
+      }
+    };
+  }
+
+  function generateWaypoints(
+    visualization: RouteVisualization, 
+    destination?: Location | null
+  ): WaypointType[] {
+    const waypoints: WaypointType[] = [];
+
+    // Add start waypoint
+    if (visualization.mainRoute.coordinates.length > 0) {
+      const start = visualization.mainRoute.coordinates[0];
+      waypoints.push({
+        type: 'parking',
+        location: start,
+        name: 'Starting Point'
+      });
+    }
+
+    // Add destination waypoint
+    if (destination) {
+      waypoints.push({
+        type: 'destination',
+        location: {
+          lat: destination.coordinates[0],
+          lng: destination.coordinates[1]
+        },
+        name: destination.address
+      });
+    }
+
+    return waypoints;
+  }
+
+  const handleRouteVisualization = async (route: Route) => {
+    if (!mapServiceRef.current) return;
+
+    try {
+      const visualization = convertRouteToVisualization(route);
+      await mapServiceRef.current.visualizeRoute(visualization);
+    } catch (error) {
+      console.error('Failed to visualize route:', error);
+    }
+  };
+
   return (
-    <ErrorBoundary>
-      <div className="grid grid-cols-[minmax(350px,_400px)_1fr] h-full w-full overflow-hidden">
-        {/* Left Panel - Chat Interface */}
-        <div className="flex flex-col h-full bg-stone-900 border-r border-stone-800 overflow-hidden">
-          <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
-            <AIChat
-              messages={messages}
-              onSendMessage={handleChatMessage}
-              userLocation={userLocation}
-              destinationLocation={destinationLocation}
-              weatherData={weatherData}
-              onViewSuggestion={handleViewOnMap}
-              onAddToRoute={handleAddToRoute}
-              isGenerating={isGenerating}
-            />
-          </div>
-        </div>
-
-        {/* Right Panel - Map & Controls */}
-        <div className="relative h-full w-full overflow-hidden">
-          <MapView
-            center={mapCenter}
-            zoom={mapZoom}
-            onMapClick={handleMapClick}
-            showWeather={false}
-            showUserLocation={true}
-            darkMode={theme === 'dark'}
-            onMapInit={handleMapServiceInit}
-          />
-
-          <MapToolbar 
-            mapIntegration={mapServiceRef.current}
-            onToolSelect={handleToolSelect}
-            onPreferencesToggle={() => {}}
-            showPreferences={false}
-          />
-
-          {/* Search Box Overlay */}
-          <div className="absolute top-4 left-4 z-10 w-96 max-w-[calc(100%-2rem)] space-y-2">
-            <SearchBox 
-              onSelect={handleLocationSelect}
-              placeholder="Set your starting point..."
-              useCurrentLocation={true}
-              initialValue={userLocation?.address || ''}
-              key={`start-${userLocation?.coordinates?.join(',')}-${Date.now()}`}
-              className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
-            />
-            <SearchBox 
-              onSelect={handleDestinationSelect}
-              placeholder="Choose destination..."
-              initialValue={destinationLocation?.address || ''}
-              key={`end-${destinationLocation?.coordinates?.join(',')}-${Date.now()}`}
-              className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
-            />
+    <ProgressProvider>
+      <ErrorBoundary>
+        <div className="grid grid-cols-[minmax(350px,_400px)_1fr] h-full w-full overflow-hidden">
+          {/* Left Panel - Chat Interface */}
+          <div className="flex flex-col h-full bg-stone-900 border-r border-stone-800 overflow-hidden">
+            <RouteErrorBoundary>
+              <AIChat
+                messages={messages}
+                onSendMessage={handleChatMessage}
+                userLocation={userLocation}
+                destinationLocation={destinationLocation}
+                weatherData={weatherData}
+                onViewSuggestion={handleViewOnMap}
+                onAddToRoute={handleAddToRoute}
+                isGenerating={isGenerating}
+              />
+            </RouteErrorBoundary>
           </div>
 
-          {/* Weather Widget */}
-          {weatherData && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-              <div className="bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg border border-stone-800/50 px-4 py-2">
-                <div className="flex items-center gap-4">
-                  <div className="text-stone-200">
-                    <span className="text-lg font-medium">{weatherData.temperature}°F</span>
-                    <span className="text-stone-400 text-sm ml-2">{weatherData.location}</span>
-                  </div>
-                  <div className="text-stone-400 text-sm border-l border-stone-800/50 pl-4">
-                    <div>{weatherData.conditions}</div>
-                    <div>{weatherData.windSpeed} mph</div>
+          {/* Right Panel - Map & Controls */}
+          <div className="relative h-full w-full overflow-hidden">
+            <RouteErrorBoundary>
+              <MapView
+                options={{
+                  center: mapCenter,
+                  zoom: mapZoom
+                }}
+                showWeather={false}
+                showUserLocation={true}
+                darkMode={theme === 'dark'}
+                onMapInit={(service) => {
+                  mapServiceRef.current = service;
+                }}
+              />
+            </RouteErrorBoundary>
+
+            <MapToolbar 
+              mapIntegration={mapServiceRef.current}
+              onToolSelect={handleToolSelect}
+              onPreferencesToggle={() => {}}
+              showPreferences={false}
+            />
+
+            {/* Search Box Overlay */}
+            <div className="absolute top-4 left-4 z-10 w-96 max-w-[calc(100%-2rem)] space-y-2">
+              <ErrorBoundary>
+                <SearchBox 
+                  onSelect={handleLocationSelect}
+                  placeholder="Set your starting point..."
+                  useCurrentLocation={true}
+                  initialValue={userLocation?.address || ''}
+                  key={`start-${userLocation?.coordinates?.join(',')}-${Date.now()}`}
+                  className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
+                />
+              </ErrorBoundary>
+              <ErrorBoundary>
+                <SearchBox 
+                  onSelect={handleDestinationSelect}
+                  placeholder="Choose destination..."
+                  initialValue={destinationLocation?.address || ''}
+                  key={`end-${destinationLocation?.coordinates?.join(',')}-${Date.now()}`}
+                  className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
+                />
+              </ErrorBoundary>
+            </div>
+
+            {/* Weather Widget */}
+            {weatherData && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+                <WeatherWidget data={weatherData} />
+              </div>
+            )}
+
+            {/* Loading Overlay */}
+            {isLoading && (
+              <div className="absolute inset-0 bg-[#1B1B1B]/50 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="bg-[#1B1B1B]/95 rounded-lg border border-stone-800/50 px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                    <span className="text-stone-200">Generating route...</span>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Loading Overlay */}
-          {isLoading && (
-            <div className="absolute inset-0 bg-[#1B1B1B]/50 backdrop-blur-sm flex items-center justify-center z-50">
-              <div className="bg-[#1B1B1B]/95 rounded-lg border border-stone-800/50 px-6 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                  <span className="text-stone-200">Generating route...</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {mainRoute && (
-            <div className="absolute bottom-4 left-4 z-10 max-w-md">
-              <div className="bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg border border-stone-800/50">
-                {/* Route Header */}
-                <div className="px-4 py-2 border-b border-stone-800/50">
-                  <div className="flex items-center gap-2 text-xs text-stone-400">
-                    <Map className="w-3.5 h-3.5" />
-                    <span>CURRENT ROUTE</span>
-                  </div>
-                </div>
-
-                {/* Route Details */}
-                <div className="p-4 space-y-3">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3 text-stone-200">
-                      <Clock className="w-4 h-4 text-stone-400" />
-                      <span>{formatDuration(mainRoute.totalMetrics?.duration || 0)}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-stone-200">
-                      <Map className="w-4 h-4 text-stone-400" />
-                      <span>{formatDistance(mainRoute.totalMetrics?.distance || 0)}</span>
-                    </div>
-                  </div>
-
-                  {mainRoute.alternatives && mainRoute.alternatives.length > 0 && (
-                    <div className="pt-3 border-t border-stone-800/50">
-                      <p className="text-xs text-stone-400">
-                        {mainRoute.alternatives.length} alternative{' '}
-                        {mainRoute.alternatives.length === 1 ? 'route' : 'routes'} available
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+            {mainRoute && (
+              <MonitoringErrorBoundary>
+                <RouteMonitorPanel
+                  route={mainRoute}
+                  onAlert={handleMonitoringAlert}
+                />
+              </MonitoringErrorBoundary>
+            )}
+          </div>
         </div>
-      </div>
-    </ErrorBoundary>
+      </ErrorBoundary>
+      <ProgressOverview />
+    </ProgressProvider>
   );
 }

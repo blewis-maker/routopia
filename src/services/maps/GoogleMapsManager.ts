@@ -13,6 +13,14 @@ import { ACTIVITY_COLORS, getActivityStyle, getTrafficStyle, mapStyles } from '@
 import { RouteVisualizationData, ActivityType, TrafficSegment } from '@/types/maps';
 import GoogleMapsLoader from './GoogleMapsLoader';
 import { Route } from '@/types/route/types';
+import { DirectionsResult } from '@/types/route/types';
+import { 
+  RouteVisualization, 
+  RouteVisualizationSegment,
+  isRouteVisualization 
+} from '@/types/route/visualization';
+import { isValidLatLng } from '@/lib/utils/typeValidation';
+import { MapVisualization } from '@/types/maps/visualization';
 
 export class GoogleMapsManager implements MapServiceInterface {
   private _map: google.maps.Map | null = null;
@@ -143,9 +151,10 @@ export class GoogleMapsManager implements MapServiceInterface {
   };
   private suggestionMarkers: Map<string, google.maps.Marker> = new Map();
   private suggestionOverlays: Set<google.maps.OverlayView> = new Set();
+  private readonly googleMaps: typeof google.maps;
 
   constructor() {
-    // Remove the loader initialization as we'll use GoogleMapsLoader
+    this.googleMaps = google.maps;
   }
 
   async initialize(containerId: string, options?: { 
@@ -279,88 +288,35 @@ export class GoogleMapsManager implements MapServiceInterface {
     });
   }
 
-  async addUserLocationMarker(location: Coordinates): Promise<void> {
-    if (!this._map) return;
-
-    // Remove existing marker and overlay
+  async addUserLocationMarker(location: Coordinates): void {
     if (this.userLocationMarker) {
       this.userLocationMarker.setMap(null);
-      this.userLocationMarker = null;
     }
     if (this.userLocationOverlay) {
       this.userLocationOverlay.setMap(null);
-      this.userLocationOverlay = null;
     }
 
-    // Create marker with a small transparent icon
-    const marker = new google.maps.Marker({
+    // Create user location marker
+    this.userLocationMarker = new google.maps.Marker({
       position: location,
       map: this._map,
       icon: {
         path: google.maps.SymbolPath.CIRCLE,
-        scale: 0,
-        fillOpacity: 0,
-        strokeOpacity: 0
-      }
+        scale: 7, // Increased from 6
+        fillColor: '#10B981',
+        fillOpacity: 0.9,
+        strokeColor: '#4B5563',
+        strokeWeight: 1.5,
+        strokeOpacity: 0.8
+      },
+      zIndex: 2
     });
 
-    // Create custom overlay class
-    class UserLocationOverlay extends google.maps.OverlayView {
-      private div: HTMLDivElement | null = null;
-
-      onAdd(): void {
-        const div = document.createElement('div');
-        div.style.position = 'absolute';
-        div.style.width = '18px';
-        div.style.height = '18px';
-        div.innerHTML = `
-          <div style="position: relative; width: 100%; height: 100%;">
-            <div style="position: absolute; width: 18px; height: 18px; background: #10b981; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);"></div>
-            <div style="position: absolute; width: 18px; height: 18px; background: rgba(16, 185, 129, 0.4); border-radius: 50%; animation: pulse 2s ease-out infinite;"></div>
-          </div>
-        `;
-
-        const style = document.createElement('style');
-        style.textContent = `
-          @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            100% { transform: scale(3); opacity: 0; }
-          }
-        `;
-        document.head.appendChild(style);
-
-        this.div = div;
-        const panes = this.getPanes();
-        panes?.overlayImage.appendChild(div);
-      }
-
-      draw(): void {
-        if (!this.div) return;
-        const overlayProjection = this.getProjection();
-        const position = overlayProjection.fromLatLngToDivPixel(
-          new google.maps.LatLng(location.lat, location.lng)
-        );
-        
-        if (position) {
-          this.div.style.left = (position.x - 9) + 'px';
-          this.div.style.top = (position.y - 9) + 'px';
-        }
-      }
-
-      onRemove(): void {
-        if (this.div) {
-          this.div.parentNode?.removeChild(this.div);
-          this.div = null;
-        }
-      }
-    }
-
-    // Create and add the overlay
-    const overlay = new UserLocationOverlay();
-    overlay.setMap(this._map);
-
-    this.userLocationMarker = marker;
-    this.userLocationOverlay = overlay;
+    // Create pulsing effect
+    this.userLocationOverlay = this.createPulsingMarker(
+      location,
+      '#10B981'
+    );
   }
 
   setCenter(coordinates: Coordinates): void {
@@ -375,63 +331,42 @@ export class GoogleMapsManager implements MapServiceInterface {
 
   async addMarker(
     coordinates: Coordinates,
-    options?: {
-      type?: 'start' | 'end' | 'waypoint';
-      draggable?: boolean;
+    options: {
+      type?: 'start' | 'end';
+      icon?: string;
       onClick?: () => void;
-      onDragEnd?: (coords: Coordinates) => void;
-    }
-  ): Promise<string> {
-    if (!this._map) throw new Error('Map not initialized');
-
-    // Clear existing marker of the same type
-    if (options?.type === 'start' && this.currentMarkers.start) {
-      this.currentMarkers.start.setMap(null);
-      this.currentMarkers.start = null;
-    } else if (options?.type === 'end' && this.currentMarkers.end) {
-      this.currentMarkers.end.setMap(null);
-      this.currentMarkers.end = null;
-    }
-
-    const marker = new google.maps.Marker({
+    } = {}
+  ): string {
+    const markerId = `marker-${Date.now()}`;
+    
+    const markerOptions: google.maps.MarkerOptions = {
       position: coordinates,
       map: this._map,
-      icon: this.getMarkerIcon(options?.type),
-      draggable: options?.draggable
-    });
+      draggable: false,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 4.25,
+        fillColor: this.getMarkerColor(options.type),
+        fillOpacity: 0.9,
+        strokeColor: '#374151',
+        strokeWeight: 1.8,
+        strokeOpacity: 0.9
+      }
+    };
 
-    // Store marker reference
-    if (options?.type === 'start') {
-      this.currentMarkers.start = marker;
-    } else if (options?.type === 'end') {
-      this.currentMarkers.end = marker;
+    const marker = new google.maps.Marker(markerOptions);
+    this.markers.set(markerId, marker);
+
+    // Add pulsing effect for start/end markers
+    if (options.type === 'start' || options.type === 'end') {
+      const pulseOverlay = this.createPulsingMarker(
+        coordinates,
+        this.getMarkerColor(options.type)
+      );
+      this.currentMarkers.overlays.add(pulseOverlay);
     }
 
-    // Add pulsing effect
-    if (options?.type === 'start' || options?.type === 'end') {
-      const color = options.type === 'start' ? '#10b981' : '#8B5CF6';
-      const overlay = this.createPulsingMarker(coordinates, color);
-      this.currentMarkers.overlays.add(overlay);
-    }
-
-    // Add event listeners
-    if (options?.onClick) {
-      marker.addListener('click', options.onClick);
-    }
-
-    if (options?.onDragEnd) {
-      marker.addListener('dragend', () => {
-        const position = marker.getPosition();
-        if (position) {
-          options.onDragEnd?.({
-            lat: position.lat(),
-            lng: position.lng()
-          });
-        }
-      });
-    }
-
-    return `marker-${Date.now()}`;
+    return markerId;
   }
 
   removeMarker(markerId: string): void {
@@ -472,7 +407,7 @@ export class GoogleMapsManager implements MapServiceInterface {
         });
       });
 
-      // Draw alternative routes first
+      // Draw alternative routes first with subtle styling
       if (options.showAlternatives && result.routes.length > 1) {
         result.routes.slice(1).forEach((_, index) => {
           const alternativeRenderer = new google.maps.DirectionsRenderer({
@@ -483,7 +418,7 @@ export class GoogleMapsManager implements MapServiceInterface {
             zIndex: 1,
             polylineOptions: {
               strokeColor: '#FDE68A',
-              strokeOpacity: 0.6,
+              strokeOpacity: 0.35,
               strokeWeight: 3
             }
           });
@@ -491,19 +426,33 @@ export class GoogleMapsManager implements MapServiceInterface {
         });
       }
 
-      // Then draw main route on top
+      // Draw main route with outline effect
       this.directionsRenderer = new google.maps.DirectionsRenderer({
         map: this._map,
         directions: result,
         routeIndex: 0,
         suppressMarkers: true,
-        zIndex: 2, // Higher z-index for main route
+        zIndex: 2,
         polylineOptions: {
-          strokeColor: '#A78BFA', // Main route in purple
-          strokeOpacity: 0.75,
-          strokeWeight: 4
+          path: result.routes[0].overview_path,
+          strokeColor: '#374151',
+          strokeOpacity: 0.35,
+          strokeWeight: 5
         }
       });
+
+      // Draw the main colored line on top
+      const mainRoute = new google.maps.Polyline({
+        path: result.routes[0].overview_path,
+        strokeColor: '#8B5CF6',
+        strokeOpacity: 0.8,
+        strokeWeight: 3,
+        zIndex: 3,
+        map: this._map
+      });
+
+      // Store reference for cleanup
+      this.currentRoute = mainRoute;
 
       // Add markers
       await this.addMarker(route.waypoints.start, { type: 'start' });
@@ -618,24 +567,43 @@ export class GoogleMapsManager implements MapServiceInterface {
     this.alternativeRoutes.forEach(route => route.setMap(null));
     this.alternativeRoutes = [];
 
-    // Clear markers
-    this.currentMarkers.start?.setMap(null);
-    this.currentMarkers.end?.setMap(null);
-    this.currentMarkers.start = null;
-    this.currentMarkers.end = null;
+    // Clear all markers
+    this.markers.forEach(marker => marker.setMap(null));
+    this.markers.clear();
 
-    // Clear overlays
+    // Clear current markers
+    if (this.currentMarkers.start) {
+      this.currentMarkers.start.setMap(null);
+      this.currentMarkers.start = null;
+    }
+    if (this.currentMarkers.end) {
+      this.currentMarkers.end.setMap(null);
+      this.currentMarkers.end = null;
+    }
+
+    // Clear all overlays
     this.currentMarkers.overlays.forEach(overlay => overlay.setMap(null));
     this.currentMarkers.overlays.clear();
 
     // Clear suggestion markers
-    this.clearSuggestionMarkers();
+    this.suggestionMarkers.forEach(marker => marker.setMap(null));
+    this.suggestionMarkers.clear();
+
+    // Clear suggestion overlays
+    this.suggestionOverlays.forEach(overlay => overlay.setMap(null));
+    this.suggestionOverlays.clear();
 
     // Clear directions renderer
     if (this.directionsRenderer) {
       this.directionsRenderer.setMap(null);
       this.directionsRenderer = null;
     }
+
+    // Clear alternative renderers
+    this.alternativeRenderers.forEach(renderer => {
+      renderer.setMap(null);
+    });
+    this.alternativeRenderers = [];
   }
 
   public async setTrafficLayer(visible: boolean): Promise<void> {
@@ -817,21 +785,22 @@ export class GoogleMapsManager implements MapServiceInterface {
 
   private createPulsingMarker(coordinates: Coordinates, color: string): google.maps.OverlayView {
     class PulsingMarkerOverlay extends google.maps.OverlayView {
+      private div: HTMLDivElement | null = null;
+
       onAdd(): void {
         const div = document.createElement('div');
         div.style.position = 'absolute';
-        div.style.width = '14px';
-        div.style.height = '14px';
+        div.style.width = '10px';
+        div.style.height = '10px';
 
-        // Make both pulses equally bright
-        const glowIntensity = '20px';  // Increased from 15px/10px
-        const pulseOpacity = '1';      // Increased from 0.9/0.7
-        const pulseColor = color === '#8B5CF6' ? '#A78BFA' : color; // Use lighter purple for end marker pulse
+        const glowIntensity = '14px';
+        const pulseOpacity = '1';
+        const pulseColor = color === '#EC4899' ? '#F472B6' : color;
 
         div.innerHTML = `
           <div style="position: relative; width: 100%; height: 100%;">
-            <div style="position: absolute; width: 14px; height: 14px; background: ${color}; border: 1px solid white; border-radius: 50%; box-shadow: 0 0 ${glowIntensity} ${pulseColor}"></div>
-            <div style="position: absolute; width: 14px; height: 14px; background: ${pulseColor}40; border-radius: 50%; animation: pulse-${color.replace('#', '')} 2s ease-out infinite;"></div>
+            <div style="position: absolute; width: 10px; height: 10px; background: ${color}; border: 1.8px solid #374151; border-radius: 50%; box-shadow: 0 0 ${glowIntensity} ${pulseColor}"></div>
+            <div style="position: absolute; width: 10px; height: 10px; background: ${pulseColor}40; border-radius: 50%; animation: pulse-${color.replace('#', '')} 2s ease-out infinite;"></div>
           </div>
         `;
 
@@ -839,8 +808,8 @@ export class GoogleMapsManager implements MapServiceInterface {
         style.textContent = `
           @keyframes pulse-${color.replace('#', '')} {
             0% { transform: scale(1); opacity: ${pulseOpacity}; }
-            70% { transform: scale(2.5); opacity: 0.5; }
-            100% { transform: scale(3); opacity: 0; }
+            70% { transform: scale(2.0625); opacity: 0.5; }
+            100% { transform: scale(2.475); opacity: 0; }
           }
         `;
         document.head.appendChild(style);
@@ -858,8 +827,8 @@ export class GoogleMapsManager implements MapServiceInterface {
         );
         
         if (position) {
-          this.div.style.left = (position.x - 7) + 'px';
-          this.div.style.top = (position.y - 7) + 'px';
+          this.div.style.left = (position.x - 5) + 'px';
+          this.div.style.top = (position.y - 5) + 'px';
         }
       }
 
@@ -871,7 +840,7 @@ export class GoogleMapsManager implements MapServiceInterface {
       }
     }
 
-    const overlay = new PulsingMarkerOverlay(coordinates);
+    const overlay = new PulsingMarkerOverlay();
     overlay.setMap(this._map);
     return overlay;
   }
@@ -1195,46 +1164,72 @@ export class GoogleMapsManager implements MapServiceInterface {
     }
   }
 
-  public async visualizeRoute(route: Route): Promise<void> {
+  public async visualizeRoute(route: MapVisualization): Promise<void> {
     if (!this._map) throw new Error('Map not initialized');
-    
+
     // Clear existing route
-    this.clearRoute();
+    this.clearVisualization();
 
-    // Create path from route segments
-    const path = route.segments.flatMap(segment => [
-      { lat: segment.startPoint.latitude, lng: segment.startPoint.longitude },
-      { lat: segment.endPoint.latitude, lng: segment.endPoint.longitude }
-    ]);
+    try {
+      // Draw main route
+      const mainPolyline = new google.maps.Polyline({
+        path: route.mainRoute.coordinates,
+        geodesic: true,
+        strokeColor: this.getSegmentColor(route.mainRoute),
+        strokeOpacity: 0.8,
+        strokeWeight: 4,
+        map: this._map
+      });
+      this.activeSegments.push(mainPolyline);
 
-    // Create and render the route polyline
-    this.currentRoute = new google.maps.Polyline({
-      path,
-      geodesic: true,
-      strokeColor: '#10b981', // Teal color matching the theme
-      strokeOpacity: 0.8,
-      strokeWeight: 4,
-      map: this._map
-    });
+      // Draw alternatives if they exist
+      if (route.alternatives?.length) {
+        route.alternatives.forEach(alt => {
+          const altPolyline = new google.maps.Polyline({
+            path: alt.coordinates,
+            geodesic: true,
+            strokeColor: this.getSegmentColor(alt),
+            strokeOpacity: 0.6,
+            strokeWeight: 3,
+            map: this._map
+          });
+          this.alternativeRoutes.push(altPolyline);
+        });
+      }
 
-    // Add markers for start and end points if needed
-    const startPoint = path[0];
-    const endPoint = path[path.length - 1];
+      // Add waypoints if they exist
+      if (route.waypoints) {
+        await this.addWaypoints(route.waypoints);
+      }
 
-    await this.addMarker(startPoint, { type: 'start' });
-    await this.addMarker(endPoint, { type: 'end' });
+      // Show traffic data if available
+      if (route.mainRoute.trafficData) {
+        await this.visualizeTrafficData(route.mainRoute.trafficData);
+      }
 
-    // Fit bounds to show the entire route
-    const bounds = new google.maps.LatLngBounds();
-    path.forEach(point => bounds.extend(point));
-    this._map.fitBounds(bounds);
+      // Fit bounds to show entire route
+      this.fitRouteBounds(route);
+    } catch (error) {
+      console.error('Error visualizing route:', error);
+      throw error;
+    }
+  }
+
+  private getSegmentColor(segment: RouteVisualizationSegment): string {
+    const colors = {
+      road: '#4285F4',
+      trail: '#34A853',
+      ski: '#EA4335',
+      connection: '#FBBC05'
+    };
+    return colors[segment.type] || colors.road;
   }
 
   public async generateRoute(
     start: Coordinates,
     end: Coordinates,
     options?: {
-      waypoints?: Coordinates[];
+      waypoints?: google.maps.DirectionsWaypoint[];
       activityType?: 'car' | 'bike' | 'walk';
       alternatives?: boolean;
     }
@@ -1243,16 +1238,13 @@ export class GoogleMapsManager implements MapServiceInterface {
       throw new Error('Map or DirectionsService not initialized');
     }
 
-    // Clear existing route and markers
-    this.clearRoute();
-
-    console.log('Generating route with mode:', options?.activityType || 'car'); // Debug log
-
     const request: google.maps.DirectionsRequest = {
       origin: start,
       destination: end,
+      waypoints: options?.waypoints,
+      optimizeWaypoints: true,
       travelMode: this.getTravelMode(options?.activityType || 'car'),
-      provideRouteAlternatives: true
+      provideRouteAlternatives: options?.alternatives
     };
 
     try {
@@ -1405,5 +1397,225 @@ export class GoogleMapsManager implements MapServiceInterface {
     this.suggestionMarkers.clear();
     this.suggestionOverlays.forEach(overlay => overlay.setMap(null));
     this.suggestionOverlays.clear();
+  }
+
+  private getMarkerColor(type?: 'start' | 'end' | 'waypoint'): string {
+    switch (type) {
+      case 'start':
+        return '#10B981'; // emerald-500
+      case 'end':
+        return '#EC4899'; // pink-500
+      case 'waypoint':
+        return '#6366F1'; // indigo-500
+      default:
+        return '#6B7280'; // stone-500
+    }
+  }
+
+  async getDirections(params: {
+    origin: string | google.maps.LatLng;
+    destination: string | google.maps.LatLng;
+    mode: 'driving' | 'walking' | 'bicycling' | 'transit';
+  }): Promise<{
+    path: google.maps.LatLng[];
+    distance: number;
+    duration: number;
+    polyline: string;
+  }> {
+    const directionsService = new this.googleMaps.DirectionsService();
+    
+    try {
+      const result = await directionsService.route({
+        origin: params.origin,
+        destination: params.destination,
+        travelMode: params.mode.toUpperCase() as google.maps.TravelMode
+      });
+
+      if (!result.routes[0]) {
+        throw new Error('No route found');
+      }
+
+      const route = result.routes[0].legs[0];
+      const path = this.googleMaps.geometry.encoding.decodePath(
+        result.routes[0].overview_polyline.points
+      );
+
+      return {
+        path: path.map(point => ({ lat: point.lat(), lng: point.lng() })),
+        distance: route.distance?.value || 0,
+        duration: route.duration?.value || 0,
+        polyline: result.routes[0].overview_polyline.points
+      };
+    } catch (error) {
+      console.error('Google Maps Directions error:', error);
+      throw new Error('Failed to get directions');
+    }
+  }
+
+  async getTrafficData(bounds: MapBounds): Promise<TrafficData> {
+    if (!this.map) throw new Error('Map not initialized');
+    
+    const response = await this.client.distancematrix.getTrafficData({
+      bounds: {
+        north: bounds.north,
+        south: bounds.south,
+        east: bounds.east,
+        west: bounds.west
+      }
+    });
+
+    return {
+      timestamp: new Date(),
+      congestionLevel: this.getCongestionLevel(response.congestion_value),
+      averageSpeed: response.average_speed,
+      incidents: response.incidents.map(this.transformIncident),
+      segments: response.segments.map(this.transformSegment)
+    };
+  }
+
+  async getTrafficFlow(location: LatLng, radius: number): Promise<TrafficFlow> {
+    if (!this.map) throw new Error('Map not initialized');
+
+    const response = await this.client.roads.getTrafficFlow({
+      location: { lat: location.lat, lng: location.lng },
+      radius
+    });
+
+    return {
+      location,
+      timestamp: new Date(),
+      speed: response.speed,
+      density: response.density,
+      direction: response.direction,
+      confidence: response.confidence,
+      history: response.history?.map(h => ({
+        timestamp: new Date(h.timestamp),
+        speed: h.speed,
+        density: h.density
+      }))
+    };
+  }
+
+  async getAlternativeRoutes(
+    start: LatLng,
+    end: LatLng,
+    options?: {
+      departureTime?: Date;
+      avoidTolls?: boolean;
+      avoidHighways?: boolean;
+    }
+  ): Promise<Array<{
+    route: LatLng[];
+    duration: number;
+    distance: number;
+    trafficDensity: number;
+  }>> {
+    if (!this.map) throw new Error('Map not initialized');
+
+    const response = await this.client.directions.route({
+      origin: { lat: start.lat, lng: start.lng },
+      destination: { lat: end.lat, lng: end.lng },
+      alternatives: true,
+      ...options
+    });
+
+    return response.routes.map(route => ({
+      route: this.decodePolyline(route.overview_polyline.points),
+      duration: route.legs[0].duration_in_traffic.value,
+      distance: route.legs[0].distance.value,
+      trafficDensity: this.calculateTrafficDensity(route)
+    }));
+  }
+
+  private getCongestionLevel(value: number): 'low' | 'moderate' | 'high' {
+    if (value < 0.3) return 'low';
+    if (value < 0.7) return 'moderate';
+    return 'high';
+  }
+
+  private transformIncident(incident: google.maps.TrafficIncident): TrafficIncident {
+    return {
+      id: incident.id,
+      type: this.getIncidentType(incident.type),
+      location: {
+        lat: incident.location.lat(),
+        lng: incident.location.lng()
+      },
+      description: incident.description,
+      severity: this.getSeverityLevel(incident.severity),
+      startTime: new Date(incident.startTime),
+      endTime: incident.endTime ? new Date(incident.endTime) : undefined,
+      impact: {
+        radius: incident.impactRadius,
+        affectedRoads: incident.affectedRoads || [],
+        delay: incident.delay || 0
+      }
+    };
+  }
+
+  private transformSegment(segment: google.maps.TrafficSegment): TrafficSegment {
+    return {
+      start: {
+        lat: segment.start.lat(),
+        lng: segment.start.lng()
+      },
+      end: {
+        lat: segment.end.lat(),
+        lng: segment.end.lng()
+      },
+      congestionLevel: this.getCongestionLevel(segment.congestionValue),
+      speed: segment.speed,
+      duration: segment.duration,
+      length: segment.length,
+      confidence: segment.confidence
+    };
+  }
+
+  private calculateTrafficDensity(route: google.maps.DirectionsRoute): number {
+    let totalDensity = 0;
+    let totalDistance = 0;
+
+    route.legs.forEach(leg => {
+      leg.steps.forEach(step => {
+        const distance = step.distance.value;
+        const durationInTraffic = step.duration_in_traffic?.value || step.duration.value;
+        const normalDuration = step.duration.value;
+        
+        // Calculate density based on the ratio of traffic duration to normal duration
+        const density = durationInTraffic / normalDuration;
+        totalDensity += density * distance;
+        totalDistance += distance;
+      });
+    });
+
+    return totalDistance > 0 ? totalDensity / totalDistance : 1;
+  }
+
+  private getIncidentType(type: number): 'accident' | 'construction' | 'closure' | 'event' {
+    const types = {
+      1: 'accident',
+      2: 'construction',
+      3: 'closure',
+      4: 'event'
+    };
+    return types[type as keyof typeof types] || 'event';
+  }
+
+  private getSeverityLevel(severity: number): 'low' | 'moderate' | 'high' {
+    if (severity <= 3) return 'low';
+    if (severity <= 7) return 'moderate';
+    return 'high';
+  }
+
+  private decodePolyline(encoded: string): LatLng[] {
+    const poly = new google.maps.geometry.encoding.decodePath(encoded);
+    return poly.map(point => ({
+      lat: point.lat(),
+      lng: point.lng()
+    }));
+  }
+
+  public isInitialized(): boolean {
+    return this._map !== null;
   }
 } 

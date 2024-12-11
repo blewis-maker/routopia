@@ -1,27 +1,17 @@
-import { Redis } from 'ioredis';
+import { redisService } from '@/services/cache/RedisService';
 
-const getRedisClient = () => {
-  const redis = new Redis({
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-    password: process.env.REDIS_PASSWORD,
-    tls: process.env.REDIS_TLS === 'true' ? {} : undefined
-  });
+// Export for backward compatibility
+export const redis = redisService.getClient();
+export default redis;
 
-  redis.on('error', (err) => console.error('Redis Client Error', err));
-  redis.on('connect', () => console.log('Redis Client Connected'));
-
-  return redis;
-};
-
-export const redis = getRedisClient();
-
+// Helper functions
 export const cacheKey = (userId: string, type: 'start' | 'dest') => 
   `user:${userId}:recent:${type}`;
 
 export async function getCachedLocations(userId: string, type: 'start' | 'dest') {
-  const key = cacheKey(userId, type);
-  const cached = await redis.get(key);
+  if (typeof window !== 'undefined') return null;
+  
+  const cached = await redisService.get(cacheKey(userId, type));
   return cached ? JSON.parse(cached) : null;
 }
 
@@ -30,6 +20,30 @@ export async function setCachedLocations(
   type: 'start' | 'dest', 
   locations: any[]
 ) {
-  const key = cacheKey(userId, type);
-  await redis.setex(key, 3600, JSON.stringify(locations)); // Cache for 1 hour
-} 
+  if (typeof window !== 'undefined') return;
+  
+  await redisService.set(
+    cacheKey(userId, type),
+    JSON.stringify(locations),
+    3600
+  );
+}
+
+// Use feature flags to control Redis usage
+export const redisConfig = {
+  development: {
+    enabled: process.env.REDIS_ENABLED === 'true', // Explicit control
+    // ... other config
+  }
+};
+
+// Graceful fallbacks when Redis isn't available
+export class CacheService {
+  async get(key: string) {
+    if (!this.redisService.isAvailable()) {
+      // Fall back to memory cache or return null
+      return this.memoryCache.get(key);
+    }
+    return this.redisService.get(key);
+  }
+}

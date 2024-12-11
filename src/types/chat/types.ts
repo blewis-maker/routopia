@@ -1,13 +1,16 @@
+import { WeatherConditions, ActivityContext } from '@/types/activities';
+
 export interface ChatSuggestion {
   name: string;
-  type: 'attraction' | 'rest' | 'viewpoint';
+  description: string;
+  type: string;
   location: {
     lat: number;
     lng: number;
+    address: string;
+    city?: string;
+    state?: string;
   };
-  description: string;
-  distance?: string;
-  eta?: string;
 }
 
 export interface ChatMessage {
@@ -23,16 +26,19 @@ export interface ChatMessage {
 export interface RouteContext {
   start: string;
   end: string;
-  mode: 'car' | 'bike' | 'walk';
+  mode: string;
   timeOfDay: string;
-  message?: string;
-  weather: {
-    temperature: number;
-    conditions: string;
-    windSpeed: number;
+  message: string;
+  weather: WeatherConditions;
+  activity: ActivityContext;
+  preferences: string[];
+  userId?: string;
+  timeContext: {
+    startTime?: string;
+    preferredArrival?: string;
+    timeOfDay: string;
+    dayOfWeek: number;
   };
-  duration?: number;
-  preferences?: string[];
 }
 
 export interface RouteSuggestions {

@@ -1,17 +1,17 @@
-export interface RouteVisualization {
-  mainRoute: {
-    coordinates: Array<{ lat: number; lng: number }>;
-    distance?: number;
-    duration?: number;
-  };
-  waypoints: {
-    start: { lat: number; lng: number };
-    end: { lat: number; lng: number };
-    via?: Array<{ lat: number; lng: number }>;
-  };
-  alternatives?: Array<{
-    coordinates: Array<{ lat: number; lng: number }>;
-    distance?: number;
-    duration?: number;
+import { LatLng } from '../shared';
+
+export interface TrafficData {
+  congestionLevel: 'low' | 'moderate' | 'heavy';
+  incidents?: string[];
+  segments?: Array<{
+    start: LatLng;
+    end: LatLng;
+    congestion: 'low' | 'moderate' | 'heavy';
+    speed?: number;
+    delay?: number;
   }>;
-} 
+}
+
+// Re-export all map types
+export * from './traffic';
+export * from './visualization'; 

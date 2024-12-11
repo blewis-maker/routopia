@@ -1,10 +1,9 @@
 'use client';
 
-import { signIn } from 'next-auth/react';
 import { useState } from 'react';
+import { signIn } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { Dialog } from '@headlessui/react';
-import Image from 'next/image';
-import Logo from '@/assets/icons/routopia-logo.png';
 
 interface SignUpModalProps {
   isOpen: boolean;
@@ -12,16 +11,21 @@ interface SignUpModalProps {
 }
 
 export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
 
   const handleGoogleSignIn = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      await signIn('google', { 
-        callbackUrl: '/dashboard',
-        redirect: true,
+      const result = await signIn('google', { 
+        callbackUrl: '/route-planner',
+        redirect: false 
       });
+      
+      if (result?.ok) {
+        router.push('/route-planner');
+      }
     } catch (error) {
       console.error('Google sign in error:', error);
     } finally {
@@ -31,7 +35,22 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Implement email sign in logic
+    setIsLoading(true);
+    try {
+      const result = await signIn('email', {
+        email,
+        callbackUrl: '/route-planner',
+        redirect: false
+      });
+      
+      if (result?.ok) {
+        router.push('/route-planner');
+      }
+    } catch (error) {
+      console.error('Email sign in error:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -91,9 +110,10 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
             />
             <button
               type="submit"
+              disabled={isLoading}
               className="w-full bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl p-3 
                        font-medium hover:from-teal-400 hover:to-emerald-400 transition-all duration-200
-                       shadow-lg shadow-teal-500/20"
+                       shadow-lg shadow-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Continue with Email
             </button>
@@ -102,7 +122,10 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
           <div className="mt-6 text-center text-sm text-stone-500">
             <p>
               Already have an account?{' '}
-              <button onClick={() => signIn()} className="text-teal-500 hover:text-teal-400 transition-colors">
+              <button 
+                onClick={() => signIn(undefined, { callbackUrl: '/route-planner' })} 
+                className="text-teal-500 hover:text-teal-400 transition-colors"
+              >
                 Log In
               </button>
             </p>

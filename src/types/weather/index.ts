@@ -175,8 +175,12 @@ export interface WeatherPattern {
 }
 
 export interface WeatherAlert {
+  title: string;
   type: string;
   severity: 'low' | 'moderate' | 'high' | 'severe';
+  message: string;
+  issued: Date;
+  expires: Date;
   location: GeoPoint;
   timing: {
     start: string;
@@ -198,4 +202,46 @@ export type WeatherTrend = {
   trend: 'increasing' | 'decreasing' | 'stable' | 'fluctuating';
   confidence: number;
   seasonalAdjusted: boolean;
-}; 
+};
+
+export interface WeatherData {
+  temperature: number;
+  condition: string;
+  windSpeed: number;
+  humidity: number;
+  feelsLike: number;
+  visibility: number;
+  precipitation: number;
+  updatedAt: Date;
+}
+
+export interface DailyForecast {
+  date: Date;
+  maxTemp: number;
+  minTemp: number;
+  condition: string;
+  chanceOfRain: number;
+  sunrise: string;
+  sunset: string;
+}
+
+export interface WeatherForecast {
+  daily: DailyForecast[];
+}
+
+export interface WeatherAlert {
+  title: string;
+  severity: 'low' | 'medium' | 'high' | 'severe';
+  message: string;
+  issued: Date;
+  expires: Date;
+}
+
+export type WeatherCondition = 
+  | 'clear'
+  | 'cloudy'
+  | 'rain'
+  | 'snow'
+  | 'storm'
+  | 'fog'
+  | 'windy'; 
