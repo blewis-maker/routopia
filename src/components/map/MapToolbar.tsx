@@ -4,6 +4,9 @@ import { useState, useRef, useMemo } from 'react';
 import { Sun, Moon, Satellite, Layers } from 'lucide-react';
 import { useOnClickOutside } from '@/hooks/useOnClickOutside';
 import { HybridMapService } from '@/services/maps/HybridMapService';
+import { Button } from '@/components/ui/Button';
+import { cn } from '@/lib/utils';
+import { baseStyles, roundedStyles, glassStyles } from '@/styles/components';
 
 interface MapToolbarProps {
   mapIntegration: HybridMapService | null;
@@ -66,39 +69,40 @@ export function MapToolbar({ mapIntegration }: MapToolbarProps) {
   return (
     <div className="absolute top-4 right-4 z-10" ref={menuRef}>
       <div className="relative">
-        <button
+        <Button
+          variant="glass"
+          size="md"
           onClick={() => setIsOpen(!isOpen)}
-          className={`p-2 bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg border border-stone-800/50 
-            text-stone-400 hover:text-stone-200 transition-all duration-200 hover:scale-105
-            ${isChangingStyle ? 'opacity-50' : ''}`}
+          disabled={isChangingStyle}
           aria-label="Map Style Options"
         >
           <Layers className="w-5 h-5" />
-        </button>
+        </Button>
 
         {isOpen && (
-          <div 
-            className="absolute top-full right-0 mt-2 bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg 
-              border border-stone-800/50 overflow-hidden flex flex-col gap-1 p-1"
-            role="menu"
-          >
+          <div className={cn(
+            baseStyles.card,
+            roundedStyles.lg,
+            glassStyles.dark,
+            'absolute top-full right-0 mt-2 p-1 flex flex-col gap-1 min-w-[120px]'
+          )}>
             {styleButtons.map(({ type, icon: Icon, activeColor, hoverColor, label }) => (
-              <button
+              <Button
                 key={type}
+                variant="ghost"
+                size="sm"
                 onClick={() => handleMapTypeChange(type)}
-                className={`flex items-center justify-center px-3 py-2 text-sm transition-all 
-                  duration-200 hover:scale-105 rounded-md 
-                  ${isChangingStyle ? 'opacity-50 cursor-wait' : ''} 
-                  ${currentStyle === type 
-                    ? `${activeColor} bg-stone-800/50` 
+                disabled={isChangingStyle}
+                className={cn(
+                  'flex items-center justify-center w-full',
+                  currentStyle === type 
+                    ? `${activeColor} bg-stone-800` 
                     : `text-stone-400 ${hoverColor}`
-                  }`}
+                )}
                 aria-label={label}
-                role="menuitem"
-                aria-disabled={isChangingStyle}
               >
                 <Icon className="w-4 h-4" />
-              </button>
+              </Button>
             ))}
           </div>
         )}

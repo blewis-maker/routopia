@@ -6,6 +6,8 @@
 /* Theme Base Layer */
 @layer base {
   :root {
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    
     --color-primary: theme('colors.teal.400');
     --color-primary-dark: theme('colors.teal.500');
     --color-primary-light: theme('colors.teal.300');

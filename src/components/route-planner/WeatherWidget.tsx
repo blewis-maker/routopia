@@ -1,5 +1,7 @@
 import { Cloud, CloudRain, CloudSnow, Sun, Wind, Droplets } from 'lucide-react';
 import { WeatherData } from '@/types/weather';
+import { cn } from '@/lib/utils';
+import { baseStyles, roundedStyles, glassStyles } from '@/styles/components';
 
 interface WeatherWidgetProps {
   data: WeatherData;
@@ -24,9 +26,14 @@ export function WeatherWidget({ data }: WeatherWidgetProps) {
   };
 
   return (
-    <div className="bg-[#1B1B1B]/95 backdrop-blur-sm rounded-lg border border-stone-800/50">
+    <div className={cn(
+      baseStyles.card,
+      roundedStyles.lg,
+      glassStyles.dark,
+      'px-4 py-2 flex items-center gap-3'
+    )}>
+      {/* Weather info */}
       <div className="flex flex-col px-4 py-2">
-        {/* Weather info */}
         <div className="flex items-center gap-4">
           {/* Weather Icon */}
           <div className="flex items-center">

@@ -1,22 +1,22 @@
 /* Typography styles */
 h1, .h1 {
-  @apply text-4xl font-bold font-montserrat;
+  @apply text-4xl font-bold;
 }
 
 h2, .h2 {
-  @apply text-3xl font-bold font-montserrat;
+  @apply text-3xl font-bold;
 }
 
 h3, .h3 {
-  @apply text-2xl font-semibold font-montserrat;
+  @apply text-2xl font-semibold;
 }
 
 h4, .h4 {
-  @apply text-xl font-semibold font-montserrat;
+  @apply text-xl font-semibold;
 }
 
 p {
-  @apply text-base font-inter;
+  @apply text-base;
 }
 
 /* Text utilities */

@@ -1,7 +1,7 @@
 import mapboxgl from 'mapbox-gl';
 import { GoogleMapsManager } from './GoogleMapsManager';
 import { MapboxStyleManager } from './mapbox-custom-styles';
-import { Coordinates, MarkerOptions } from './MapServiceInterface';
+import { Coordinates, MarkerOptions } from '@/types/maps/interfaces';
 import { RouteVisualization } from '@/types/route/visualization';
 
 export class HybridMapService {

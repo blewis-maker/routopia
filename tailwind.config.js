@@ -16,10 +16,7 @@ module.exports = {
         text: colors.text,
       },
       fontFamily: {
-        montserrat: typography.fonts.secondary,
-        inter: typography.fonts.primary,
-        sans: typography.fonts.primary,
-        mono: typography.fonts.mono,
+        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
       },
       animation: {
         'bounce-slow': 'bounce 2s infinite',
@@ -32,8 +29,30 @@ module.exports = {
           '100%': { backgroundPosition: '0% 50%' },
         },
       },
+      borderRadius: {
+        DEFAULT: '0.5rem'
+      }
     },
   },
-  plugins: [],
+  plugins: [
+    function({ addComponents }) {
+      addComponents({
+        '.btn': {
+          '@apply relative isolate overflow-hidden transition-all duration-200': {},
+          '&:before': {
+            content: '""',
+            '@apply absolute inset-0 z-[-1]': {},
+          }
+        },
+        '.glass-panel': {
+          '@apply relative isolate overflow-hidden backdrop-blur-sm': {},
+          '&:before': {
+            content: '""',
+            '@apply absolute inset-0 z-[-1]': {},
+          }
+        }
+      });
+    }
+  ]
 };
 

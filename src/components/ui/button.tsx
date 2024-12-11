@@ -1,40 +1,63 @@
 "use client"
 
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "@/utils/cn"
+import { forwardRef } from 'react';
+import { baseStyles, roundedStyles, glassStyles } from '@/styles/components';
+import { cn } from '@/lib/utils';
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-  {
-    variants: {
-      variant: {
-        primary: "bg-teal-600 text-white hover:bg-teal-500",
-        secondary: "bg-stone-800 text-white hover:bg-stone-700",
-        outline: "border border-stone-700 hover:bg-stone-800",
-      },
-      size: {
-        sm: "h-9 px-3 text-sm",
-        md: "h-10 px-4 text-base",
-        lg: "h-11 px-8 text-lg",
-      },
-    },
-    defaultVariants: {
-      variant: "primary",
-      size: "md",
-    },
-  }
-)
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'solid' | 'outline' | 'ghost' | 'glass';
+  size?: 'sm' | 'md' | 'lg';
+  rounded?: keyof typeof roundedStyles;
+  glass?: boolean;
+  isLoading?: boolean;
+}
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
+  className,
+  variant = 'solid',
+  size = 'md',
+  rounded = 'lg',
+  glass = false,
+  isLoading = false,
+  children,
+  ...props
+}, ref) => {
+  const variants = {
+    solid: 'bg-teal-500 hover:bg-teal-600 text-white',
+    outline: 'border border-stone-800 hover:bg-stone-800/10',
+    ghost: 'hover:bg-stone-800/10',
+    glass: cn(glassStyles.dark, 'text-stone-400 hover:text-stone-200')
+  };
 
-export function Button({ className, variant, size, ...props }: ButtonProps) {
+  const sizes = {
+    sm: 'px-3 py-1.5 text-sm',
+    md: 'px-4 py-2',
+    lg: 'px-6 py-3 text-lg'
+  };
+
   return (
     <button
-      className={cn(buttonVariants({ variant, size, className }))}
+      ref={ref}
+      className={cn(
+        baseStyles.button,
+        variants[variant],
+        sizes[size],
+        roundedStyles[rounded],
+        glass && glassStyles.dark,
+        isLoading && 'opacity-50 cursor-wait',
+        className
+      )}
+      disabled={isLoading || props.disabled}
       {...props}
-    />
-  )
-}
+    >
+      <span className="relative z-10 flex items-center justify-center gap-2">
+        {isLoading && (
+          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        )}
+        {children}
+      </span>
+    </button>
+  );
+});
+
+Button.displayName = 'Button';

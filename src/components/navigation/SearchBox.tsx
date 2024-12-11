@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
 import { useGoogleMaps } from '@/contexts/GoogleMapsContext';
 import { Locate, LocateFixed } from 'lucide-react';
+import { baseStyles, roundedStyles, glassStyles, inputStyles } from '@/styles/components';
+import { cn } from '@/lib/utils';
 
 interface SearchResult {
   coordinates: [number, number];
@@ -82,17 +84,27 @@ export function SearchBox({
   };
 
   return (
-    <div className={`relative ${className}`}>
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          value={inputValue}
-          onChange={handleInputChange}
-          placeholder={placeholder}
-          className="w-full px-4 py-2.5 bg-[#1B1B1B]/95 text-stone-200 rounded-lg border border-stone-800/50 focus:outline-none focus:border-emerald-500/30 focus:ring-1 focus:ring-emerald-500/30 focus:ring-offset-0 resize-none placeholder-stone-500 text-sm font-medium"
-        />
-      </div>
+    <div className={cn(
+      baseStyles.card,
+      roundedStyles.lg,
+      glassStyles.dark,
+      'w-full relative',
+      className
+    )}>
+      <input
+        ref={inputRef}
+        type="text"
+        value={inputValue}
+        onChange={handleInputChange}
+        placeholder={placeholder}
+        className={cn(
+          baseStyles.input,
+          'w-full bg-transparent px-4 py-2.5',
+          'text-stone-200 placeholder-stone-500',
+          'text-sm font-medium',
+          inputStyles.dark
+        )}
+      />
 
       {useCurrentLocation && (
         <button

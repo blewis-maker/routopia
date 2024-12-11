@@ -4,6 +4,8 @@ import { Location } from '@/types';
 import { CoreActivityType } from '@/types/activities';
 import { useActivityContext } from '@/contexts/ActivityContext';
 import { MapVisualization } from '@/types/maps/visualization';
+import { Keyboard } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface AIChatProps {
   messages: ChatMessage[];
@@ -124,28 +126,18 @@ export function AIChat({
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Where would you like to go?"
-              className="w-full px-4 py-3 pr-12 bg-stone-900/90 text-stone-100 rounded-lg border border-stone-700/50 focus:outline-none focus:border-emerald-500/30 focus:ring-1 focus:ring-emerald-500/30 resize-none placeholder-stone-500 text-[13px] font-medium"
-              rows={1}
+              className="w-full px-4 py-2.5 bg-[#1B1B1B] text-stone-200 rounded-lg border border-stone-800 focus:outline-none resize-none placeholder-stone-500"
             />
-            <button
-              type="submit"
+            <button 
+              className={cn(
+                "absolute right-3 bottom-3 transition-colors",
+                inputValue.trim() 
+                  ? "text-teal-500 hover:text-teal-400" 
+                  : "text-stone-600"
+              )}
               onClick={handleSubmit}
-              disabled={!inputValue.trim() || isGenerating}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-stone-400 hover:text-stone-300 disabled:opacity-30 disabled:hover:text-stone-400 transition-colors"
             >
-              <svg
-                className="w-4 h-4 rotate-90"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M5 10l7-7m0 0l7 7m-7-7v18"
-                />
-              </svg>
+              <Keyboard className="w-5 h-5" />
             </button>
           </div>
         </div>

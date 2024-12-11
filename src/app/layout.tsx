@@ -8,6 +8,7 @@ import { getServerSession } from 'next-auth';
 import { SessionProvider } from 'next-auth/react';
 import { headers } from 'next/headers';
 import { ThemeProvider } from 'next-themes'
+import { Inter } from 'next/font/google';
 
 export const viewport: Viewport = {
   themeColor: '#0F172A',
@@ -66,7 +67,7 @@ export default async function RootLayout({
   const session = await getServerSession(authOptions);
 
   return (
-    <html lang="en" className={`${montserrat.variable} ${inter.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} font-sans`} suppressHydrationWarning>
       <head>
         <link 
           rel="preload" 

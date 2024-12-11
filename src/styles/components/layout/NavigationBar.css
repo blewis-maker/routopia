@@ -1,29 +1,60 @@
 /* Main Navigation */
 .nav-bar {
-  @apply fixed top-0 left-0 right-0 z-40
-         h-16
-         bg-white/80 dark:bg-neutral-900/80
-         backdrop-blur-sm
-         border-b border-neutral-200 dark:border-neutral-800;
+  @apply fixed top-0 left-0 right-0 z-50
+         bg-stone-900/90 backdrop-blur-md
+         border-b border-stone-800/50;
 }
 
 .nav-bar__container {
-  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  @apply flex items-center justify-between
+         max-w-7xl mx-auto px-4 h-14;
 }
 
 /* Logo Styles */
 .nav-bar__logo {
-  @apply relative;
+  @apply flex items-center gap-2
+         text-stone-200 hover:text-white
+         transition-colors duration-200;
 }
 
-.nav-bar__logo-image {
-  @apply drop-shadow-lg;
-  filter: drop-shadow(0 0 8px rgba(45, 212, 191, 0.3));
+.nav-bar__logo-icon {
+  @apply w-6 h-6;
 }
 
 .nav-bar__logo-text {
-  @apply font-montserrat;
+  @apply font-sans font-semibold;
   text-shadow: 0 0 20px rgba(45, 212, 191, 0.2);
+}
+
+/* Navigation Links */
+.nav-bar__links {
+  @apply flex items-center gap-6;
+}
+
+.nav-link {
+  @apply text-sm text-stone-400 hover:text-stone-200
+         transition-colors duration-200;
+}
+
+.nav-link--active {
+  @apply text-stone-200;
+}
+
+/* User Menu */
+.nav-bar__user-menu {
+  @apply flex items-center gap-4;
+}
+
+.nav-bar__user-button {
+  @apply flex items-center gap-2 px-3 py-1.5
+         text-sm text-stone-400 hover:text-stone-200
+         transition-colors duration-200;
+}
+
+.nav-bar__user-avatar {
+  @apply w-6 h-6 rounded-full bg-stone-800
+         flex items-center justify-center
+         text-xs text-stone-300;
 }
 
 /* Global Scrollbar Hiding */
