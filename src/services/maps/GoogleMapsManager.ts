@@ -23,14 +23,14 @@ import { isValidLatLng } from '@/lib/utils/typeValidation';
 import { MapVisualization } from '@/types/maps/visualization';
 
 export class GoogleMapsManager implements MapServiceInterface {
-  private _map: google.maps.Map | null = null;
-  private markers: Map<string, google.maps.Marker> = new Map();
+  private map: google.maps.Map | null = null;
+  private markers: Map<string, google.maps.marker.AdvancedMarkerElement> = new Map();
   private currentRoute: google.maps.Polyline | null = null;
   private trafficLayer: google.maps.TrafficLayer | null = null;
   private trafficIncidentsLayer: google.maps.visualization.HeatmapLayer | null = null;
   private directionsService: google.maps.DirectionsService | null = null;
   private placesService: google.maps.places.PlacesService | null = null;
-  private userLocationMarker: google.maps.Marker | null = null;
+  private userLocationMarker: google.maps.marker.AdvancedMarkerElement | null = null;
   private userLocationOverlay: google.maps.OverlayView | null = null;
   private alternativeRoutes: google.maps.Polyline[] = [];
   private trafficLayerVisible = false;
@@ -83,11 +83,11 @@ export class GoogleMapsManager implements MapServiceInterface {
       // Dark mode - current style
       {
         elementType: "geometry",
-        stylers: [{ color: "#242f3e" }]
+        stylers: [{ color: "#1B1B1B" }]
       },
       {
         elementType: "labels.text.stroke",
-        stylers: [{ color: "#242f3e" }]
+        stylers: [{ color: "#1B1B1B" }]
       },
       {
         elementType: "labels.text.fill",
@@ -155,6 +155,18 @@ export class GoogleMapsManager implements MapServiceInterface {
 
   constructor() {
     this.googleMaps = google.maps;
+  }
+
+  setMapInstance(map: google.maps.Map) {
+    this.map = map;
+  }
+
+  getMap() {
+    return this.map;
+  }
+
+  cleanup() {
+    this.map = null;
   }
 
   async initialize(containerId: string, options?: { 
@@ -288,35 +300,73 @@ export class GoogleMapsManager implements MapServiceInterface {
     });
   }
 
-  async addUserLocationMarker(location: Coordinates): void {
+  async addUserLocationMarker(location: Coordinates): Promise<void> {
+    if (!this.map) return;
+
+    // Remove existing marker if any
     if (this.userLocationMarker) {
-      this.userLocationMarker.setMap(null);
-    }
-    if (this.userLocationOverlay) {
-      this.userLocationOverlay.setMap(null);
+      this.userLocationMarker.map = null;
     }
 
-    // Create user location marker
-    this.userLocationMarker = new google.maps.Marker({
-      position: location,
-      map: this._map,
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 7, // Increased from 6
-        fillColor: '#10B981',
-        fillOpacity: 0.9,
-        strokeColor: '#4B5563',
-        strokeWeight: 1.5,
-        strokeOpacity: 0.8
-      },
-      zIndex: 2
-    });
+    // Create marker using standard Marker for now (fallback)
+    if (!google.maps.marker?.AdvancedMarkerElement) {
+      const marker = new google.maps.Marker({
+        position: location,
+        map: this.map,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 7,
+          fillColor: '#10B981',
+          fillOpacity: 0.9,
+          strokeColor: '#4B5563',
+          strokeWeight: 1.5,
+          strokeOpacity: 0.8
+        }
+      });
 
-    // Create pulsing effect
-    this.userLocationOverlay = this.createPulsingMarker(
-      location,
-      '#10B981'
-    );
+      // Store as any since we're mixing marker types
+      this.userLocationMarker = marker as any;
+      return;
+    }
+
+    // If AdvancedMarkerElement is available, use it
+    try {
+      const markerView = new google.maps.marker.PinElement({
+        scale: 1.2,
+        background: '#10B981',
+        borderColor: '#4B5563',
+        glyphColor: '#FFFFFF'
+      });
+
+      this.userLocationMarker = new google.maps.marker.AdvancedMarkerElement({
+        map: this.map,
+        position: location,
+        content: markerView.element,
+        title: 'Your Location'
+      });
+
+      if (this.userLocationMarker.content) {
+        const element = this.userLocationMarker.content as HTMLElement;
+        element.style.animation = 'pulse 2s infinite';
+        
+        if (!document.getElementById('marker-pulse-animation')) {
+          const style = document.createElement('style');
+          style.id = 'marker-pulse-animation';
+          style.textContent = `
+            @keyframes pulse {
+              0% { transform: scale(1); opacity: 1; }
+              70% { transform: scale(1.3); opacity: 0.7; }
+              100% { transform: scale(1.5); opacity: 0; }
+            }
+          `;
+          document.head.appendChild(style);
+        }
+      }
+    } catch (error) {
+      console.error('Error creating advanced marker:', error);
+      // Fallback to standard marker if advanced marker fails
+      this.addUserLocationMarker(location);
+    }
   }
 
   setCenter(coordinates: Coordinates): void {
@@ -332,40 +382,34 @@ export class GoogleMapsManager implements MapServiceInterface {
   async addMarker(
     coordinates: Coordinates,
     options: {
-      type?: 'start' | 'end';
-      icon?: string;
+      type?: 'start' | 'end' | 'waypoint';
+      title?: string;
       onClick?: () => void;
     } = {}
-  ): string {
+  ): Promise<string> {
+    if (!this.map) return '';
+
     const markerId = `marker-${Date.now()}`;
     
-    const markerOptions: google.maps.MarkerOptions = {
+    const markerView = new google.maps.marker.PinElement({
+      scale: 1,
+      background: this.getMarkerColor(options.type),
+      borderColor: '#374151',
+      glyphColor: '#FFFFFF'
+    });
+
+    const marker = new google.maps.marker.AdvancedMarkerElement({
+      map: this.map,
       position: coordinates,
-      map: this._map,
-      draggable: false,
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 4.25,
-        fillColor: this.getMarkerColor(options.type),
-        fillOpacity: 0.9,
-        strokeColor: '#374151',
-        strokeWeight: 1.8,
-        strokeOpacity: 0.9
-      }
-    };
+      content: markerView.element,
+      title: options.title
+    });
 
-    const marker = new google.maps.Marker(markerOptions);
-    this.markers.set(markerId, marker);
-
-    // Add pulsing effect for start/end markers
-    if (options.type === 'start' || options.type === 'end') {
-      const pulseOverlay = this.createPulsingMarker(
-        coordinates,
-        this.getMarkerColor(options.type)
-      );
-      this.currentMarkers.overlays.add(pulseOverlay);
+    if (options.onClick) {
+      marker.addListener('click', options.onClick);
     }
 
+    this.markers.set(markerId, marker);
     return markerId;
   }
 

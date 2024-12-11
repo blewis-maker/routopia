@@ -1,29 +1,42 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { loadGoogleMaps } from '@/lib/maps/GoogleMapsLoader';
+import { createContext, useContext, useEffect, useState } from 'react';
+import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
 
 interface GoogleMapsContextType {
   isLoaded: boolean;
   error: Error | null;
 }
 
-const GoogleMapsContext = createContext<GoogleMapsContextType | undefined>(undefined);
+const GoogleMapsContext = createContext<GoogleMapsContextType>({
+  isLoaded: false,
+  error: null
+});
 
-export function GoogleMapsProvider({ children }: { children: ReactNode }) {
+const GOOGLE_MAPS_LIBRARIES = [
+  'places',
+  'geometry',
+  'drawing',
+  'visualization'
+] as const;
+
+export function GoogleMapsProvider({ children }: { children: React.ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    async function initGoogleMaps() {
+    const initGoogleMaps = async () => {
       try {
-        await loadGoogleMaps();
+        const loader = GoogleMapsLoader.getInstance();
+        await loader.load({
+          libraries: GOOGLE_MAPS_LIBRARIES
+        });
         setIsLoaded(true);
       } catch (err) {
         console.error('Failed to load Google Maps:', err);
         setError(err instanceof Error ? err : new Error('Failed to load Google Maps'));
       }
-    }
+    };
 
     initGoogleMaps();
   }, []);
@@ -36,9 +49,5 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
 }
 
 export function useGoogleMaps() {
-  const context = useContext(GoogleMapsContext);
-  if (context === undefined) {
-    throw new Error('useGoogleMaps must be used within a GoogleMapsProvider');
-  }
-  return context;
+  return useContext(GoogleMapsContext);
 } 

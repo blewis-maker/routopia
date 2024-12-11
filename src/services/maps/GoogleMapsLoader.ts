@@ -1,20 +1,24 @@
 import { Loader } from '@googlemaps/js-api-loader';
 
+const GOOGLE_MAPS_LIBRARIES = [
+  'places',
+  'geometry',
+  'drawing',
+  'visualization',
+  'marker'
+] as const;
+
 class GoogleMapsLoader {
   private static instance: GoogleMapsLoader;
   private loader: Loader;
-  private loadPromise: Promise<typeof google> | null = null;
+  private loadPromise: Promise<void> | null = null;
 
   private constructor() {
-    const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
-    if (!googleMapsKey) {
-      throw new Error('Google Maps API key not found');
-    }
-
     this.loader = new Loader({
-      apiKey: googleMapsKey,
+      apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || '',
       version: 'weekly',
-      libraries: ['places', 'visualization', 'geometry']
+      libraries: GOOGLE_MAPS_LIBRARIES,
+      mapIds: [process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || '']
     });
   }
 
@@ -25,7 +29,7 @@ class GoogleMapsLoader {
     return GoogleMapsLoader.instance;
   }
 
-  public async load(): Promise<typeof google> {
+  public async load(): Promise<void> {
     if (!this.loadPromise) {
       this.loadPromise = this.loader.load();
     }

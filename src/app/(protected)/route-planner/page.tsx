@@ -439,11 +439,11 @@ export default function RoutePlannerPage() {
     }
   };
 
-  const handleToolSelect = async (tool: 'ROUTE' | 'SEARCH' | 'TRAFFIC' | 'LAYERS') => {
+  const handleToolSelect = (tool: 'ROUTE' | 'SEARCH' | 'TRAFFIC') => {
     setActiveLayer(tool);
     
     if (tool === 'TRAFFIC' && mapServiceRef.current) {
-      await mapServiceRef.current.setTrafficLayer(true);
+      mapServiceRef.current.setTrafficLayer(true);
     }
   };
 
