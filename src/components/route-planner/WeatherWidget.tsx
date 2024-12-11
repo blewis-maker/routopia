@@ -30,48 +30,31 @@ export function WeatherWidget({ data }: WeatherWidgetProps) {
       baseStyles.card,
       roundedStyles.lg,
       glassStyles.dark,
-      'px-4 py-2 flex items-center gap-3'
+      'px-3 py-1.5 flex items-center gap-2'
     )}>
-      {/* Weather info */}
-      <div className="flex flex-col px-4 py-2">
-        <div className="flex items-center gap-4">
-          {/* Weather Icon */}
-          <div className="flex items-center">
-            {getWeatherIcon()}
-          </div>
+      <div className="flex items-center gap-1.5">
+        {getWeatherIcon()}
+        <span className="text-sm text-stone-200">
+          {data.temperature > 0 ? `${Math.round(data.temperature)}°F` : '--°F'}
+        </span>
+      </div>
 
-          {/* Temperature */}
-          <div className="flex items-center text-stone-200">
-            <span className="text-[19px] font-medium">
-              {data.temperature > 0 ? `${Math.round(data.temperature)}°F` : '--°F'}
-            </span>
-          </div>
+      <div className="flex items-center gap-1.5">
+        <Droplets className="w-4 h-4 text-blue-400" />
+        <span className="text-sm text-stone-200">
+          {data.humidity || '--'}%
+        </span>
+      </div>
 
-          {/* Humidity */}
-          <div className="flex items-center gap-1.5">
-            <Droplets className="w-[17px] h-[17px] text-blue-400" />
-            <span className="text-[14px] text-stone-200">
-              {data.humidity || '--'}%
-            </span>
-          </div>
+      <div className="flex items-center gap-1.5">
+        <Wind className="w-4 h-4 text-stone-400" />
+        <span className="text-sm text-stone-200">
+          {data.windSpeed ? `${Math.round(data.windSpeed)} mph` : '--'}
+        </span>
+      </div>
 
-          {/* Wind Speed */}
-          <div className="flex items-center gap-1.5">
-            <Wind className="w-[17px] h-[17px] text-stone-400" />
-            <span className="text-[14px] text-stone-200">
-              {data.windSpeed ? `${Math.round(data.windSpeed)} mph` : '--'}
-            </span>
-          </div>
-        </div>
-
-        {/* Location text below - centered */}
-        {data.location && (
-          <div className="mt-1 text-center">
-            <span className="text-[11px] text-stone-400 font-medium tracking-wide">
-              {formatLocation(data.location)}
-            </span>
-          </div>
-        )}
+      <div className="text-xs text-stone-400">
+        {formatLocation(data.location)}
       </div>
     </div>
   );

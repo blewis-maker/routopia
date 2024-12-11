@@ -13,7 +13,7 @@
 /* Logo Styles */
 .nav-bar__logo {
   @apply flex items-center gap-2
-         text-stone-200 hover:text-white
+         text-stone-400 hover:text-stone-300
          transition-colors duration-200;
 }
 

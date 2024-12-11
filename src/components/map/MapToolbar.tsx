@@ -84,7 +84,7 @@ export function MapToolbar({ mapIntegration }: MapToolbarProps) {
             baseStyles.card,
             roundedStyles.lg,
             glassStyles.dark,
-            'absolute top-full right-0 mt-2 p-1 flex flex-col gap-1 min-w-[120px]'
+            'absolute top-full right-0 mt-2 p-1 flex flex-col gap-1 w-10'
           )}>
             {styleButtons.map(({ type, icon: Icon, activeColor, hoverColor, label }) => (
               <Button

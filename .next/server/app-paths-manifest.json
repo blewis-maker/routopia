@@ -1,6 +1,6 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
   "/api/weather/route": "app/api/weather/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
   "/(protected)/route-planner/page": "app/(protected)/route-planner/page.js"
 }

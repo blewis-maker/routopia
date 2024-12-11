@@ -145,3 +145,41 @@
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.05); }
 }
+
+@keyframes pulse-analog {
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(45, 212, 191, 0.5);
+  }
+  50% {
+    opacity: 0.3;
+    box-shadow: 0 0 4px rgba(45, 212, 191, 0.3);
+  }
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(45, 212, 191, 0.5);
+  }
+}
+
+.animate-pulse-analog {
+  animation: pulse-analog 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes logo-blink-analog {
+  0% {
+    stroke: #2BAF9D;
+    filter: drop-shadow(0 0 8px rgba(43, 175, 157, 0.7));
+  }
+  50% {
+    stroke: #238C7E;
+    filter: drop-shadow(0 0 4px rgba(43, 175, 157, 0.3));
+  }
+  100% {
+    stroke: #2BAF9D;
+    filter: drop-shadow(0 0 8px rgba(43, 175, 157, 0.7));
+  }
+}
+
+.animate-logo-blink {
+  animation: logo-blink-analog 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

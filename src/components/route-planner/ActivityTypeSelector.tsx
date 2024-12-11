@@ -6,6 +6,7 @@ type ActivityType = 'drive' | 'bike' | 'run' | 'ski' | 'adventure';
 interface ActivityTypeSelectorProps {
   selected: ActivityType;
   onChange: (type: ActivityType) => void;
+  className?: string;
 }
 
 const activities = [
@@ -16,9 +17,9 @@ const activities = [
   { type: 'adventure' as const, icon: Compass, label: 'Adventure' }
 ];
 
-export function ActivityTypeSelector({ selected, onChange }: ActivityTypeSelectorProps) {
+export function ActivityTypeSelector({ selected, onChange, className }: ActivityTypeSelectorProps) {
   return (
-    <div className="flex gap-2 p-2">
+    <div className={cn("flex items-center gap-2", className)}>
       {activities.map(({ type, icon: Icon, label }) => (
         <button
           key={type}
@@ -35,7 +36,7 @@ export function ActivityTypeSelector({ selected, onChange }: ActivityTypeSelecto
           <Icon className="w-5 h-5" />
           
           {/* Tooltip */}
-          <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 
+          <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 
             bg-stone-800 text-stone-200 text-xs rounded opacity-0 group-hover:opacity-100 
             transition-opacity whitespace-nowrap">
             {label}
