@@ -144,7 +144,7 @@ export function SavedRoutesContainer() {
 }
 
 export function SavedRoutes() {
-  const [routes, setRoutes] = useState<SavedRoute[]>([]);
+  const [routes, setRoutes] = useState<Route[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [statusIndicators, setStatusIndicators] = useState<Record<string, RouteStatusIndicator[]>>({});
   const [view, setView] = useState<'list' | 'grid'>('list');
@@ -166,15 +166,21 @@ export function SavedRoutes() {
     email: { enabled: true, recipients: [] },
     slack: { enabled: false, channel: '' }
   });
+  const routeCache = new RouteCache();
 
   const loadSavedRoutes = useCallback(async () => {
     if (!session?.user?.id) return;
 
     try {
-      const routes = await routeCache.getSavedRoutes(session.user.id);
-      setRoutes(routes);
+      const response = await fetch('/api/routes/saved');
+      if (!response.ok) {
+        throw new Error('Failed to fetch routes');
+      }
+      const data = await response.json();
+      setRoutes(data);
     } catch (error) {
       console.error('Error loading saved routes:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load routes');
     } finally {
       setIsLoading(false);
     }
@@ -259,7 +265,7 @@ export function SavedRoutes() {
     }));
   };
 
-  const handleRouteSelect = useCallback((route: SavedRoute) => {
+  const handleRouteSelect = useCallback((route: Route) => {
     setSelectedRoute(route.id);
     setActiveRoute(route);
     // Trigger map update
@@ -328,8 +334,8 @@ function RouteItem({
   onSelect, 
   indicators 
 }: { 
-  route: SavedRoute; 
-  onSelect: (route: SavedRoute) => void;
+  route: Route; 
+  onSelect: (route: Route) => void;
   indicators?: RouteStatusIndicator[];
 }) {
   return (

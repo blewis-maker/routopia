@@ -1,5 +1,7 @@
 {
   "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/routes/saved/route": "app/api/routes/saved/route.js",
   "/api/weather/route": "app/api/weather/route.js",
   "/(protected)/route-planner/page": "app/(protected)/route-planner/page.js"
 }

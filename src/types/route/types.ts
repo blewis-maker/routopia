@@ -86,12 +86,15 @@ export interface RouteMetadata {
 
 export interface Route {
   id: string;
+  userId: string;
   name: string;
-  type: RouteSegmentType;
-  segments: RouteSegment[];
-  metrics: RouteMetrics;
-  waypoints: WaypointType[];
-  metadata: RouteMetadata;
+  startPoint: string;
+  endPoint: string;
+  distance: number;
+  duration: number;
+  activityType: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface WaypointType {

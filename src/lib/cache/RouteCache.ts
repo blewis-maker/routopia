@@ -13,7 +13,10 @@ export class RouteCache {
     }
 
     try {
-      const response = await fetch(`/api/routes/saved?userId=${userId}`);
+      const response = await fetch('/api/routes/saved');
+      if (!response.ok) {
+        throw new Error('Failed to fetch routes');
+      }
       const routes = await response.json();
       this.cache.set(userId, routes);
       return routes;
