@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Location } from '@/types';
 import { useGoogleMaps } from '@/contexts/GoogleMapsContext';
@@ -11,52 +11,103 @@ interface SearchBoxProps {
   onSelect: (location: Location) => void;
   className?: string;
   initialValue?: string;
+  onError?: (error: Error) => void;
 }
 
 export function SearchBox({
   placeholder = 'Search location...',
   onSelect,
   className,
-  initialValue = ''
+  initialValue = '',
+  onError
 }: SearchBoxProps) {
   const [value, setValue] = useState(initialValue);
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const { isLoaded } = useGoogleMaps();
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    // Inject custom styles for the dropdown
+    const style = document.createElement('style');
+    style.textContent = `
+      .pac-container {
+        background: rgba(28, 25, 23, 0.95);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(68, 64, 60, 0.5);
+        border-radius: 8px;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        margin-top: 4px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      }
+      .pac-item {
+        padding: 8px 12px;
+        border-top: 1px solid rgba(68, 64, 60, 0.3);
+        color: rgb(214, 211, 209);
+        font-size: 14px;
+        line-height: 20px;
+        cursor: pointer;
+      }
+      .pac-item:hover {
+        background: rgba(68, 64, 60, 0.3);
+      }
+      .pac-item-query {
+        color: rgb(231, 229, 228);
+        font-size: 14px;
+      }
+      .pac-matched {
+        color: rgb(45, 212, 191);
+      }
+    `;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, []);
 
   useEffect(() => {
     if (!isLoaded || !inputRef.current) return;
 
-    // Initialize Google Places Autocomplete
-    autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
-      fields: ['formatted_address', 'geometry', 'name'],
-      types: ['address', 'establishment']
-    });
-
-    // Add place_changed event listener
-    autocompleteRef.current.addListener('place_changed', () => {
-      const place = autocompleteRef.current?.getPlace();
+    try {
+      setIsLoading(true);
       
-      if (place?.geometry?.location) {
-        const location: Location = {
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
-          address: place.formatted_address || '',
-          name: place.name || ''
-        };
-        
-        setValue(place.formatted_address || place.name || '');
-        onSelect(location);
-      }
-    });
+      autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
+        fields: ['formatted_address', 'geometry', 'name'],
+        types: ['address', 'establishment']
+      });
+
+      autocompleteRef.current.addListener('place_changed', () => {
+        try {
+          const place = autocompleteRef.current?.getPlace();
+          
+          if (!place?.geometry?.location) {
+            throw new Error('Invalid place selected');
+          }
+
+          const location: Location = {
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+            address: place.formatted_address || '',
+            name: place.name || ''
+          };
+          
+          setValue(place.formatted_address || place.name || '');
+          onSelect(location);
+        } catch (error) {
+          onError?.(error instanceof Error ? error : new Error('Failed to process location'));
+        }
+      });
+    } catch (error) {
+      onError?.(error instanceof Error ? error : new Error('Failed to initialize search'));
+    } finally {
+      setIsLoading(false);
+    }
 
     return () => {
       if (autocompleteRef.current) {
         google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
     };
-  }, [isLoaded, onSelect]);
+  }, [isLoaded, onSelect, onError]);
 
   const handleClear = () => {
     setValue('');
@@ -79,13 +130,22 @@ export function SearchBox({
         "transition-all duration-200",
         isFocused && "border-teal-500/50 shadow-lg shadow-teal-500/10"
       )}>
-        <Search className={cn(
-          "absolute left-3",
-          "w-4 h-4",
-          "text-stone-400",
-          isFocused && "text-teal-500",
-          "transition-colors"
-        )} />
+        {isLoading ? (
+          <Loader2 className={cn(
+            "absolute left-3",
+            "w-4 h-4",
+            "text-stone-400",
+            "animate-spin"
+          )} />
+        ) : (
+          <Search className={cn(
+            "absolute left-3",
+            "w-4 h-4",
+            "text-stone-400",
+            isFocused && "text-teal-500",
+            "transition-colors"
+          )} />
+        )}
         
         <input
           ref={inputRef}
@@ -99,7 +159,8 @@ export function SearchBox({
             "w-full",
             "bg-transparent",
             "px-9 py-2",
-            "text-sm text-stone-200",
+            "text-sm",
+            "text-stone-200",
             "placeholder:text-stone-500",
             "focus:outline-none"
           )}
