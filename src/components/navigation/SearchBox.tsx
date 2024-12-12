@@ -10,73 +10,77 @@ import { cn } from '@/lib/utils';
 const style = document.createElement('style');
 style.textContent = `
   .pac-container {
-    background-color: rgba(28, 28, 28, 0.95) !important;
-    backdrop-filter: blur(8px) !important;
+    background: rgba(28, 28, 28, 0.95) !important;
+    backdrop-filter: blur(12px) !important;
     border: 1px solid rgba(68, 68, 68, 0.5) !important;
-    border-radius: 0.75rem !important;
-    font-family: inherit !important;
-    margin-top: 0.5rem !important;
-    z-index: 1000 !important;
+    border-radius: 8px !important;
+    font-family: var(--font-sans) !important;
+    margin-top: 8px !important;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 
                 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-    padding: 0.5rem 0 !important;
+    padding: 4px !important;
+    z-index: 1000 !important;
+    max-width: calc(100% - 24px) !important;
+    text-rendering: optimizeLegibility !important;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11" !important;
   }
   
   .pac-item {
-    padding: 0.75rem 1rem !important;
-    color: #e5e5e5 !important;
+    padding: 8px 12px !important;
+    color: var(--color-stone-50) !important;
     border: none !important;
     font-family: inherit !important;
-    font-size: 0.875rem !important;
-    line-height: 1.25rem !important;
+    font-size: 13px !important;
+    line-height: 1.4 !important;
     display: flex !important;
     align-items: center !important;
-    gap: 0.75rem !important;
-    transition: all 150ms ease-in-out !important;
+    gap: 0 !important;
+    margin: 2px !important;
+    border-radius: 6px !important;
+    transition: all 150ms ease-out !important;
+    font-weight: 400 !important;
   }
   
   .pac-item:hover {
-    background-color: rgba(45, 45, 45, 0.8) !important;
+    background-color: rgba(45, 45, 45, 0.95) !important;
     cursor: pointer !important;
   }
   
   .pac-item-query {
-    color: #e5e5e5 !important;
+    color: var(--color-stone-50) !important;
     font-family: inherit !important;
-    font-size: 0.875rem !important;
-    padding-right: 0.5rem !important;
-  }
-  
-  .pac-matched {
-    color: #10b981 !important;
+    font-size: 13px !important;
+    padding-right: 6px !important;
     font-weight: 500 !important;
   }
   
-  .pac-icon {
-    filter: invert(1) !important;
-    margin-right: 0.5rem !important;
+  .pac-matched {
+    color: var(--color-primary) !important;
+    font-weight: 600 !important;
   }
   
-  /* Style the Powered by Google element */
+  /* Hide the location marker icon */
+  .pac-icon {
+    display: none !important;
+  }
+  
+  /* Hide the Powered by Google element */
   .pac-container:after {
-    background-color: rgba(28, 28, 28, 0.95) !important;
-    padding: 0.5rem 1rem !important;
-    height: auto !important;
-    font-size: 0.75rem !important;
-    color: #6b7280 !important;
-    border-top: 1px solid rgba(68, 68, 68, 0.5) !important;
-    margin-top: 0.5rem !important;
+    display: none !important;
   }
   
   /* Additional refinements */
   .pac-item span:not(.pac-item-query) {
-    color: #9ca3af !important;
-    font-size: 0.75rem !important;
+    color: var(--color-stone-400) !important;
+    font-size: 12px !important;
+    opacity: 0.8 !important;
   }
   
   /* Improve focus states */
-  .pac-item.pac-item-selected {
-    background-color: rgba(45, 45, 45, 0.8) !important;
+  .pac-item.pac-item-selected,
+  .pac-item:focus {
+    background-color: rgba(43, 175, 157, 0.15) !important;
+    outline: none !important;
   }
 `;
 document.head.appendChild(style);
@@ -121,19 +125,32 @@ export function SearchBox({
 
     try {
       const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-        fields: ['formatted_address', 'geometry', 'name', 'place_id'],
-        types: ['geocode', 'establishment']
+        fields: ['formatted_address', 'geometry', 'name', 'place_id', 'address_components'],
+        types: ['geocode', 'establishment'],
+        componentRestrictions: { country: 'us' },
       });
 
       autocomplete.addListener('place_changed', () => {
         const place = autocomplete.getPlace();
         if (place.geometry?.location) {
+          // Get address components
+          const addressComponents = place.address_components || [];
+          
+          // Build formatted address without country and state
+          const streetNumber = addressComponents.find(c => c.types.includes('street_number'))?.long_name || '';
+          const street = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
+          const city = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
+          const state = addressComponents.find(c => c.types.includes('administrative_area_level_1'))?.short_name || '';
+          
+          // Construct address without USA
+          const formattedAddress = `${streetNumber} ${street}, ${city}, ${state}`.trim();
+
           onSelect({
             coordinates: [
               place.geometry.location.lng(),
               place.geometry.location.lat()
             ],
-            formatted_address: place.formatted_address || '',
+            formatted_address: formattedAddress,
             place_name: place.name,
             place_id: place.place_id
           });
