@@ -990,7 +990,6 @@ export default function RoutePlannerPage() {
                       isLoading={isCalculatingRoute}
                       initialValue={destinationLocation?.address || ''}
                       key={`end-${destinationLocation?.coordinates?.join(',')}-${Date.now()}`}
-                      className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
                     />
                   </ErrorBoundary>
                   
@@ -1005,13 +1004,6 @@ export default function RoutePlannerPage() {
                         }}
                         placeholder={`Stop ${index + 1}`}
                         isLoading={isCalculatingRoute}
-                        className={cn(
-                          "bg-[#1B1B1B]/95",
-                          "backdrop-blur-sm",
-                          "border-stone-800/50",
-                          "transition-all duration-200",
-                          "group-hover:border-stone-700/50"
-                        )}
                       />
                       <button
                         onClick={() => removeWaypoint(index)}
