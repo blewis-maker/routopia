@@ -1,7 +1,9 @@
 {
+  "/not-found": "app/not-found.js",
   "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/api/routes/saved/route": "app/api/routes/saved/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/api/weather/route": "app/api/weather/route.js",
+  "/api/routes/saved/route": "app/api/routes/saved/route.js",
+  "/(marketing)/page": "app/(marketing)/page.js",
   "/(protected)/route-planner/page": "app/(protected)/route-planner/page.js"
 }

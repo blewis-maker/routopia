@@ -172,10 +172,19 @@ export function SavedRoutes() {
     if (!session?.user?.id) return;
 
     try {
-      const response = await fetch('/api/routes/saved');
+      setIsLoading(true);
+      const response = await fetch('/api/routes/saved', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
       if (!response.ok) {
-        throw new Error('Failed to fetch routes');
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to fetch routes');
       }
+
       const data = await response.json();
       setRoutes(data);
     } catch (error) {

@@ -42,13 +42,14 @@ model Session {
 }
 
 model User {
-  id    String  @id @default(cuid())
-  email String  @unique
-  name  String?
-
-  // Auth related
-  accounts            Account[]
-  sessions            Session[]
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  routes        Route[]
   verificationTokens  VerificationToken[]
   passwordResetTokens PasswordResetToken[]
 
@@ -408,5 +409,21 @@ model ChatMessage {
   type      String
 
   @@index([routeId])
+  @@index([userId])
+}
+
+model Route {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  startPoint   String
+  endPoint     String
+  distance     Float
+  duration     Int
+  activityType String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+
   @@index([userId])
 }
