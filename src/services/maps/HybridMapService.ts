@@ -583,5 +583,95 @@ export class HybridMapService {
     }
   }
 
+  async calculateRoute(params: {
+    origin: Location;
+    destination: Location;
+    waypoints?: Location[];
+  }) {
+    if (!this.isReady()) {
+      throw new Error('Map not initialized');
+    }
+
+    try {
+      // Use Google's DirectionsService for stable routing
+      const directionsService = new google.maps.DirectionsService();
+      
+      const request = {
+        origin: { lat: params.origin.lat, lng: params.origin.lng },
+        destination: { lat: params.destination.lat, lng: params.destination.lng },
+        waypoints: params.waypoints?.map(point => ({
+          location: { lat: point.lat, lng: point.lng },
+          stopover: true
+        })) || [],
+        travelMode: google.maps.TravelMode.DRIVING
+      };
+
+      const result = await directionsService.route(request);
+      return this.processRouteResult(result);
+    } catch (error) {
+      console.error('Route calculation failed:', error);
+      throw error;
+    }
+  }
+
+  private processRouteResult(result: google.maps.DirectionsResult) {
+    // Extract route data in a format we can use
+    const route = result.routes[0];
+    return {
+      path: route.overview_path.map(point => ({
+        lat: point.lat(),
+        lng: point.lng()
+      })),
+      distance: route.legs.reduce((total, leg) => total + leg.distance.value, 0),
+      duration: route.legs.reduce((total, leg) => total + leg.duration.value, 0),
+      bounds: route.bounds,
+    };
+  }
+
+  async updateRouteVisualization(routeData: any) {
+    if (!this.mapbox || !routeData.path) return;
+
+    // Remove existing route layer if it exists
+    if (this.mapbox.getLayer('route')) {
+      this.mapbox.removeLayer('route');
+      this.mapbox.removeSource('route');
+    }
+
+    // Add the route source and layer
+    this.mapbox.addSource('route', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: routeData.path.map(point => [point.lng, point.lat])
+        }
+      }
+    });
+
+    // Add route layer with our styling
+    this.mapbox.addLayer({
+      id: 'route',
+      type: 'line',
+      source: 'route',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#00B2B2',
+        'line-width': 4,
+        'line-opacity': 0.8
+      }
+    });
+
+    // Fit bounds to show the entire route
+    this.mapbox.fitBounds([
+      [routeData.bounds.getSouthWest().lng(), routeData.bounds.getSouthWest().lat()],
+      [routeData.bounds.getNorthEast().lng(), routeData.bounds.getNorthEast().lat()]
+    ], { padding: 50 });
+  }
+
   // ... add other necessary methods
 } 

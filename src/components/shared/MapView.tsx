@@ -17,6 +17,12 @@ interface MapViewProps {
   showUserLocation?: boolean;
   darkMode?: boolean;
   onMapInit?: (mapService: HybridMapService) => void;
+  onRouteUpdate?: (route: {
+    origin: Location;
+    destination: Location;
+    waypoints: Location[];
+    path: any; // Define specific type based on your map service
+  }) => void;
 }
 
 export function MapView({
@@ -24,7 +30,8 @@ export function MapView({
   showWeather = false,
   showUserLocation = false,
   darkMode = false,
-  onMapInit
+  onMapInit,
+  onRouteUpdate
 }: MapViewProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const serviceRef = useRef<HybridMapService | null>(null);
