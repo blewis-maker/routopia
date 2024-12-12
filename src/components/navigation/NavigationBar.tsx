@@ -5,15 +5,39 @@ import { User } from 'next-auth';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { signOut } from 'next-auth/react';
+import { useState } from 'react';
+import { Settings, LogOut } from 'lucide-react';
+import { useClickOutside } from '@/hooks/useClickOutside';
 
 interface NavigationBarProps {
   user?: User | null;
   isLandingPage?: boolean;
 }
 
+const menuItemStyles = {
+  wrapper: cn(
+    "flex items-center gap-2",
+    "px-4 py-2",
+    "text-sm text-stone-300",
+    "transition-colors duration-200",
+    "w-full text-left"
+  ),
+  icon: cn(
+    "w-4 h-4",
+    "transition-colors duration-200",
+    "group-hover:text-teal-500"
+  )
+};
+
 export function NavigationBar({ user, isLandingPage = false }: NavigationBarProps) {
   const pathname = usePathname();
   const isRoutePlanner = pathname === '/route-planner';
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
+  // Create ref using the hook
+  const dropdownRef = useClickOutside(() => {
+    setIsUserMenuOpen(false);
+  });
 
   return (
     <nav className={cn(
@@ -75,25 +99,75 @@ export function NavigationBar({ user, isLandingPage = false }: NavigationBarProp
                     Route Planner
                   </Link>
                 )}
-                <button
-                  onClick={() => signOut()}
-                  className={cn(
-                    "text-sm font-sans font-medium",
-                    "text-stone-300 hover:text-teal-500",
-                    "transition-colors duration-200"
+                <div className="relative">
+                  <button
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    className={cn(
+                      "w-9 h-9 rounded-full",
+                      "bg-stone-950/80",
+                      "border border-stone-800/50",
+                      "flex items-center justify-center",
+                      "shadow-lg",
+                      "hover:border-teal-500/50",
+                      "hover:shadow-teal-500/20",
+                      "transition-all duration-200",
+                      "backdrop-blur-sm"
+                    )}
+                  >
+                    <span className="text-sm font-sans font-medium text-stone-200">
+                      {user.name?.[0] || '?'}
+                    </span>
+                  </button>
+
+                  {isUserMenuOpen && (
+                    <div 
+                      ref={dropdownRef}
+                      className={cn(
+                        "absolute right-0 mt-2",
+                        "w-48",
+                        "bg-stone-950/80",
+                        "backdrop-blur-md",
+                        "border border-stone-800/50",
+                        "rounded-lg",
+                        "shadow-lg shadow-black/10",
+                        "py-1",
+                        "z-50"
+                      )}>
+                      <div className={cn(
+                        "px-4 py-2",
+                        "border-b border-stone-800/50"
+                      )}>
+                        <p className="text-sm font-medium text-stone-200">
+                          {user.name}
+                        </p>
+                        <p className="text-xs text-stone-400">
+                          {user.email}
+                        </p>
+                      </div>
+                      
+                      <Link
+                        href="/settings"
+                        className={cn(
+                          menuItemStyles.wrapper,
+                          "group"
+                        )}
+                      >
+                        <Settings className={menuItemStyles.icon} />
+                        <span>Settings</span>
+                      </Link>
+
+                      <button
+                        onClick={() => signOut()}
+                        className={cn(
+                          menuItemStyles.wrapper,
+                          "group"
+                        )}
+                      >
+                        <LogOut className={menuItemStyles.icon} />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
                   )}
-                >
-                  Sign Out
-                </button>
-                <div className={cn(
-                  "w-8 h-8 rounded-sm",
-                  "bg-stone-800 border border-stone-700",
-                  "flex items-center justify-center",
-                  "shadow-sm"
-                )}>
-                  <span className="text-sm font-sans font-medium text-stone-200">
-                    {user.name?.[0] || '?'}
-                  </span>
                 </div>
               </>
             ) : (

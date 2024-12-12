@@ -28,6 +28,7 @@ import { useProgressStore } from '@/stores/progressStore';
 import { ServiceErrorBoundary } from '@/components/error-boundaries/ServiceErrorBoundary';
 import { useSession } from 'next-auth/react';
 import { Route } from '@/types/route/types';
+import { useClickOutside } from '@/hooks/useClickOutside';
 
 interface RouteStatusIndicator {
   icon: JSX.Element;
@@ -353,11 +354,20 @@ export function SavedRoutes() {
 
   const [isMonitoringActive, setIsMonitoringActive] = useState(true);
 
+  const dropdownRef = useClickOutside(() => {
+    if (isExpanded) {
+      setIsExpanded(false);
+    }
+  });
+
   return (
-    <div className={cn(
-      routeStyles.container,
-      isExpanded ? routeStyles.expanded : routeStyles.collapsed
-    )}>
+    <div 
+      ref={dropdownRef}
+      className={cn(
+        routeStyles.container,
+        isExpanded ? routeStyles.expanded : routeStyles.collapsed
+      )}
+    >
       <div 
         className={routeStyles.header.wrapper}
         onClick={() => setIsExpanded(!isExpanded)}
