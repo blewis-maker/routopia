@@ -7,7 +7,7 @@ import {
   Bike, Car, Snowflake, Wind, 
   AlertTriangle, Flame, Radio,
   Cloud, Timer, User2, MapPin, Clock,
-  Loader2, Map as MapIcon
+  Loader2, Map as MapIcon, ChevronDown
 } from 'lucide-react';
 import { UserActivityService } from '@/services/user/UserActivityService';
 import { RouteMonitor } from '@/services/monitoring/RouteMonitor';
@@ -53,24 +53,32 @@ const routeStyles = {
   header: {
     wrapper: cn(
       "px-4 py-3",
-      sg.colors.background.primary,
+      "bg-stone-950/80",
+      "backdrop-blur-md",
       sg.colors.border.primary,
       "border",
-      sg.effects.glass,
       sg.effects.shadow,
       "rounded-lg",
       "flex items-center justify-between",
       "min-h-[52px]",
       "cursor-pointer",
       "select-none",
-      "hover:bg-stone-900/20",
-      "transition-colors duration-200"
+      "hover:bg-stone-900/80",
+      "hover:border-stone-700/60",
+      "hover:shadow-lg hover:shadow-black/15",
+      "focus:outline-none",
+      "focus:ring-2",
+      "focus:ring-teal-500/20",
+      "group",
+      "transition-all duration-200"
     ),
     title: cn(
       sg.typography.base,
       sg.typography.sizes.sm,
       sg.colors.text.primary,
-      "flex items-center gap-2"
+      "flex items-center gap-2",
+      "group-hover:text-stone-50",
+      "transition-colors duration-200"
     ),
     logo: cn(
       "w-4 h-4",
@@ -90,7 +98,13 @@ const routeStyles = {
       ),
       active: "bg-emerald-500 shadow-emerald-500/50",
       inactive: "bg-red-500 shadow-red-500/50",
-    }
+    },
+    chevron: cn(
+      "w-4 h-4",
+      "text-stone-400",
+      "transition-transform duration-200",
+      "group-hover:text-stone-300"
+    )
   },
   indicator: {
     base: cn(
@@ -347,6 +361,12 @@ export function SavedRoutes() {
       <div 
         className={routeStyles.header.wrapper}
         onClick={() => setIsExpanded(!isExpanded)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsExpanded(!isExpanded);
+          }
+        }}
         role="button"
         tabIndex={0}
       >
@@ -428,22 +448,32 @@ export function SavedRoutes() {
             </>
           )}
         </div>
-        <div className={routeStyles.header.status}>
-          <div className={cn(
-            routeStyles.header.statusDot.base,
-            isMonitoringActive 
-              ? routeStyles.header.statusDot.active 
-              : routeStyles.header.statusDot.inactive
-          )} />
-          <span>monitoring active</span>
+        <div className="flex items-center gap-2">
+          <div className={routeStyles.header.status}>
+            <div className={cn(
+              routeStyles.header.statusDot.base,
+              isMonitoringActive 
+                ? routeStyles.header.statusDot.active 
+                : routeStyles.header.statusDot.inactive
+            )} />
+            <span>monitoring active</span>
+          </div>
+          <ChevronDown 
+            className={cn(
+              routeStyles.header.chevron,
+              isExpanded ? "rotate-180" : "rotate-0"
+            )} 
+          />
         </div>
       </div>
 
       <div 
         className={cn(
-          "transition-all duration-300 ease-in-out",
+          "transition-all duration-200 ease-in-out",
           "transform",
-          isExpanded ? "opacity-100 scale-y-100" : "opacity-0 scale-y-0 h-0"
+          isExpanded 
+            ? "opacity-100 scale-y-100" 
+            : "opacity-0 scale-y-0 h-0 pointer-events-none"
         )}
       >
         <div className={routeStyles.content}>
