@@ -1,4 +1,8 @@
 {
-  "/icon/[[...__metadata_id__]]/route": "static/webpack/app/icon/[[...__metadata_id__]]/route.61390a257829f739.hot-update.js",
+  "/icon/[[...__metadata_id__]]/route": "app/icon/[[...__metadata_id__]]/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
+  "/api/routes/saved/route": "app/api/routes/saved/route.js",
+  "/api/weather/route": "app/api/weather/route.js",
   "/(protected)/route-planner/page": "app/(protected)/route-planner/page.js"
 }

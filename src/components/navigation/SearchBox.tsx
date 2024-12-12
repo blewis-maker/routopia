@@ -10,31 +10,73 @@ import { cn } from '@/lib/utils';
 const style = document.createElement('style');
 style.textContent = `
   .pac-container {
-    background-color: #1c1c1c !important;
-    border: 1px solid #404040 !important;
-    border-radius: 0.5rem !important;
+    background-color: rgba(28, 28, 28, 0.95) !important;
+    backdrop-filter: blur(8px) !important;
+    border: 1px solid rgba(68, 68, 68, 0.5) !important;
+    border-radius: 0.75rem !important;
     font-family: inherit !important;
-    margin-top: 0.25rem !important;
+    margin-top: 0.5rem !important;
     z-index: 1000 !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+                0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+    padding: 0.5rem 0 !important;
   }
+  
   .pac-item {
     padding: 0.75rem 1rem !important;
     color: #e5e5e5 !important;
-    border-color: #404040 !important;
+    border: none !important;
     font-family: inherit !important;
+    font-size: 0.875rem !important;
+    line-height: 1.25rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+    transition: all 150ms ease-in-out !important;
   }
+  
   .pac-item:hover {
-    background-color: #2d2d2d !important;
+    background-color: rgba(45, 45, 45, 0.8) !important;
+    cursor: pointer !important;
   }
+  
   .pac-item-query {
     color: #e5e5e5 !important;
     font-family: inherit !important;
+    font-size: 0.875rem !important;
+    padding-right: 0.5rem !important;
   }
+  
   .pac-matched {
     color: #10b981 !important;
+    font-weight: 500 !important;
   }
+  
   .pac-icon {
     filter: invert(1) !important;
+    margin-right: 0.5rem !important;
+  }
+  
+  /* Style the Powered by Google element */
+  .pac-container:after {
+    background-color: rgba(28, 28, 28, 0.95) !important;
+    padding: 0.5rem 1rem !important;
+    height: auto !important;
+    font-size: 0.75rem !important;
+    color: #6b7280 !important;
+    border-top: 1px solid rgba(68, 68, 68, 0.5) !important;
+    margin-top: 0.5rem !important;
+  }
+  
+  /* Additional refinements */
+  .pac-item span:not(.pac-item-query) {
+    color: #9ca3af !important;
+    font-size: 0.75rem !important;
+  }
+  
+  /* Improve focus states */
+  .pac-item.pac-item-selected {
+    background-color: rgba(45, 45, 45, 0.8) !important;
   }
 `;
 document.head.appendChild(style);
