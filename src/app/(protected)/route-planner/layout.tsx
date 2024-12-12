@@ -7,6 +7,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { authOptions } from '@/lib/auth';
 import { SavedRoutes } from '@/components/route-planner/SavedRoutes';
 import ClientLayout from './ClientLayout';
+import { Toaster } from 'react-hot-toast';
 
 export default async function RoutePlannerLayout({
   children,
@@ -35,6 +36,18 @@ export default async function RoutePlannerLayout({
           </div>
         </ProgressProvider>
       </ErrorBoundary>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          className: 'bg-stone-950/90 text-stone-200 border border-stone-800/50 backdrop-blur-md',
+          duration: 4000,
+          style: {
+            background: 'rgba(28, 25, 23, 0.9)',
+            color: '#e7e5e4',
+            borderRadius: '0.75rem',
+          },
+        }}
+      />
     </AppShell>
   );
 }

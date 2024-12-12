@@ -39,6 +39,7 @@ import { useGoogleMaps } from '@/contexts/GoogleMapsContext';
 import { MapErrorBoundary } from '@/components/error/MapErrorBoundary';
 import { HybridMapService } from '@/services/maps/HybridMapService';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 
 interface WeatherInfo {
   location: string;
@@ -132,6 +133,7 @@ export default function RoutePlannerPage() {
   const [mapService, setMapService] = useState<HybridMapService | null>(null);
   const [waypoints, setWaypoints] = useState<Location[]>([]);
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
+  const [isMovingMap, setIsMovingMap] = useState(false);
 
   // 3. All context hooks
   const { theme } = useTheme();
@@ -149,13 +151,9 @@ export default function RoutePlannerPage() {
         mapServiceRef.current = mapService;
         setMapService(mapService);
         
-        // Get user's location
+        // Get user's location with better error handling
         try {
-          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject);
-          });
-
-          // Reverse geocode the coordinates to get the address
+          const position = await getCurrentPosition();
           const geocoder = new google.maps.Geocoder();
           const latlng = {
             lat: position.coords.latitude,
@@ -171,16 +169,29 @@ export default function RoutePlannerPage() {
               isCurrentLocation: true
             };
 
-            // Update user location with the geocoded address
+            // Update user location and search box
             setUserLocation(location);
             
-            // Center map on user location
+            // Center and zoom map on user location
             mapService.setCenter([location.lng, location.lat]);
-            mapService.setZoom(13);
+            mapService.setZoom(14); // Closer zoom for better context
             await mapService.addUserLocationMarker(location);
+
+            // Fetch weather for initial location
+            await fetchWeatherData(location.lat, location.lng, location.address);
           }
         } catch (locationError) {
           console.error('Error getting user location:', locationError);
+          // Set default location (Fort Collins) if user location fails
+          const defaultLocation = {
+            lat: 40.5852602,
+            lng: -105.0749801,
+            address: 'Fort Collins, CO',
+            isCurrentLocation: false
+          };
+          setUserLocation(defaultLocation);
+          mapService.setCenter([defaultLocation.lng, defaultLocation.lat]);
+          mapService.setZoom(12);
         }
 
         initializationRef.current = true;
@@ -378,7 +389,10 @@ export default function RoutePlannerPage() {
   };
 
   const handleLocationSelect = async (location: Location, type: 'origin' | 'destination') => {
-    if (!mapServiceRef.current) return;
+    if (!mapServiceRef.current) {
+      toast.error('Map service not initialized');
+      return;
+    }
 
     try {
       if (type === 'origin') {
@@ -387,24 +401,24 @@ export default function RoutePlannerPage() {
           isCurrentLocation: location.isCurrentLocation || false
         });
 
-        // Always fetch weather for origin if no destination is set
-        if (!destinationLocation) {
+        try {
+          await mapServiceRef.current.addUserLocationMarker({
+            lat: location.lat,
+            lng: location.lng
+          });
+        } catch (markerError) {
+          toast.error('Failed to add location marker');
+        }
+
+        try {
           await fetchWeatherData(location.lat, location.lng, location.address);
+        } catch (weatherError) {
+          toast.error('Failed to fetch weather data');
         }
 
-        await mapServiceRef.current.addUserLocationMarker({
-          lat: location.lat,
-          lng: location.lng
-        });
-
-        if (!destinationLocation) {
-          mapServiceRef.current.setCenter([location.lng, location.lat]);
-          mapServiceRef.current.setZoom(13);
-        }
       } else {
         setDestinationLocation(location);
-        // Always fetch weather for destination when it's set
-        await fetchWeatherData(location.lat, location.lng, location.address);
+        toast.success('Destination set successfully');
       }
 
       if (mapServiceRef.current && 
@@ -428,7 +442,7 @@ export default function RoutePlannerPage() {
         }
       }
     } catch (error) {
-      console.error('Error handling location select:', error);
+      toast.error('Failed to update location');
     }
   };
 
@@ -848,25 +862,26 @@ export default function RoutePlannerPage() {
   // Update waypoint management functions
   const addWaypoint = () => {
     if (waypoints.length >= 5) {
-      // Could add a toast notification here
-      console.warn('Maximum number of waypoints reached');
+      toast.error('Maximum number of waypoints reached');
       return;
     }
     setWaypoints(current => [...current, null]);
+    toast.success('Stop added');
   };
 
   const removeWaypoint = async (index: number) => {
     setIsCalculatingRoute(true);
+    const loadingToast = toast.loading('Updating route...');
     try {
       const newWaypoints = waypoints.filter((_, i) => i !== index);
       setWaypoints(newWaypoints);
       
-      // Only recalculate if we have origin and destination
       if (userLocation && destinationLocation) {
         await updateRoute(newWaypoints);
       }
+      toast.success('Stop removed', { id: loadingToast });
     } catch (error) {
-      console.error('Failed to remove waypoint:', error);
+      toast.error('Failed to update route', { id: loadingToast });
     } finally {
       setIsCalculatingRoute(false);
     }
@@ -899,20 +914,29 @@ export default function RoutePlannerPage() {
 
   // Add a handler for when user uses their current location
   const handleUseCurrentLocation = async () => {
-    if (!mapServiceRef.current) return;
+    if (!mapServiceRef.current) {
+      toast.error('Map service not initialized');
+      return;
+    }
 
+    const loadingToast = toast.loading('Getting your location...');
     try {
       const position = await getCurrentPosition();
       const location: Location = {
         lat: position.coords.latitude,
         lng: position.coords.longitude,
-        address: 'Current Location', // You might want to reverse geocode this
+        address: 'Current Location',
         isCurrentLocation: true
       };
       
-      handleLocationSelect(location, 'origin');
+      await handleLocationSelect(location, 'origin');
+      toast.success('Location set to current position', {
+        id: loadingToast
+      });
     } catch (error) {
-      console.error('Error getting current location:', error);
+      toast.error('Failed to get your location', {
+        id: loadingToast
+      });
     }
   };
 
