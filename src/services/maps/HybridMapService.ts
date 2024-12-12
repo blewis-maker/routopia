@@ -631,13 +631,10 @@ export class HybridMapService {
   async updateRouteVisualization(routeData: any) {
     if (!this.mapbox || !routeData.path) return;
 
-    // Remove existing route layer if it exists
-    if (this.mapbox.getLayer('route')) {
-      this.mapbox.removeLayer('route');
-      this.mapbox.removeSource('route');
-    }
+    // Remove existing layers
+    this.cleanupRouteLayers();
 
-    // Add the route source and layer with enhanced styling
+    // Add the route source with initial empty state
     this.mapbox.addSource('route', {
       type: 'geojson',
       data: {
@@ -645,12 +642,58 @@ export class HybridMapService {
         properties: {},
         geometry: {
           type: 'LineString',
-          coordinates: routeData.path.map(point => [point.lng, point.lat])
+          coordinates: []
         }
       }
     });
 
-    // Add route layer with enhanced styling
+    // Add base route layer
+    this.addRouteLayers();
+
+    // Animate the route drawing
+    await this.animateRoute(routeData.path);
+
+    // Fit bounds with smooth transition
+    this.fitRouteBounds(routeData.bounds);
+  }
+
+  private cleanupRouteLayers() {
+    if (!this.mapbox) return;
+    
+    ['route', 'route-glow', 'route-casing'].forEach(layerId => {
+      if (this.mapbox.getLayer(layerId)) {
+        this.mapbox.removeLayer(layerId);
+      }
+    });
+    
+    if (this.mapbox.getSource('route')) {
+      this.mapbox.removeSource('route');
+    }
+  }
+
+  private addRouteLayers() {
+    if (!this.mapbox) return;
+
+    // Add casing layer for depth effect
+    this.mapbox.addLayer({
+      id: 'route-casing',
+      type: 'line',
+      source: 'route',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#002626',
+        'line-width': ['interpolate', ['linear'], ['zoom'],
+          10, 5,
+          15, 8
+        ],
+        'line-opacity': 0.5
+      }
+    });
+
+    // Main route layer
     this.mapbox.addLayer({
       id: 'route',
       type: 'line',
@@ -665,19 +708,11 @@ export class HybridMapService {
           10, 3,
           15, 6
         ],
-        'line-opacity': 0.8,
-        'line-blur': 0.5,
-        'line-gradient': [
-          'interpolate',
-          ['linear'],
-          ['line-progress'],
-          0, '#00B2B2',
-          1, '#80FFD4'
-        ]
+        'line-opacity': 0.8
       }
     });
 
-    // Add glow effect
+    // Glow effect
     this.mapbox.addLayer({
       id: 'route-glow',
       type: 'line',
@@ -695,13 +730,32 @@ export class HybridMapService {
         'line-opacity': 0.2,
         'line-blur': 3
       }
-    }, 'route');
+    });
+  }
 
-    // Fit bounds to show the entire route
-    this.mapbox.fitBounds([
-      [routeData.bounds.getSouthWest().lng(), routeData.bounds.getSouthWest().lat()],
-      [routeData.bounds.getNorthEast().lng(), routeData.bounds.getNorthEast().lat()]
-    ], { padding: 50 });
+  private async animateRoute(path: Array<{lat: number, lng: number}>) {
+    if (!this.mapbox) return;
+
+    const points = path.map(p => [p.lng, p.lat]);
+    const steps = 50;
+    const duration = 1000;
+    const stepDuration = duration / steps;
+
+    for (let i = 1; i <= steps; i++) {
+      const progress = i / steps;
+      const currentPoints = points.slice(0, Math.floor(points.length * progress));
+
+      this.mapbox.getSource('route').setData({
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: currentPoints
+        }
+      });
+
+      await new Promise(resolve => setTimeout(resolve, stepDuration));
+    }
   }
 
   // ... add other necessary methods

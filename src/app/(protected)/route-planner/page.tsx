@@ -15,7 +15,7 @@ import { GoogleMapsManager } from '@/services/maps/GoogleMapsManager';
 import { MapToolbar } from '@/components/map/MapToolbar';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
-import { Clock, Map, MapPinPlus } from 'lucide-react';
+import { Clock, Map, MapPinPlus, CircleX } from 'lucide-react';
 import { Route } from '@/types/route/types';
 import { AIChat } from '@/components/chat/AIChat';
 import { ChatMessage } from '@/types/chat/types';
@@ -391,29 +391,52 @@ export default function RoutePlannerPage() {
   };
 
   const handleLocationSelect = async (location: Location, type: 'origin' | 'destination') => {
-    if (type === 'origin') {
-      setUserLocation(location);
-    } else {
-      setDestinationLocation(location);
-    }
+    if (!mapServiceRef.current) return;
 
-    // If we have both origin and destination, calculate route
-    if (mapServiceRef.current && userLocation && destinationLocation) {
-      try {
-        const route = await mapServiceRef.current.calculateRoute({
-          origin: type === 'origin' ? location : userLocation,
-          destination: type === 'destination' ? location : destinationLocation,
-          waypoints: [] // We can add waypoint support later
+    try {
+      if (type === 'origin') {
+        setUserLocation(location);
+        
+        // Update marker and map view for origin
+        await mapServiceRef.current.addUserLocationMarker({
+          lat: location.lat,
+          lng: location.lng
         });
 
-        // Update route visualization
-        await mapServiceRef.current.updateRouteVisualization(route);
-        
-        // Update route state if needed
-        setMainRoute(route);
-      } catch (error) {
-        console.error('Failed to calculate route:', error);
+        // If no destination is set, zoom to origin
+        if (!destinationLocation) {
+          mapServiceRef.current.setCenter([location.lng, location.lat]);
+          mapServiceRef.current.setZoom(13); // Adjust zoom level as needed
+        }
+      } else {
+        setDestinationLocation(location);
       }
+
+      // If we have both origin and destination, calculate and display route
+      if (mapServiceRef.current && 
+          (type === 'origin' ? location : userLocation) && 
+          (type === 'destination' ? location : destinationLocation)) {
+        
+        setIsCalculatingRoute(true);
+        try {
+          const route = await mapServiceRef.current.calculateRoute({
+            origin: type === 'origin' ? location : userLocation,
+            destination: type === 'destination' ? location : destinationLocation,
+            waypoints: waypoints.filter(Boolean)
+          });
+
+          // Update route visualization - this will also handle appropriate zoom
+          await mapServiceRef.current.updateRouteVisualization(route);
+          
+          setMainRoute(route);
+        } catch (error) {
+          console.error('Failed to calculate route:', error);
+        } finally {
+          setIsCalculatingRoute(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error handling location select:', error);
     }
   };
 
@@ -835,33 +858,53 @@ export default function RoutePlannerPage() {
     // We can integrate this with your existing route state management
   };
 
-  // Add waypoint management
+  // Update waypoint management functions
   const addWaypoint = () => {
-    setWaypoints([...waypoints]);
+    if (waypoints.length >= 5) {
+      // Could add a toast notification here
+      console.warn('Maximum number of waypoints reached');
+      return;
+    }
+    setWaypoints(current => [...current, null]);
   };
 
-  const removeWaypoint = (index: number) => {
-    const newWaypoints = waypoints.filter((_, i) => i !== index);
-    setWaypoints(newWaypoints);
-    updateRoute();
+  const removeWaypoint = async (index: number) => {
+    setIsCalculatingRoute(true);
+    try {
+      const newWaypoints = waypoints.filter((_, i) => i !== index);
+      setWaypoints(newWaypoints);
+      
+      // Only recalculate if we have origin and destination
+      if (userLocation && destinationLocation) {
+        await updateRoute(newWaypoints);
+      }
+    } catch (error) {
+      console.error('Failed to remove waypoint:', error);
+    } finally {
+      setIsCalculatingRoute(false);
+    }
   };
 
-  // Update the route calculation to include waypoints
-  const updateRoute = async () => {
-    if (!mapServiceRef.current || !userLocation || !destinationLocation) return;
+  // Update the route calculation to be more robust
+  const updateRoute = async (currentWaypoints = waypoints) => {
+    if (!mapServiceRef.current || !userLocation || !destinationLocation) {
+      console.warn('Cannot update route: missing required data');
+      return;
+    }
     
     setIsCalculatingRoute(true);
     try {
       const route = await mapServiceRef.current.calculateRoute({
         origin: userLocation,
         destination: destinationLocation,
-        waypoints: waypoints.filter(wp => wp !== null)
+        waypoints: currentWaypoints.filter(wp => wp !== null)
       });
 
       await mapServiceRef.current.updateRouteVisualization(route);
       setMainRoute(route);
     } catch (error) {
       console.error('Failed to calculate route:', error);
+      // Could add error notification here
     } finally {
       setIsCalculatingRoute(false);
     }
@@ -936,24 +979,44 @@ export default function RoutePlannerPage() {
                   </ErrorBoundary>
                   
                   {waypoints.map((waypoint, index) => (
-                    <div key={index} className="relative">
+                    <div key={index} className="relative group">
                       <SearchBox 
                         onSelect={(location) => {
                           const newWaypoints = [...waypoints];
                           newWaypoints[index] = location;
                           setWaypoints(newWaypoints);
-                          updateRoute();
+                          updateRoute(newWaypoints);
                         }}
                         placeholder={`Stop ${index + 1}`}
                         isLoading={isCalculatingRoute}
-                        className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
+                        className={cn(
+                          "bg-[#1B1B1B]/95",
+                          "backdrop-blur-sm",
+                          "border-stone-800/50",
+                          "transition-all duration-200",
+                          "group-hover:border-stone-700/50"
+                        )}
                       />
                       <button
                         onClick={() => removeWaypoint(index)}
-                        className="absolute right-0 top-1/2 -translate-y-1/2 -translate-x-full mr-2 
-                                   text-stone-400 hover:text-red-400 transition-colors"
+                        disabled={isCalculatingRoute}
+                        className={cn(
+                          "absolute right-0 top-1/2 -translate-y-1/2 -translate-x-full mr-2.5",
+                          "text-stone-400",
+                          "transition-all duration-200",
+                          "hover:text-red-400",
+                          "hover:scale-110",
+                          "active:scale-95",
+                          "disabled:opacity-50 disabled:cursor-not-allowed",
+                          "group/close"
+                        )}
+                        aria-label={`Remove stop ${index + 1}`}
                       >
-                        <X className="w-4 h-4" />
+                        <CircleX className={cn(
+                          "w-4 h-4",
+                          "transition-transform duration-200",
+                          "group-hover/close:rotate-90"
+                        )} />
                       </button>
                     </div>
                   ))}
