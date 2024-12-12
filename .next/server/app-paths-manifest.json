@@ -1,9 +1,4 @@
 {
-  "/not-found": "app/not-found.js",
-  "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/weather/route": "app/api/weather/route.js",
-  "/api/routes/saved/route": "app/api/routes/saved/route.js",
-  "/(marketing)/page": "app/(marketing)/page.js",
+  "/icon/[[...__metadata_id__]]/route": "static/webpack/app/icon/[[...__metadata_id__]]/route.61390a257829f739.hot-update.js",
   "/(protected)/route-planner/page": "app/(protected)/route-planner/page.js"
 }

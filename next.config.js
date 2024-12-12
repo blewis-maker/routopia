@@ -8,7 +8,9 @@ const nextConfig = {
       bodySizeLimit: '2mb'
     }
   },
-  serverExternalPackages: ['@prisma/client'],
+  transpilePackages: [
+    // Add your external packages here that need transpilation
+  ],
   async headers() {
     return [
       {

@@ -8,6 +8,8 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { ThemeProvider } from 'next-themes';
 import { TooltipProvider } from '@/components/ui/Tooltip';
+import { UserAvatar } from '@/components/UserAvatar';
+import { AuthProvider } from '@/components/AuthProvider';
 
 export const metadata: Metadata = {
   title: 'Routopia - AI-Powered Route Planning',
@@ -39,9 +41,14 @@ export default async function RootLayout({
           forcedTheme="dark"
         >
           <TooltipProvider>
-            <Providers session={session}>
-              {children}
-            </Providers>
+            <AuthProvider>
+              <Providers session={session}>
+                <nav>
+                  <UserAvatar />
+                </nav>
+                {children}
+              </Providers>
+            </AuthProvider>
           </TooltipProvider>
         </ThemeProvider>
       </body>

@@ -16,6 +16,34 @@ export function UserAvatar() {
 
   const defaultAvatar = '/default-avatar.png';
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.[0]) return;
+    
+    setIsUploading(true);
+    setError(null);
+    
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/user/avatar', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Failed to upload image');
+
+      const data = await response.json();
+      await update({ image: data.url }); // Update the session with new image URL
+    } catch (err) {
+      setError('Failed to upload image');
+      console.error('Upload error:', err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div 
       className="relative"

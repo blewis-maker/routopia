@@ -1,11 +1,43 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
 import { useGoogleMaps } from '@/contexts/GoogleMapsContext';
 import { Locate, LocateFixed } from 'lucide-react';
 import { baseStyles, roundedStyles, glassStyles, inputStyles } from '@/styles/components';
 import { cn } from '@/lib/utils';
+
+// Add custom styles for Google Places Autocomplete dropdown
+const style = document.createElement('style');
+style.textContent = `
+  .pac-container {
+    background-color: #1c1c1c !important;
+    border: 1px solid #404040 !important;
+    border-radius: 0.5rem !important;
+    font-family: inherit !important;
+    margin-top: 0.25rem !important;
+    z-index: 1000 !important;
+  }
+  .pac-item {
+    padding: 0.75rem 1rem !important;
+    color: #e5e5e5 !important;
+    border-color: #404040 !important;
+    font-family: inherit !important;
+  }
+  .pac-item:hover {
+    background-color: #2d2d2d !important;
+  }
+  .pac-item-query {
+    color: #e5e5e5 !important;
+    font-family: inherit !important;
+  }
+  .pac-matched {
+    color: #10b981 !important;
+  }
+  .pac-icon {
+    filter: invert(1) !important;
+  }
+`;
+document.head.appendChild(style);
 
 interface SearchResult {
   coordinates: [number, number];
