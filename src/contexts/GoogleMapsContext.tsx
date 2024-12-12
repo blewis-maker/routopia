@@ -1,7 +1,8 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import GoogleMapsLoader from '@/services/maps/GoogleMapsLoader';
+import { Loader } from '@googlemaps/js-api-loader';
+import { env } from '@/env.mjs';
 
 interface GoogleMapsContextType {
   isLoaded: boolean;
@@ -10,35 +11,31 @@ interface GoogleMapsContextType {
 
 const GoogleMapsContext = createContext<GoogleMapsContextType>({
   isLoaded: false,
-  error: null
+  error: null,
 });
-
-const GOOGLE_MAPS_LIBRARIES = [
-  'places',
-  'geometry',
-  'drawing',
-  'visualization'
-] as const;
 
 export function GoogleMapsProvider({ children }: { children: React.ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const initGoogleMaps = async () => {
-      try {
-        const loader = GoogleMapsLoader.getInstance();
-        await loader.load({
-          libraries: GOOGLE_MAPS_LIBRARIES
-        });
-        setIsLoaded(true);
-      } catch (err) {
-        console.error('Failed to load Google Maps:', err);
-        setError(err instanceof Error ? err : new Error('Failed to load Google Maps'));
-      }
-    };
+    if (typeof window === 'undefined') return;
 
-    initGoogleMaps();
+    const loader = new Loader({
+      apiKey: env.NEXT_PUBLIC_GOOGLE_MAPS_KEY,
+      version: 'weekly',
+      libraries: ['places', 'geometry', 'drawing'],
+    });
+
+    loader.load()
+      .then(() => {
+        console.log('Google Maps loaded successfully');
+        setIsLoaded(true);
+      })
+      .catch((err) => {
+        console.error('Google Maps load error:', err);
+        setError(err);
+      });
   }, []);
 
   return (
@@ -49,5 +46,9 @@ export function GoogleMapsProvider({ children }: { children: React.ReactNode }) 
 }
 
 export function useGoogleMaps() {
-  return useContext(GoogleMapsContext);
+  const context = useContext(GoogleMapsContext);
+  if (!context) {
+    throw new Error('useGoogleMaps must be used within a GoogleMapsProvider');
+  }
+  return context;
 } 

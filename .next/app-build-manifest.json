@@ -3,18 +3,13 @@
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
+      "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
     "/(protected)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(protected)/layout.js"
-    ],
-    "/(protected)/route-planner/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/(protected)/route-planner/page.css",
-      "static/chunks/app/(protected)/route-planner/page.js"
     ],
     "/(protected)/route-planner/layout": [
       "static/chunks/webpack.js",
@@ -26,10 +21,16 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(protected)/route-planner/loading.js"
     ],
-    "/not-found": [
+    "/(protected)/route-planner/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/not-found.js"
+      "static/css/app/(protected)/route-planner/page.css",
+      "static/chunks/app/(protected)/route-planner/page.js"
+    ],
+    "/api/weather/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/weather/route.js"
     ]
   }
 }

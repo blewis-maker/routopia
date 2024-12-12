@@ -26,6 +26,8 @@ import { AIMonitoring } from '@/services/monitoring/AIMonitoring';
 import { useRouteStore } from '@/stores/routeStore';
 import { useProgressStore } from '@/stores/progressStore';
 import { ServiceErrorBoundary } from '@/components/error-boundaries/ServiceErrorBoundary';
+import { useSession } from 'next-auth/react';
+import { Route } from '@/types/route/types';
 
 interface RouteStatusIndicator {
   icon: JSX.Element;
@@ -150,6 +152,7 @@ export function SavedRoutes() {
   const { setProgress } = useProgressStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { data: session } = useSession();
 
   // Services
   const activityService = new UserActivityService();
@@ -165,66 +168,17 @@ export function SavedRoutes() {
   });
 
   const loadSavedRoutes = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    if (!session?.user?.id) return;
+
     try {
-      // Try cache first
-      const cached = await routeCache.get<SavedRoute[]>('saved-routes');
-      if (cached) {
-        setRoutes(validateRouteArray(cached));
-        return;
-      }
-
-      // Fetch with retry if cache miss
-      const recentRoutes = await retryWithBackoff(
-        () => activityService.getRecentRoutes(),
-        { maxAttempts: 3 }
-      );
-
-      const savedRoutes = validateRouteArray(
-        recentRoutes
-          .filter(route => route.id)
-          .map(route => ({
-            id: route.id!,
-            name: `Route ${route.id}`,
-            activityType: route.activityType,
-            distance: route.distance,
-            duration: route.duration,
-            startPoint: typeof route.startPoint === 'string' 
-              ? JSON.parse(route.startPoint)
-              : route.startPoint,
-            endPoint: typeof route.endPoint === 'string'
-              ? JSON.parse(route.endPoint)
-              : route.endPoint,
-            activities: [{
-              type: route.activityType,
-              duration: route.duration,
-              distance: route.distance
-            }],
-            status: {
-              id: route.id!,
-              timestamp: new Date(),
-              conditions: {}
-            },
-            lastChecked: new Date()
-          }))
-      );
-
-      setRoutes(savedRoutes);
-      await routeCache.set('saved-routes', savedRoutes);
-      
-      // Initialize monitoring
-      savedRoutes.forEach(route => {
-        subscribeToRouteUpdates(route.id);
-      });
+      const routes = await routeCache.getSavedRoutes(session.user.id);
+      setRoutes(routes);
     } catch (error) {
-      AIMonitoring.logRouteRecommendationError(error, {
-        operation: 'loadSavedRoutes'
-      });
-      console.error('Failed to load saved routes:', error);
+      console.error('Error loading saved routes:', error);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  }, []);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     loadSavedRoutes();

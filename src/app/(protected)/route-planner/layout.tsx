@@ -5,36 +5,35 @@ import AppShell from '@/components/layout/AppShell';
 import { ProgressProvider } from '@/contexts/ProgressContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { authOptions } from '@/lib/auth';
-import { GoogleMapsProvider } from '@/contexts/GoogleMapsContext';
 import { SavedRoutes } from '@/components/route-planner/SavedRoutes';
+import ClientLayout from './ClientLayout';
 
-interface RoutePlannerLayoutProps {
+export default async function RoutePlannerLayout({
+  children,
+}: {
   children: ReactNode;
-}
-
-export default async function RoutePlannerLayout({ children }: RoutePlannerLayoutProps) {
+}) {
   const session = await getServerSession(authOptions);
 
-  // Redirect unauthenticated users to marketing page
-  if (!session) {
+  if (!session?.user) {
     redirect('/');
   }
 
   return (
     <AppShell>
       <ErrorBoundary>
-        <GoogleMapsProvider>
-          <ProgressProvider>
-            <div className="fixed inset-0 top-16 overflow-hidden">
-              <div className="flex h-full">
-                <div className="flex-1 relative">
+        <ProgressProvider>
+          <div className="fixed inset-0 top-16 overflow-hidden">
+            <div className="flex h-full">
+              <div className="flex-1 relative">
+                <ClientLayout>
                   {children}
-                </div>
-                <SavedRoutes />
+                </ClientLayout>
               </div>
+              <SavedRoutes userId={session.user.id} />
             </div>
-          </ProgressProvider>
-        </GoogleMapsProvider>
+          </div>
+        </ProgressProvider>
       </ErrorBoundary>
     </AppShell>
   );
