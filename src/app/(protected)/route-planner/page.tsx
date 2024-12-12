@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Location } from '@/types';
 import { MapView } from '@/components/shared/MapView';
 import { WeatherWidget } from '@/components/route-planner/WeatherWidget';
@@ -15,7 +15,7 @@ import { GoogleMapsManager } from '@/services/maps/GoogleMapsManager';
 import { MapToolbar } from '@/components/map/MapToolbar';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
-import { Clock, Map } from 'lucide-react';
+import { Clock, Map, MapPinPlus } from 'lucide-react';
 import { Route } from '@/types/route/types';
 import { AIChat } from '@/components/chat/AIChat';
 import { ChatMessage } from '@/types/chat/types';
@@ -38,6 +38,7 @@ import { convertRouteToVisualization } from '@/lib/utils/routeConversion';
 import { useGoogleMaps } from '@/contexts/GoogleMapsContext';
 import { MapErrorBoundary } from '@/components/error/MapErrorBoundary';
 import { HybridMapService } from '@/services/maps/HybridMapService';
+import { cn } from '@/lib/utils';
 
 interface WeatherInfo {
   location: string;
@@ -127,6 +128,10 @@ export default function RoutePlannerPage() {
   const [routeType, setRouteType] = useState<'drive' | 'bike' | 'run' | 'ski' | 'adventure'>('drive');
   const [isMapInitialized, setIsMapInitialized] = useState(false);
   const initializationRef = useRef<boolean>(false);
+  const [isWeatherVisible, setIsWeatherVisible] = useState(true);
+  const [mapService, setMapService] = useState<HybridMapService | null>(null);
+  const [waypoints, setWaypoints] = useState<Location[]>([]);
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
 
   // 3. All context hooks
   const { theme } = useTheme();
@@ -385,28 +390,30 @@ export default function RoutePlannerPage() {
     }
   };
 
-  // Update location select handler
-  const handleLocationSelect = async (result: SearchResult) => {
-    if (!mapServiceRef.current?.isReady()) return;
-
-    try {
-      const location: Location = {
-        coordinates: result.coordinates,
-        address: result.formatted_address
-      };
-
+  const handleLocationSelect = async (location: Location, type: 'origin' | 'destination') => {
+    if (type === 'origin') {
       setUserLocation(location);
-      
-      if (isMapInitialized) { // Check if map is initialized
-        await mapServiceRef.current.addUserLocationMarker({
-          lat: location.coordinates[1],
-          lng: location.coordinates[0]
+    } else {
+      setDestinationLocation(location);
+    }
+
+    // If we have both origin and destination, calculate route
+    if (mapServiceRef.current && userLocation && destinationLocation) {
+      try {
+        const route = await mapServiceRef.current.calculateRoute({
+          origin: type === 'origin' ? location : userLocation,
+          destination: type === 'destination' ? location : destinationLocation,
+          waypoints: [] // We can add waypoint support later
         });
 
-        mapServiceRef.current.setCenter([location.coordinates[0], location.coordinates[1]]);
+        // Update route visualization
+        await mapServiceRef.current.updateRouteVisualization(route);
+        
+        // Update route state if needed
+        setMainRoute(route);
+      } catch (error) {
+        console.error('Failed to calculate route:', error);
       }
-    } catch (error) {
-      console.error('Error handling location select:', error);
     }
   };
 
@@ -818,6 +825,48 @@ export default function RoutePlannerPage() {
     }
   };
 
+  const handleRouteUpdate = (route: {
+    origin: Location;
+    destination: Location;
+    waypoints: Location[];
+    path: any;
+  }) => {
+    console.log('Route updated:', route);
+    // We can integrate this with your existing route state management
+  };
+
+  // Add waypoint management
+  const addWaypoint = () => {
+    setWaypoints([...waypoints]);
+  };
+
+  const removeWaypoint = (index: number) => {
+    const newWaypoints = waypoints.filter((_, i) => i !== index);
+    setWaypoints(newWaypoints);
+    updateRoute();
+  };
+
+  // Update the route calculation to include waypoints
+  const updateRoute = async () => {
+    if (!mapServiceRef.current || !userLocation || !destinationLocation) return;
+    
+    setIsCalculatingRoute(true);
+    try {
+      const route = await mapServiceRef.current.calculateRoute({
+        origin: userLocation,
+        destination: destinationLocation,
+        waypoints: waypoints.filter(wp => wp !== null)
+      });
+
+      await mapServiceRef.current.updateRouteVisualization(route);
+      setMainRoute(route);
+    } catch (error) {
+      console.error('Failed to calculate route:', error);
+    } finally {
+      setIsCalculatingRoute(false);
+    }
+  };
+
   return (
     <ProgressProvider>
       <ErrorBoundary>
@@ -846,7 +895,7 @@ export default function RoutePlannerPage() {
                   center: mapCenter,
                   zoom: mapZoom
                 }}
-                showWeather={false}
+                showWeather={isWeatherVisible}
                 showUserLocation={true}
                 darkMode={theme === 'dark'}
                 onMapInit={handleMapInit}
@@ -866,9 +915,9 @@ export default function RoutePlannerPage() {
                 <div className="absolute top-4 left-4 z-10 w-96 max-w-[calc(100%-2rem)] space-y-2">
                   <ErrorBoundary>
                     <SearchBox 
-                      onSelect={handleLocationSelect}
+                      onSelect={(location) => handleLocationSelect(location, 'origin')}
                       placeholder="Set your starting point..."
-                      useCurrentLocation={true}
+                      isLoading={isCalculatingRoute}
                       initialValue={userLocation?.address || ''}
                       key={`start-${userLocation?.coordinates?.join(',')}-${Date.now()}`}
                       className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
@@ -877,13 +926,65 @@ export default function RoutePlannerPage() {
                   </ErrorBoundary>
                   <ErrorBoundary>
                     <SearchBox 
-                      onSelect={handleDestinationSelect}
+                      onSelect={(location) => handleLocationSelect(location, 'destination')}
                       placeholder="Choose destination..."
+                      isLoading={isCalculatingRoute}
                       initialValue={destinationLocation?.address || ''}
                       key={`end-${destinationLocation?.coordinates?.join(',')}-${Date.now()}`}
                       className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
                     />
                   </ErrorBoundary>
+                  
+                  {waypoints.map((waypoint, index) => (
+                    <div key={index} className="relative">
+                      <SearchBox 
+                        onSelect={(location) => {
+                          const newWaypoints = [...waypoints];
+                          newWaypoints[index] = location;
+                          setWaypoints(newWaypoints);
+                          updateRoute();
+                        }}
+                        placeholder={`Stop ${index + 1}`}
+                        isLoading={isCalculatingRoute}
+                        className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
+                      />
+                      <button
+                        onClick={() => removeWaypoint(index)}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 -translate-x-full mr-2 
+                                   text-stone-400 hover:text-red-400 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {waypoints.length < 5 && (
+                    <button 
+                      onClick={addWaypoint}
+                      className={cn(
+                        "flex items-center gap-2",
+                        "px-3 py-1.5",
+                        "text-sm text-stone-300",
+                        "bg-[#1B1B1B]",
+                        "border border-stone-800",
+                        "rounded",
+                        "transition-all duration-200",
+                        "hover:bg-stone-800",
+                        "hover:text-teal-500",
+                        "hover:shadow-[0_0_8px_rgba(45,212,191,0.3)]",
+                        "active:translate-y-[1px]",
+                        "group"
+                      )}
+                    >
+                      <MapPinPlus className={cn(
+                        "w-4 h-4",
+                        "transition-colors duration-200",
+                        "group-hover:text-teal-500",
+                        "group-hover:animate-pulse-analog"
+                      )} />
+                      <span className="font-medium tracking-wide">Add stop</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Weather Widget */}

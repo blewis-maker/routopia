@@ -1,5 +1,6 @@
 {
   "/icon/[[...__metadata_id__]]/route": "app/icon/[[...__metadata_id__]]/route.js",
+  "/not-found": "app/not-found.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
   "/api/routes/saved/route": "app/api/routes/saved/route.js",

@@ -637,7 +637,7 @@ export class HybridMapService {
       this.mapbox.removeSource('route');
     }
 
-    // Add the route source and layer
+    // Add the route source and layer with enhanced styling
     this.mapbox.addSource('route', {
       type: 'geojson',
       data: {
@@ -650,7 +650,7 @@ export class HybridMapService {
       }
     });
 
-    // Add route layer with our styling
+    // Add route layer with enhanced styling
     this.mapbox.addLayer({
       id: 'route',
       type: 'line',
@@ -661,10 +661,41 @@ export class HybridMapService {
       },
       paint: {
         'line-color': '#00B2B2',
-        'line-width': 4,
-        'line-opacity': 0.8
+        'line-width': ['interpolate', ['linear'], ['zoom'],
+          10, 3,
+          15, 6
+        ],
+        'line-opacity': 0.8,
+        'line-blur': 0.5,
+        'line-gradient': [
+          'interpolate',
+          ['linear'],
+          ['line-progress'],
+          0, '#00B2B2',
+          1, '#80FFD4'
+        ]
       }
     });
+
+    // Add glow effect
+    this.mapbox.addLayer({
+      id: 'route-glow',
+      type: 'line',
+      source: 'route',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#00B2B2',
+        'line-width': ['interpolate', ['linear'], ['zoom'],
+          10, 6,
+          15, 12
+        ],
+        'line-opacity': 0.2,
+        'line-blur': 3
+      }
+    }, 'route');
 
     // Fit bounds to show the entire route
     this.mapbox.fitBounds([

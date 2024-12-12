@@ -12,6 +12,7 @@ interface SearchBoxProps {
   className?: string;
   initialValue?: string;
   onError?: (error: Error) => void;
+  isLoading?: boolean;
 }
 
 export function SearchBox({
@@ -19,14 +20,14 @@ export function SearchBox({
   onSelect,
   className,
   initialValue = '',
-  onError
+  onError,
+  isLoading
 }: SearchBoxProps) {
   const [value, setValue] = useState(initialValue);
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const { isLoaded } = useGoogleMaps();
-  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     // Inject custom styles for the dropdown
@@ -68,8 +69,6 @@ export function SearchBox({
     if (!isLoaded || !inputRef.current) return;
 
     try {
-      setIsLoading(true);
-      
       autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
         fields: ['formatted_address', 'geometry', 'name'],
         types: ['address', 'establishment']
@@ -98,8 +97,6 @@ export function SearchBox({
       });
     } catch (error) {
       onError?.(error instanceof Error ? error : new Error('Failed to initialize search'));
-    } finally {
-      setIsLoading(false);
     }
 
     return () => {
@@ -128,15 +125,11 @@ export function SearchBox({
         "border border-stone-800/50",
         "rounded-lg",
         "transition-all duration-200",
-        isFocused && "border-teal-500/50 shadow-lg shadow-teal-500/10"
+        isFocused && "border-teal-500/50 shadow-lg shadow-teal-500/10",
+        isLoading && "opacity-75"
       )}>
         {isLoading ? (
-          <Loader2 className={cn(
-            "absolute left-3",
-            "w-4 h-4",
-            "text-stone-400",
-            "animate-spin"
-          )} />
+          <Loader2 className="absolute left-3 w-4 h-4 text-teal-500 animate-spin" />
         ) : (
           <Search className={cn(
             "absolute left-3",
@@ -164,6 +157,7 @@ export function SearchBox({
             "placeholder:text-stone-500",
             "focus:outline-none"
           )}
+          disabled={isLoading}
         />
 
         {value && (
