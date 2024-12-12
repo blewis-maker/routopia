@@ -139,72 +139,59 @@ export default function RoutePlannerPage() {
 
   // 4. Single useEffect for initialization
   useEffect(() => {
-    let mounted = true;
-
-    const initGoogleServices = async () => {
-      if (!isLoaded || !mounted) return;
-
+    const initializeMap = async () => {
+      if (initializationRef.current || !isLoaded || error) return;
+      
       try {
-        if (!geocoder.current) {
-          geocoder.current = new google.maps.Geocoder();
-        }
-
+        // Initialize map service
+        const mapService = new HybridMapService();
+        await mapService.initialize();
+        mapServiceRef.current = mapService;
+        setMapService(mapService);
+        
         // Get user's location
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            timeout: 10000,
-            maximumAge: 0,
-            enableHighAccuracy: true
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject);
           });
-        });
 
-        if (!mounted) return;
+          // Reverse geocode the coordinates to get the address
+          const geocoder = new google.maps.Geocoder();
+          const latlng = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
 
-        const { latitude: lat, longitude: lng } = position.coords;
+          const result = await geocoder.geocode({ location: latlng });
+          if (result.results[0]) {
+            const location: Location = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+              address: result.results[0].formatted_address,
+              isCurrentLocation: true
+            };
 
-        // Reverse geocode to get address
-        const result = await geocoder.current.geocode({
-          location: { lat, lng }
-        });
-
-        if (!mounted) return;
-
-        if (result.results[0]) {
-          const address = result.results[0].formatted_address;
-          const addressParts = address.split(',').map(part => part.trim());
-          const street = addressParts[0];
-          const city = addressParts[1];
-          const state = addressParts[2]?.split(' ')[0];
-          const displayAddress = `${street}, ${city}, ${state}`;
-
-          if (mounted) {
-            setUserLocation({
-              coordinates: [lng, lat],
-              address: displayAddress
-            });
-
-            setMapCenter({ lat, lng });
-            setMapZoom(14);
+            // Update user location with the geocoded address
+            setUserLocation(location);
             
-            setWeatherInfo({
-              location: address,
-              coordinates: [lng, lat]
-            });
-
-            await fetchWeatherData(lat, lng, address);
+            // Center map on user location
+            mapService.setCenter([location.lng, location.lat]);
+            mapService.setZoom(13);
+            await mapService.addUserLocationMarker(location);
           }
+        } catch (locationError) {
+          console.error('Error getting user location:', locationError);
         }
+
+        initializationRef.current = true;
+        setIsMapInitialized(true);
       } catch (error) {
-        console.error('Error initializing services:', error);
+        console.error('Failed to initialize map:', error);
       }
     };
 
-    initGoogleServices();
-
-    return () => {
-      mounted = false;
-    };
-  }, [isLoaded]); // Only depend on isLoaded
+    initializeMap();
+  }, [isLoaded, error]); // Dependencies remain the same
 
   // Update the map init handler
   const handleMapInit = async (service: HybridMapService) => {
@@ -395,24 +382,31 @@ export default function RoutePlannerPage() {
 
     try {
       if (type === 'origin') {
-        setUserLocation(location);
-        
-        // Update marker and map view for origin
+        setUserLocation({
+          ...location,
+          isCurrentLocation: location.isCurrentLocation || false
+        });
+
+        // Always fetch weather for origin if no destination is set
+        if (!destinationLocation) {
+          await fetchWeatherData(location.lat, location.lng, location.address);
+        }
+
         await mapServiceRef.current.addUserLocationMarker({
           lat: location.lat,
           lng: location.lng
         });
 
-        // If no destination is set, zoom to origin
         if (!destinationLocation) {
           mapServiceRef.current.setCenter([location.lng, location.lat]);
-          mapServiceRef.current.setZoom(13); // Adjust zoom level as needed
+          mapServiceRef.current.setZoom(13);
         }
       } else {
         setDestinationLocation(location);
+        // Always fetch weather for destination when it's set
+        await fetchWeatherData(location.lat, location.lng, location.address);
       }
 
-      // If we have both origin and destination, calculate and display route
       if (mapServiceRef.current && 
           (type === 'origin' ? location : userLocation) && 
           (type === 'destination' ? location : destinationLocation)) {
@@ -425,9 +419,7 @@ export default function RoutePlannerPage() {
             waypoints: waypoints.filter(Boolean)
           });
 
-          // Update route visualization - this will also handle appropriate zoom
           await mapServiceRef.current.updateRouteVisualization(route);
-          
           setMainRoute(route);
         } catch (error) {
           console.error('Failed to calculate route:', error);
@@ -486,6 +478,7 @@ export default function RoutePlannerPage() {
   };
 
   const fetchWeatherData = async (lat: number, lng: number, location?: string) => {
+    console.log('Fetching weather:', { lat, lng, location });
     try {
       console.log('Fetching weather for:', { lat, lng, location });
       
@@ -502,17 +495,11 @@ export default function RoutePlannerPage() {
         throw new Error('Invalid weather data received');
       }
 
-      setWeatherData({
-        temperature: data.temperature,
-        conditions: data.conditions,
-        windSpeed: data.windSpeed,
-        humidity: data.humidity,
-        icon: data.icon,
-        location: location
-      });
+      setWeatherData(data);
+      console.log('Weather data set:', data);
 
     } catch (error) {
-      console.error('Error fetching weather:', error);
+      console.error('Failed to fetch weather:', error);
       // Set a default state instead of null
       setWeatherData({
         temperature: 0,
@@ -910,6 +897,35 @@ export default function RoutePlannerPage() {
     }
   };
 
+  // Add a handler for when user uses their current location
+  const handleUseCurrentLocation = async () => {
+    if (!mapServiceRef.current) return;
+
+    try {
+      const position = await getCurrentPosition();
+      const location: Location = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        address: 'Current Location', // You might want to reverse geocode this
+        isCurrentLocation: true
+      };
+      
+      handleLocationSelect(location, 'origin');
+    } catch (error) {
+      console.error('Error getting current location:', error);
+    }
+  };
+
+  const getCurrentPosition = () => {
+    return new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        timeout: 10000,
+        maximumAge: 0,
+        enableHighAccuracy: true
+      });
+    });
+  };
+
   return (
     <ProgressProvider>
       <ErrorBoundary>
@@ -945,7 +961,7 @@ export default function RoutePlannerPage() {
               />
             </MapErrorBoundary>
 
-            {isMapInitialized && ( // Only show UI when map is initialized
+            {isMapInitialized && (
               <>
                 <MapToolbar 
                   mapIntegration={mapServiceRef.current}
@@ -965,6 +981,7 @@ export default function RoutePlannerPage() {
                       key={`start-${userLocation?.coordinates?.join(',')}-${Date.now()}`}
                       className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
                       isLocationSet={!!userLocation}
+                      isUserLocation={userLocation?.isCurrentLocation}
                     />
                   </ErrorBoundary>
                   <ErrorBoundary>
@@ -1050,12 +1067,19 @@ export default function RoutePlannerPage() {
                   )}
                 </div>
 
-                {/* Weather Widget */}
-                {weatherData && (
-                  <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-                    <WeatherWidget data={weatherData} />
-                  </div>
-                )}
+                {/* Weather Widget - Always show, with loading state if needed */}
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+                  <WeatherWidget 
+                    data={weatherData || {
+                      temperature: 0,
+                      conditions: 'Loading weather...',
+                      windSpeed: 0,
+                      humidity: 0,
+                      icon: '01d',
+                      location: 'Loading location...'
+                    }} 
+                  />
+                </div>
               </>
             )}
 

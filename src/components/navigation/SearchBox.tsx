@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useGoogleMaps } from '@/contexts/GoogleMapsContext';
-import { Locate, LocateFixed } from 'lucide-react';
+import { Search, X, Loader2, CircleX, LocateFixed, Locate } from 'lucide-react';
 import { baseStyles, roundedStyles, glassStyles, inputStyles } from '@/styles/components';
 import { cn } from '@/lib/utils';
 
@@ -99,15 +99,19 @@ interface SearchBoxProps {
   useCurrentLocation?: boolean;
   className?: string;
   isLocationSet?: boolean;
+  isUserLocation?: boolean;
+  isLoading?: boolean;
 }
 
 export function SearchBox({ 
   onSelect, 
-  placeholder = 'Search locations...', 
+  placeholder = 'Search location...', 
   useCurrentLocation = false,
   initialValue = '',
   className = '',
-  isLocationSet = false
+  isLocationSet = false,
+  isUserLocation = false,
+  isLoading = false
 }: SearchBoxProps) {
   const [inputValue, setInputValue] = useState(initialValue);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -175,56 +179,96 @@ export function SearchBox({
   };
 
   return (
-    <div className={cn(
-      baseStyles.card,
-      roundedStyles.lg,
-      glassStyles.dark,
-      'w-full relative',
-      className
-    )}>
-      <input
-        ref={inputRef}
-        type="text"
-        value={inputValue}
-        onChange={handleInputChange}
-        placeholder={placeholder}
-        className={cn(
-          baseStyles.input,
-          'w-full bg-transparent px-4 py-2.5',
-          'text-stone-200 placeholder-stone-500',
-          'text-sm font-medium',
-          inputStyles.dark
+    <div className={cn(baseStyles.container, className)}>
+      <div className={cn(
+        "relative flex items-center",
+        "bg-[#1B1B1B]/95",
+        "backdrop-blur-sm",
+        "border border-stone-800/50",
+        "rounded-xl",
+        "transition-all duration-200",
+        "hover:border-stone-700/50",
+        className
+      )}>
+        {isLoading ? (
+          <Search className="absolute left-3 w-4 h-4 text-teal-500 animate-spin" />
+        ) : (
+          <Search className={cn(
+            "absolute left-3 w-4 h-4",
+            "text-stone-400"
+          )} />
         )}
-      />
 
-      {useCurrentLocation && (
-        <button
-          className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${
-            isLocationSet ? 'text-emerald-500 hover:text-emerald-400' : 'text-stone-400 hover:text-stone-300'
-          }`}
-          onClick={() => {
-            if (navigator.geolocation) {
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
-                  onSelect({
-                    coordinates: [position.coords.longitude, position.coords.latitude],
-                    formatted_address: 'Current Location'
-                  });
-                },
-                (error) => {
-                  console.error('Error getting location:', error);
-                }
-              );
-            }
-          }}
-        >
-          {isLocationSet ? (
-            <LocateFixed className="w-4 h-4" />
-          ) : (
-            <Locate className="w-4 h-4" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputValue}
+          onChange={handleInputChange}
+          placeholder={placeholder}
+          className={cn(
+            "w-full",
+            "bg-transparent",
+            "px-9 py-2.5",
+            "text-sm font-medium",
+            "text-stone-200",
+            "placeholder:text-stone-500",
+            "focus:outline-none",
+            "transition-colors"
           )}
-        </button>
-      )}
+        />
+
+        {isLocationSet && (
+          <div className="absolute right-3 flex items-center gap-2">
+            {isUserLocation ? (
+              <LocateFixed 
+                className={cn(
+                  "w-4 h-4",
+                  "text-emerald-500",
+                  "animate-pulse",
+                  "filter drop-shadow-[0_0_2px_rgba(16,185,129,0.3)]",
+                  "transition-all duration-300"
+                )}
+              />
+            ) : (
+              <Locate 
+                className={cn(
+                  "w-4 h-4",
+                  "text-emerald-600/70",
+                  "transition-all duration-300"
+                )}
+              />
+            )}
+          </div>
+        )}
+
+        {useCurrentLocation && !isLocationSet && (
+          <button
+            className={cn(
+              "absolute right-3",
+              "text-stone-400",
+              "hover:text-stone-300",
+              "transition-colors"
+            )}
+            onClick={() => {
+              if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                  (position) => {
+                    onSelect({
+                      coordinates: [position.coords.longitude, position.coords.latitude],
+                      formatted_address: 'Current Location'
+                    });
+                  },
+                  (error) => {
+                    console.error('Error getting location:', error);
+                  }
+                );
+              }
+            }}
+          >
+            <Locate className="w-4 h-4" />
+          </button>
+        )}
+      </div>
     </div>
   );
 } 

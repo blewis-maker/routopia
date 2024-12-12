@@ -1,6 +1,9 @@
 export interface Location {
-  coordinates: [number, number];
+  lat: number;
+  lng: number;
   address: string;
+  name?: string;
+  isCurrentLocation?: boolean;
 }
 
 export interface Route {
