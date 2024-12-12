@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { styleGuide as sg } from '@/lib/style-guide';
 
 export function MainNav() {
   const pathname = usePathname();
@@ -16,8 +18,12 @@ export function MainNav() {
         <Link
           key={link.href}
           href={link.href}
-          className={`text-sm font-medium transition-colors hover:text-stone-200
-            ${pathname === link.href ? 'text-stone-200' : 'text-stone-400'}`}
+          className={cn(
+            sg.typography.sizes.sm,
+            "transition-colors",
+            "hover:text-stone-200",
+            pathname === link.href ? sg.colors.text.primary : sg.colors.text.secondary
+          )}
         >
           {link.label}
         </Link>

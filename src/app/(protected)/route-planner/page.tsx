@@ -979,7 +979,6 @@ export default function RoutePlannerPage() {
                       isLoading={isCalculatingRoute}
                       initialValue={userLocation?.address || ''}
                       key={`start-${userLocation?.coordinates?.join(',')}-${Date.now()}`}
-                      className="bg-[#1B1B1B]/95 backdrop-blur-sm border-stone-800/50"
                       isLocationSet={!!userLocation}
                       isUserLocation={userLocation?.isCurrentLocation}
                     />

@@ -1,6 +1,34 @@
 import { colors } from './src/styles/tokens/colors';
 import { typography } from './src/styles/tokens/typography';
 
+const styleGuide = {
+  colors: {
+    border: {
+      primary: 'border-stone-800/50',
+    },
+    text: {
+      primary: 'text-stone-200',
+      secondary: 'text-stone-400',
+      accent: 'text-teal-500'
+    },
+    background: {
+      primary: 'bg-stone-950/80',
+    }
+  },
+  effects: {
+    glass: 'backdrop-blur-md',
+    shadow: 'shadow-lg shadow-black/10',
+  },
+  typography: {
+    base: 'font-sans antialiased',
+    sizes: {
+      xs: 'text-xs',
+      sm: 'text-sm font-medium',
+      base: 'text-base',
+    }
+  }
+};
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -63,19 +91,33 @@ module.exports = {
   plugins: [
     function({ addComponents }) {
       addComponents({
-        '.btn': {
-          '@apply relative isolate overflow-hidden transition-all duration-200': {},
-          '&:before': {
-            content: '""',
-            '@apply absolute inset-0 z-[-1]': {},
+        '.glass-panel': {
+          '@apply relative isolate overflow-hidden': {},
+          '@apply bg-stone-950/80 backdrop-blur-md': {},
+          '@apply border border-stone-800/50': {},
+          '@apply shadow-lg shadow-black/10': {},
+          '@apply rounded-lg': {},
+          '@apply transition-all duration-200': {},
+          '&:hover': {
+            '@apply bg-stone-900/80 border-stone-700/60': {},
+            '@apply shadow-lg shadow-black/15': {},
+          },
+          '&:focus': {
+            '@apply outline-none ring-2 ring-teal-500/20': {},
           }
         },
-        '.glass-panel': {
-          '@apply relative isolate overflow-hidden backdrop-blur-sm': {},
-          '&:before': {
-            content: '""',
-            '@apply absolute inset-0 z-[-1]': {},
-          }
+        '.btn': {
+          '@apply relative isolate overflow-hidden': {},
+          '@apply px-4 py-2': {},
+          '@apply text-sm font-medium': {},
+          '@apply bg-stone-950/80 backdrop-blur-md': {},
+          '@apply border border-stone-800/50': {},
+          '@apply rounded-lg': {},
+          '@apply transition-all duration-200': {},
+          '@apply hover:bg-stone-900/80 hover:border-stone-700/60': {},
+          '@apply hover:shadow-lg hover:shadow-black/15': {},
+          '@apply active:translate-y-[1px]': {},
+          '@apply focus:outline-none focus:ring-2 focus:ring-teal-500/20': {},
         }
       });
     },

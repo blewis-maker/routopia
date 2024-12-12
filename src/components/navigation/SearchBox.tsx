@@ -179,16 +179,18 @@ export function SearchBox({
   };
 
   return (
-    <div className={cn(baseStyles.container, className)}>
+    <div className={cn("w-full", className)}>
       <div className={cn(
         "relative flex items-center",
-        "bg-[#1B1B1B]/95",
-        "backdrop-blur-sm",
+        "bg-stone-950/80",
+        "backdrop-blur-md",
         "border border-stone-800/50",
         "rounded-xl",
+        "shadow-lg shadow-black/10",
         "transition-all duration-200",
-        "hover:border-stone-700/50",
-        className
+        "hover:border-stone-700/60",
+        "hover:shadow-lg hover:shadow-black/15",
+        "group"
       )}>
         {isLoading ? (
           <Search className="absolute left-3 w-4 h-4 text-teal-500 animate-spin" />
@@ -244,6 +246,7 @@ export function SearchBox({
         {useCurrentLocation && !isLocationSet && (
           <button
             className={cn(
+              "btn",
               "absolute right-3",
               "text-stone-400",
               "hover:text-stone-300",

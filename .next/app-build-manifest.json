@@ -1,15 +1,15 @@
 {
   "pages": {
+    "/(protected)/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(protected)/layout.js"
+    ],
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
-    ],
-    "/(protected)/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(protected)/layout.js"
     ],
     "/(protected)/route-planner/page": [
       "static/chunks/webpack.js",
@@ -26,21 +26,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(protected)/route-planner/loading.js"
-    ],
-    "/(marketing)/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(marketing)/page.js"
-    ],
-    "/(marketing)/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(marketing)/layout.js"
-    ],
-    "/(protected)/settings/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(protected)/settings/page.js"
     ]
   }
 }
