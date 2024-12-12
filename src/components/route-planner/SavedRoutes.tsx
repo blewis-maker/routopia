@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { styleGuide as sg } from '@/styles/theme/styleGuide';
 import { 
   Bike, Car, Snowflake, Wind, 
-  AlertTriangle, Flame, Radio, 
+  AlertTriangle, Flame, Radio,
   Cloud, Timer, User2, MapPin, Clock,
   Loader2, Map as MapIcon
 } from 'lucide-react';
@@ -40,30 +40,57 @@ interface RouteStatusIndicator {
 // Update the styles to match the chat interface aesthetic
 const routeStyles = {
   container: cn(
-    "bg-stone-900/80",
-    "backdrop-blur-md",
-    "border border-stone-800/50",
-    "rounded-lg",
-    "shadow-xl",
-    "font-inter"
+    "absolute",
+    "top-4",
+    "right-4",
+    "transition-all duration-300 ease-in-out",
+    "font-sans",
+    "flex flex-col",
+    "z-10"
   ),
+  expanded: "max-h-[calc(100vh-32px)] w-[400px]",
+  collapsed: "w-[400px]",
   header: {
     wrapper: cn(
       "px-4 py-3",
-      "bg-gradient-to-r from-stone-900/50 to-stone-800/30",
-      "border-b border-stone-700/30",
-      "flex items-center justify-between"
+      sg.colors.background.primary,
+      sg.colors.border.primary,
+      "border",
+      sg.effects.glass,
+      sg.effects.shadow,
+      "rounded-lg",
+      "flex items-center justify-between",
+      "min-h-[52px]",
+      "cursor-pointer",
+      "select-none",
+      "hover:bg-stone-900/20",
+      "transition-colors duration-200"
     ),
     title: cn(
-      "text-sm font-medium",
-      "text-stone-200",
+      sg.typography.base,
+      sg.typography.sizes.sm,
+      sg.colors.text.primary,
       "flex items-center gap-2"
+    ),
+    logo: cn(
+      "w-4 h-4",
+      sg.colors.text.accent,
+      "animate-logo-blink"
     ),
     status: cn(
       "flex items-center gap-2",
-      "text-xs",
-      "text-stone-400"
-    )
+      sg.typography.sizes.sm,
+      sg.colors.text.secondary
+    ),
+    statusDot: {
+      base: cn(
+        "w-1.5 h-1.5",
+        "rounded-full",
+        "animate-pulse-analog"
+      ),
+      active: "bg-emerald-500 shadow-emerald-500/50",
+      inactive: "bg-red-500 shadow-red-500/50",
+    }
   },
   indicator: {
     base: cn(
@@ -77,7 +104,7 @@ const routeStyles = {
     success: "bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20",
     warning: "bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/20",
     error: "bg-red-500/10 text-red-300 ring-1 ring-red-500/20",
-    blink: "animate-pulse"
+    blink: "animate-pulse-analog"
   },
   route: {
     wrapper: cn(
@@ -130,7 +157,25 @@ const routeStyles = {
       "text-center",
       "text-stone-400"
     )
-  }
+  },
+  content: cn(
+    "flex-1",
+    "mt-2",
+    sg.colors.background.primary,
+    sg.colors.border.primary,
+    "border",
+    sg.effects.glass,
+    sg.effects.shadow,
+    "rounded-lg",
+    "overflow-hidden",
+    "transition-all duration-300 ease-in-out",
+    "origin-top"
+  ),
+  contentInner: cn(
+    "h-full",
+    "overflow-y-auto",
+    "scrollbar-thin scrollbar-track-stone-800/50 scrollbar-thumb-stone-700/50"
+  )
 };
 
 export function SavedRoutesContainer() {
@@ -153,6 +198,7 @@ export function SavedRoutes() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { data: session } = useSession();
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Services
   const activityService = new UserActivityService();
@@ -198,6 +244,14 @@ export function SavedRoutes() {
   useEffect(() => {
     loadSavedRoutes();
   }, [loadSavedRoutes]);
+
+  useEffect(() => {
+    if (!isLoading && routes.length > 0) {
+      setIsExpanded(true);
+    } else if (!isLoading && routes.length === 0) {
+      setIsExpanded(false);
+    }
+  }, [isLoading, routes.length]);
 
   const subscribeToRouteUpdates = (routeId: string) => {
     notificationService.subscribeToRouteUpdates(routeId);
@@ -283,56 +337,159 @@ export function SavedRoutes() {
     }
   }, [setActiveRoute]);
 
+  const [isMonitoringActive, setIsMonitoringActive] = useState(true);
+
   return (
-    <div className={routeStyles.container}>
-      <div className={routeStyles.header.wrapper}>
+    <div className={cn(
+      routeStyles.container,
+      isExpanded ? routeStyles.expanded : routeStyles.collapsed
+    )}>
+      <div 
+        className={routeStyles.header.wrapper}
+        onClick={() => setIsExpanded(!isExpanded)}
+        role="button"
+        tabIndex={0}
+      >
         <div className={routeStyles.header.title}>
-          <span>$ routes</span>
-          <span className="text-stone-600">|</span>
-          <span>{routes.length} saved</span>
+          <svg 
+            className={routeStyles.header.logo} 
+            viewBox="0 0 35.2 35.2"
+          >
+            <circle
+              cx="17.6"
+              cy="5.6"
+              r="4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="m14.72,8.48l-6.24,6.24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <circle
+              cx="5.6"
+              cy="17.6"
+              r="4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="m9.6,17.6h16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <circle
+              cx="29.6"
+              cy="17.6"
+              r="4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="m20.48,26.72l6.24-6.24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <circle
+              cx="17.6"
+              cy="29.6"
+              r="4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span>routes</span>
+          {routes.length > 0 && (
+            <>
+              <span className="text-stone-600">|</span>
+              <span>{routes.length}</span>
+            </>
+          )}
         </div>
         <div className={routeStyles.header.status}>
-          <span>●</span>
+          <div className={cn(
+            routeStyles.header.statusDot.base,
+            isMonitoringActive 
+              ? routeStyles.header.statusDot.active 
+              : routeStyles.header.statusDot.inactive
+          )} />
           <span>monitoring active</span>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className={routeStyles.states.loading}>
-          <div className="w-8 h-8 mb-4">
-            <Loader2 className="w-full h-full animate-spin opacity-50" />
+      <div 
+        className={cn(
+          "transition-all duration-300 ease-in-out",
+          "transform",
+          isExpanded ? "opacity-100 scale-y-100" : "opacity-0 scale-y-0 h-0"
+        )}
+      >
+        <div className={routeStyles.content}>
+          <div className={routeStyles.contentInner}>
+            {isLoading ? (
+              <div className={routeStyles.states.loading}>
+                <div className="w-8 h-8 mb-4">
+                  <Loader2 className="w-full h-full animate-spin opacity-50" />
+                </div>
+                <p>Loading your routes...</p>
+              </div>
+            ) : error ? (
+              <div className={routeStyles.states.error}>
+                <AlertTriangle className="w-8 h-8 mb-4 opacity-50" />
+                <p className="mb-4">Failed to fetch routes</p>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    loadSavedRoutes();
+                  }}
+                  className="text-sm px-4 py-2 rounded-md bg-red-500/10 hover:bg-red-500/20 transition-colors"
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : routes.length === 0 ? (
+              <div className={routeStyles.states.empty}>
+                <MapIcon className="w-8 h-8 mb-4 opacity-50" />
+                <p className="mb-2">No saved routes yet</p>
+                <p className="text-sm">Create a new route to get started</p>
+              </div>
+            ) : (
+              <div>
+                {routes.map(route => (
+                  <RouteItem 
+                    key={route.id}
+                    route={route}
+                    onSelect={handleRouteSelect}
+                    indicators={statusIndicators[route.id]}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-          <p>Loading your routes...</p>
         </div>
-      ) : error ? (
-        <div className={routeStyles.states.error}>
-          <AlertTriangle className="w-8 h-8 mb-4 opacity-50" />
-          <p className="mb-4">{error}</p>
-          <button 
-            onClick={() => loadSavedRoutes()}
-            className="text-sm px-4 py-2 rounded-md bg-red-500/10 hover:bg-red-500/20 transition-colors"
-          >
-            Try Again
-          </button>
-        </div>
-      ) : routes.length === 0 ? (
-        <div className={routeStyles.states.empty}>
-          <MapIcon className="w-8 h-8 mb-4 opacity-50" />
-          <p className="mb-2">No saved routes yet</p>
-          <p className="text-sm">Create a new route to get started</p>
-        </div>
-      ) : (
-        <div>
-          {routes.map(route => (
-            <RouteItem 
-              key={route.id}
-              route={route}
-              onSelect={handleRouteSelect}
-              indicators={statusIndicators[route.id]}
-            />
-          ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
