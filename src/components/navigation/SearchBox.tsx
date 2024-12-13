@@ -5,6 +5,7 @@ import { useGoogleMaps } from '@/contexts/GoogleMapsContext';
 import { Search, X, Loader2, CircleX, LocateFixed, Locate } from 'lucide-react';
 import { baseStyles, roundedStyles, glassStyles, inputStyles } from '@/styles/components';
 import { cn } from '@/lib/utils';
+import { NeonIcon } from '@/components/ui/NeonIcon';
 
 // Add custom styles for Google Places Autocomplete dropdown
 const style = document.createElement('style');
@@ -120,8 +121,17 @@ export function SearchBox({
 
   // Update input value when initialValue changes
   useEffect(() => {
-    setInputValue(initialValue);
+    if (initialValue) {
+      setInputValue(initialValue);
+    }
   }, [initialValue]);
+
+  // Add a useEffect to handle current location text
+  useEffect(() => {
+    if (isUserLocation && !inputValue) {
+      setInputValue('Current Location');
+    }
+  }, [isUserLocation, inputValue]);
 
   // Initialize autocomplete when Google Maps is loaded
   useEffect(() => {
@@ -137,6 +147,15 @@ export function SearchBox({
       autocomplete.addListener('place_changed', () => {
         const place = autocomplete.getPlace();
         if (place.geometry?.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          
+          // Ensure we have valid coordinates
+          if (typeof lat !== 'number' || typeof lng !== 'number') {
+            console.error('Invalid coordinates from place:', place);
+            return;
+          }
+
           // Get address components
           const addressComponents = place.address_components || [];
           
@@ -150,13 +169,10 @@ export function SearchBox({
           const formattedAddress = `${streetNumber} ${street}, ${city}, ${state}`.trim();
 
           onSelect({
-            coordinates: [
-              place.geometry.location.lng(),
-              place.geometry.location.lat()
-            ],
-            formatted_address: formattedAddress,
-            place_name: place.name,
-            place_id: place.place_id
+            lat,
+            lng,
+            address: formattedAddress,
+            isCurrentLocation: false
           });
         }
       });
@@ -221,25 +237,12 @@ export function SearchBox({
 
         {isLocationSet && (
           <div className="absolute right-3 flex items-center gap-2">
-            {isUserLocation ? (
-              <LocateFixed 
-                className={cn(
-                  "w-4 h-4",
-                  "text-emerald-500",
-                  "animate-pulse",
-                  "filter drop-shadow-[0_0_2px_rgba(16,185,129,0.3)]",
-                  "transition-all duration-300"
-                )}
-              />
-            ) : (
-              <Locate 
-                className={cn(
-                  "w-4 h-4",
-                  "text-emerald-600/70",
-                  "transition-all duration-300"
-                )}
-              />
-            )}
+            <NeonIcon 
+              icon={isUserLocation ? LocateFixed : Locate}
+              color="green"
+              size="sm"
+              isActive={isUserLocation}
+            />
           </div>
         )}
 
@@ -257,8 +260,10 @@ export function SearchBox({
                 navigator.geolocation.getCurrentPosition(
                   (position) => {
                     onSelect({
-                      coordinates: [position.coords.longitude, position.coords.latitude],
-                      formatted_address: 'Current Location'
+                      lat: position.coords.latitude,
+                      lng: position.coords.longitude,
+                      address: 'Current Location',
+                      isCurrentLocation: true
                     });
                   },
                   (error) => {
@@ -268,7 +273,12 @@ export function SearchBox({
               }
             }}
           >
-            <Locate className="w-4 h-4" />
+            <NeonIcon 
+              icon={Locate}
+              color="green"
+              size="sm"
+              isActive={false}
+            />
           </button>
         )}
       </div>

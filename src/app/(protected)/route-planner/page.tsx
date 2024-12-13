@@ -40,6 +40,7 @@ import { MapErrorBoundary } from '@/components/error/MapErrorBoundary';
 import { HybridMapService } from '@/services/maps/HybridMapService';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { MapLoadingOverlay } from '@/components/map/MapLoadingOverlay';
 
 interface WeatherInfo {
   location: string;
@@ -118,8 +119,11 @@ export default function RoutePlannerPage() {
   const [userLocation, setUserLocation] = useState<Location | null>(null);
   const [destinationLocation, setDestinationLocation] = useState<Location | null>(null);
   const [weatherInfo, setWeatherInfo] = useState<WeatherInfo | null>(null);
-  const [mapCenter, setMapCenter] = useState<LatLng>({ lat: 40.5852602, lng: -105.0749801 });
-  const [mapZoom, setMapZoom] = useState(12);
+  const [mapCenter, setMapCenter] = useState<LatLng>({ 
+    lat: 40.5852602, 
+    lng: -105.0749801 
+  });
+  const [mapZoom, setMapZoom] = useState(14);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [activeLayer, setActiveLayer] = useState<'ROUTE' | 'SEARCH' | 'TRAFFIC' | 'LAYERS' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -134,6 +138,7 @@ export default function RoutePlannerPage() {
   const [waypoints, setWaypoints] = useState<Location[]>([]);
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
   const [isMovingMap, setIsMovingMap] = useState(false);
+  const [isMapLoading, setIsMapLoading] = useState(true);
 
   // 3. All context hooks
   const { theme } = useTheme();
@@ -145,9 +150,15 @@ export default function RoutePlannerPage() {
       if (initializationRef.current || !isLoaded || error) return;
       
       try {
-        // Initialize map service
+        setIsMapLoading(true); // Ensure loading is shown at start
+        
+        // Initialize map service with default center
         const mapService = new HybridMapService();
-        await mapService.initialize();
+        await mapService.initialize(undefined, {
+          center: [-105.0749801, 40.5852602], // Fort Collins as default
+          zoom: 12
+        });
+        
         mapServiceRef.current = mapService;
         setMapService(mapService);
         
@@ -174,8 +185,13 @@ export default function RoutePlannerPage() {
             
             // Center and zoom map on user location
             mapService.setCenter([location.lng, location.lat]);
-            mapService.setZoom(14); // Closer zoom for better context
-            await mapService.addUserLocationMarker(location);
+            mapService.setZoom(14); 
+
+            // Add marker for user location
+            await mapService.addUserLocationMarker({
+              lat: location.lat,
+              lng: location.lng
+            });
 
             // Fetch weather for initial location
             await fetchWeatherData(location.lat, location.lng, location.address);
@@ -192,52 +208,77 @@ export default function RoutePlannerPage() {
           setUserLocation(defaultLocation);
           mapService.setCenter([defaultLocation.lng, defaultLocation.lat]);
           mapService.setZoom(12);
+          
+          // Add marker for default location
+          await mapService.addUserLocationMarker({
+            lat: defaultLocation.lat,
+            lng: defaultLocation.lng
+          });
         }
 
         initializationRef.current = true;
         setIsMapInitialized(true);
       } catch (error) {
         console.error('Failed to initialize map:', error);
+        setIsMapLoading(false); // Hide loading on error
       }
     };
 
     initializeMap();
-  }, [isLoaded, error]); // Dependencies remain the same
+  }, [isLoaded, error]);
 
   // Update the map init handler
   const handleMapInit = async (service: HybridMapService) => {
     console.log('Map init handler called');
     mapServiceRef.current = service;
     
-    // Wait for the map to be fully ready
-    let attempts = 0;
-    const maxAttempts = 10;
-    
-    while (attempts < maxAttempts) {
-      if (service.isReady()) {
-        console.log('Map is ready');
-        setIsMapInitialized(true);
-        
-        // If we have a user location, add the marker now
-        if (userLocation) {
-          const [lng, lat] = userLocation.coordinates;
-          try {
-            await service.addUserLocationMarker({ lat, lng });
-            console.log('Initial user location marker added');
-          } catch (error) {
-            console.error('Failed to add initial user location marker:', error);
+    try {
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      while (attempts < maxAttempts) {
+        if (service.isReady()) {
+          console.log('Map is ready');
+          
+          // If we have a user location, add the marker first
+          if (userLocation) {
+            try {
+              await service.addUserLocationMarker({
+                lat: userLocation.lat,
+                lng: userLocation.lng
+              });
+              console.log('Initial user location marker added');
+            } catch (error) {
+              console.error('Failed to add initial user location marker:', error);
+            }
           }
+
+          // Wait longer for any final initialization and visual settling
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          // Update states in the correct order
+          setIsMapInitialized(true);
+          
+          // Wait for next frame to ensure map is painted before hiding loading
+          requestAnimationFrame(() => {
+            // Only hide loading after a delay to ensure smooth transition
+            setTimeout(() => {
+              setIsMapLoading(false);
+            }, 1000);
+          });
+          
+          return;
         }
         
-        return;
+        console.log('Waiting for map to be ready...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        attempts++;
       }
       
-      console.log('Waiting for map to be ready...');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      attempts++;
+      console.warn('Map failed to become ready after maximum attempts');
+    } catch (error) {
+      console.error('Map initialization error:', error);
     }
-    
-    console.warn('Map failed to become ready after maximum attempts');
   };
 
   // Separate effect for marker updates
@@ -253,12 +294,17 @@ export default function RoutePlannerPage() {
           return;
         }
 
-        const [lng, lat] = userLocation.coordinates;
-        console.log('Adding location marker at:', { lng, lat });
-        
+        // Update map center and zoom
+        setMapCenter({ 
+          lat: userLocation.lat, 
+          lng: userLocation.lng 
+        });
+        setMapZoom(14);
+
+        // Add marker
         await mapServiceRef.current.addUserLocationMarker({
-          lat,
-          lng
+          lat: userLocation.lat,
+          lng: userLocation.lng
         });
         
         console.log('Location marker added successfully');
@@ -396,10 +442,22 @@ export default function RoutePlannerPage() {
 
     try {
       if (type === 'origin') {
+        // Ensure we have valid coordinates before setting location
+        if (typeof location.lat !== 'number' || typeof location.lng !== 'number') {
+          console.error('Invalid coordinates:', location);
+          return;
+        }
+
         setUserLocation({
-          ...location,
+          lat: location.lat,
+          lng: location.lng,
+          address: location.address,
           isCurrentLocation: location.isCurrentLocation || false
         });
+
+        // Center map on new location
+        mapServiceRef.current.setCenter([location.lng, location.lat]);
+        mapServiceRef.current.setZoom(14);
 
         try {
           await mapServiceRef.current.addUserLocationMarker({
@@ -407,6 +465,11 @@ export default function RoutePlannerPage() {
             lng: location.lng
           });
         } catch (markerError) {
+          console.error('Marker error details:', {
+            lat: location.lat,
+            lng: location.lng,
+            error: markerError
+          });
           toast.error('Failed to add location marker');
         }
 
@@ -415,12 +478,12 @@ export default function RoutePlannerPage() {
         } catch (weatherError) {
           toast.error('Failed to fetch weather data');
         }
-
       } else {
         setDestinationLocation(location);
         toast.success('Destination set successfully');
       }
 
+      // Only calculate route if we have both points
       if (mapServiceRef.current && 
           (type === 'origin' ? location : userLocation) && 
           (type === 'destination' ? location : destinationLocation)) {
@@ -428,8 +491,8 @@ export default function RoutePlannerPage() {
         setIsCalculatingRoute(true);
         try {
           const route = await mapServiceRef.current.calculateRoute({
-            origin: type === 'origin' ? location : userLocation,
-            destination: type === 'destination' ? location : destinationLocation,
+            origin: type === 'origin' ? location : userLocation!,
+            destination: type === 'destination' ? location : destinationLocation!,
             waypoints: waypoints.filter(Boolean)
           });
 
@@ -442,14 +505,14 @@ export default function RoutePlannerPage() {
         }
       }
     } catch (error) {
+      console.error('Location selection error:', error);
       toast.error('Failed to update location');
     }
   };
 
   const handleDestinationSelect = async (result: any) => {
-    if (!('coordinates' in result)) return;
+    if (!result.lat || !result.lng) return;
     
-    const [lng, lat] = result.coordinates;
     // Format the full address including business name if available
     const fullAddress = result.business_name 
       ? `${result.business_name}, ${result.formatted_address}`
@@ -466,17 +529,22 @@ export default function RoutePlannerPage() {
 
     // Update destination location with full address
     setDestinationLocation({
-      coordinates: [lng, lat],
+      lat: result.lat,
+      lng: result.lng,
       address: fullAddress
     });
 
     // Update weather for new destination
-    await fetchWeatherData(lat, lng, fullAddress);
+    await fetchWeatherData(result.lat, result.lng, fullAddress);
 
     // Generate new route if we have a start location
     if (userLocation) {
       try {
-        await generateRoute(userLocation.coordinates, [lng, lat]);
+        await generateRoute(userLocation, {
+          lat: result.lat,
+          lng: result.lng,
+          address: fullAddress
+        });
       } catch (error) {
         console.error('Failed to generate route:', error);
       }
@@ -509,7 +577,11 @@ export default function RoutePlannerPage() {
         throw new Error('Invalid weather data received');
       }
 
-      setWeatherData(data);
+      // Make sure to include the location in the weather data
+      setWeatherData({
+        ...data,
+        location: location || data.location || 'Unknown Location'
+      });
       console.log('Weather data set:', data);
 
     } catch (error) {
@@ -521,7 +593,7 @@ export default function RoutePlannerPage() {
         windSpeed: 0,
         humidity: 0,
         icon: '01d',
-        location: location
+        location: location || 'Location unavailable'
       });
     }
   };
@@ -950,6 +1022,23 @@ export default function RoutePlannerPage() {
     });
   };
 
+  const generateRoute = async (start: Location, end: Location) => {
+    if (!mapServiceRef.current) return;
+    
+    try {
+      const route = await mapServiceRef.current.calculateRoute({
+        origin: start,
+        destination: end,
+        waypoints: waypoints.filter(Boolean)
+      });
+
+      await mapServiceRef.current.updateRouteVisualization(route);
+      setMainRoute(route);
+    } catch (error) {
+      console.error('Failed to generate route:', error);
+    }
+  };
+
   return (
     <ProgressProvider>
       <ErrorBoundary>
@@ -985,6 +1074,8 @@ export default function RoutePlannerPage() {
               />
             </MapErrorBoundary>
 
+            {isMapLoading && <MapLoadingOverlay />}
+            
             {isMapInitialized && (
               <>
                 <MapToolbar 

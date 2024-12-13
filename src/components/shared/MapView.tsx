@@ -6,23 +6,14 @@ import { HybridMapService } from '@/services/maps/HybridMapService';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 interface MapViewProps {
-  options?: {
-    center?: {
-      lat: number;
-      lng: number;
-    };
-    zoom?: number;
+  options: {
+    center: LatLng;
+    zoom: number;
   };
   showWeather?: boolean;
   showUserLocation?: boolean;
   darkMode?: boolean;
-  onMapInit?: (mapService: HybridMapService) => void;
-  onRouteUpdate?: (route: {
-    origin: Location;
-    destination: Location;
-    waypoints: Location[];
-    path: any; // Define specific type based on your map service
-  }) => void;
+  onMapInit: (service: HybridMapService) => void;
 }
 
 export function MapView({
@@ -30,8 +21,7 @@ export function MapView({
   showWeather = false,
   showUserLocation = false,
   darkMode = false,
-  onMapInit,
-  onRouteUpdate
+  onMapInit
 }: MapViewProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const serviceRef = useRef<HybridMapService | null>(null);
@@ -48,13 +38,15 @@ export function MapView({
     mapContainer.style.position = 'absolute';
     mapContainer.style.width = '100%';
     mapContainer.style.height = '100%';
+    mapContainer.style.opacity = '0';
+    mapContainer.style.transition = 'opacity 0.8s ease-in-out';
     wrapperRef.current.appendChild(mapContainer);
 
     const initMap = async () => {
       try {
         const center: [number, number] = [
-          options.center?.lng ?? -74.0060,
-          options.center?.lat ?? 40.7128
+          options.center?.lng ?? -105.0749801,
+          options.center?.lat ?? 40.5852602
         ];
 
         const service = new HybridMapService();
@@ -65,7 +57,7 @@ export function MapView({
           darkMode
         });
 
-        // Wait for map to be fully loaded
+        // Wait for both map and style to be loaded
         await new Promise<void>((resolve) => {
           const checkReady = () => {
             if (service.isReady()) {
@@ -78,6 +70,9 @@ export function MapView({
         });
 
         serviceRef.current = service;
+        setTimeout(() => {
+          mapContainer.style.opacity = '1';
+        }, 500);
         setIsMapReady(true);
         
         if (onMapInit) {
@@ -121,10 +116,8 @@ export function MapView({
 
   return (
     <div className="w-full h-full relative">
-      {/* Map wrapper */}
       <div ref={wrapperRef} className="absolute inset-0" />
       
-      {/* UI layer - only shown when map is ready */}
       {isMapReady && (
         <div className="absolute inset-0 pointer-events-none z-10">
           {/* UI elements go here */}

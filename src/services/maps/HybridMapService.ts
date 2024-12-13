@@ -9,6 +9,7 @@ export class HybridMapService {
   private googleManager: GoogleMapsManager | null = null;
   private styleManager: MapboxStyleManager | null = null;
   private isInitialized: boolean = false;
+  private fullyInitialized: boolean = false;
   private initializationPromise: Promise<void> | null = null;
   private pendingOperations: (() => Promise<void>)[] = [];
   private markers: Map<string, mapboxgl.Marker> = new Map();
@@ -18,12 +19,12 @@ export class HybridMapService {
   }
 
   async initialize(
-    container: HTMLElement,
+    container?: HTMLElement,
     options: {
-      center: [number, number];
-      zoom: number;
-      darkMode: boolean;
-    }
+      center?: [number, number];
+      zoom?: number;
+      darkMode?: boolean;
+    } = {}
   ): Promise<void> {
     if (this.initializationPromise) {
       return this.initializationPromise;
@@ -39,11 +40,15 @@ export class HybridMapService {
         const initialStyle = 'mapbox://styles/routopia-ai/cm4jwk0xv014s01rcdrkp68lr';
         console.log('Initializing map with style:', initialStyle);
 
+        // Set default center and zoom if not provided
+        const defaultCenter: [number, number] = [-105.0749801, 40.5852602]; // Fort Collins
+        const defaultZoom = 12;
+
         this.mapbox = new mapboxgl.Map({
-          container,
+          container: container || document.createElement('div'),
           style: initialStyle,
-          center: options.center,
-          zoom: options.zoom,
+          center: options.center || defaultCenter,
+          zoom: options.zoom || defaultZoom,
           preserveDrawingBuffer: true,
           antialias: true,
           trackResize: true
@@ -67,10 +72,15 @@ export class HybridMapService {
           })
         ]);
 
+        // Add a small delay to ensure everything is settled
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         this.isInitialized = true;
+        this.fullyInitialized = true;
         console.log('Map initialization complete');
       } catch (error) {
         this.isInitialized = false;
+        this.fullyInitialized = false;
         this.initializationPromise = null;
         console.error('Failed to initialize map:', error);
         throw error;
@@ -156,6 +166,13 @@ export class HybridMapService {
   async addUserLocationMarker(coordinates: { lat: number; lng: number }): Promise<void> {
     console.log('Adding user location marker:', coordinates);
     
+    // Validate coordinates
+    if (typeof coordinates.lat !== 'number' || typeof coordinates.lng !== 'number' ||
+        isNaN(coordinates.lat) || isNaN(coordinates.lng)) {
+      console.error('Invalid coordinates:', coordinates);
+      throw new Error('Invalid coordinates provided to addUserLocationMarker');
+    }
+
     if (!this.isReady()) {
       console.log('Map not ready, waiting for initialization...');
       await new Promise<void>((resolve, reject) => {
@@ -187,22 +204,16 @@ export class HybridMapService {
         existingMarker.remove();
       }
 
-      // Create custom marker element with wrapper div
+      // Create marker element (keeping existing marker styling)
       const el = document.createElement('div');
       el.className = 'routopia-location-marker';
       el.setAttribute('data-testid', 'location-marker');
       
-      // Create SVG wrapper to handle animations properly
       const svgWrapper = document.createElement('div');
       svgWrapper.className = 'marker-icon-wrapper';
       svgWrapper.setAttribute('data-testid', 'marker-wrapper');
       
-      // Add debug logging to verify the classes are being applied
-      console.log('Creating marker with classes:', {
-        markerClass: el.className,
-        wrapperClass: svgWrapper.className
-      });
-      
+      // Keep existing SVG markup
       svgWrapper.innerHTML = `
         <svg 
           xmlns="http://www.w3.org/2000/svg" 
@@ -227,8 +238,7 @@ export class HybridMapService {
       // Create and add the new marker
       const marker = new mapboxgl.Marker({
         element: el,
-        anchor: 'bottom',
-        offset: [0, 0] // Adjust if needed based on your icon
+        anchor: 'bottom'
       })
         .setLngLat([coordinates.lng, coordinates.lat])
         .addTo(this.mapbox!);
@@ -285,14 +295,10 @@ export class HybridMapService {
   }
 
   isReady(): boolean {
-    console.log('Checking map ready state:', {
-      hasMapbox: !!this.mapbox,
-      isInitialized: this.isInitialized,
-      isLoaded: this.mapbox?.loaded(),
-      hasGoogleManager: !!this.googleManager
-    });
-    
-    return this.isInitialized && !!this.mapbox && this.mapbox.loaded();
+    return this.fullyInitialized && 
+           !!this.mapbox && 
+           this.mapbox.loaded() && 
+           this.mapbox.isStyleLoaded();
   }
 
   async setTheme(theme: 'light' | 'dark' | 'satellite'): Promise<void> {
@@ -369,9 +375,9 @@ export class HybridMapService {
     this.isInitialized = false;
   }
 
-  setCenter(center: [number, number]) {
+  setCenter(coordinates: [number, number]) {
     if (!this.mapbox) return;
-    this.mapbox.setCenter(center);
+    this.mapbox.setCenter(coordinates);
   }
 
   setZoom(zoom: number) {
@@ -379,9 +385,12 @@ export class HybridMapService {
     this.mapbox.setZoom(zoom);
   }
 
-  fitBounds(bounds: mapboxgl.LngLatBoundsLike, options?: mapboxgl.FitBoundsOptions) {
+  fitBounds(bounds: any, options?: any) {
     if (!this.mapbox) return;
-    this.mapbox.fitBounds(bounds, options);
+    this.mapbox.fitBounds(bounds, {
+      padding: options?.padding || 50,
+      duration: options?.duration || 500
+    });
   }
 
   async setMapboxStyle(styleUrl: string) {

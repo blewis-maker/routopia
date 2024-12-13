@@ -1,3 +1,6 @@
+import { LucideIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
 interface NeonIconProps {
   icon: LucideIcon;
   color: 'green' | 'teal'; // extend as needed

@@ -72,9 +72,17 @@ export function WeatherWidget({ data }: WeatherWidgetProps) {
 
   const formatLocation = (location?: string) => {
     if (!location) return '';
+    
+    // Split by commas and clean up whitespace
     const parts = location.split(',').map(part => part.trim());
-    const city = parts[1];
-    const state = parts[2]?.split(' ')[0];
+    
+    // For "Current Location" special case
+    if (location === 'Current Location') return location;
+    
+    // Try to get city and state
+    const city = parts[0]; // Take first part as city
+    const state = parts[1]?.split(' ')[0]; // Take first word of second part as state
+    
     return state ? `${city}, ${state}` : city;
   };
 

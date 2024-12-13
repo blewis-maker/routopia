@@ -59,20 +59,38 @@ const config: Config = {
         'xl': '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
       },
       animation: {
-        'gradient-text': 'gradient-text 8s ease infinite',
+        'spin-slow': 'spin 4s linear infinite',
+        'analog-blink': 'analog-blink 4s infinite',
       },
       keyframes: {
-        'gradient-text': {
+        'analog-blink': {
           '0%, 100%': {
-            'background-size': '200% 200%',
-            'background-position': 'left center',
+            opacity: '0.15',
+            color: 'var(--neon-teal-off)',
+            filter: 'drop-shadow(0 0 0 var(--neon-teal-glow))'
           },
-          '50%': {
-            'background-size': '200% 200%',
-            'background-position': 'right center',
+          '5%': {
+            opacity: '1',
+            color: 'var(--neon-teal-on)',
+            filter: 'drop-shadow(0 0 8px var(--neon-teal-glow))'
           },
-        },
-      },
+          '10%': {
+            opacity: '0.15',
+            color: 'var(--neon-teal-off)',
+            filter: 'drop-shadow(0 0 0 var(--neon-teal-glow))'
+          },
+          '15%': {
+            opacity: '0.8',
+            color: 'var(--neon-teal-on)',
+            filter: 'drop-shadow(0 0 6px var(--neon-teal-glow))'
+          },
+          '25%, 95%': {
+            opacity: '1',
+            color: 'var(--neon-teal-on)',
+            filter: 'drop-shadow(0 0 8px var(--neon-teal-glow))'
+          }
+        }
+      }
     },
   },
   plugins: [

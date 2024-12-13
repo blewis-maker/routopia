@@ -1,0 +1,41 @@
+:root {
+  --neon-green-on: #10B981;  /* Emerald 500 */
+  --neon-green-off: #064E3B; /* Emerald 900 */
+  --neon-green-glow: rgba(16, 185, 129, 0.5);
+  
+  --neon-teal-on: #14B8A6;   /* Teal 500 */
+  --neon-teal-off: #134E4A;  /* Teal 900 */
+  --neon-teal-glow: rgba(20, 184, 166, 0.5);
+}
+
+.animate-pulse-neon {
+  animation: analog-blink 4s infinite;
+}
+
+@keyframes analog-blink {
+  0%, 100% {
+    opacity: 0.15;
+    color: var(--neon-teal-off);
+    filter: drop-shadow(0 0 0 var(--neon-teal-glow));
+  }
+  5% {
+    opacity: 1;
+    color: var(--neon-teal-on);
+    filter: drop-shadow(0 0 8px var(--neon-teal-glow));
+  }
+  10% {
+    opacity: 0.15;
+    color: var(--neon-teal-off);
+    filter: drop-shadow(0 0 0 var(--neon-teal-glow));
+  }
+  15% {
+    opacity: 0.8;
+    color: var(--neon-teal-on);
+    filter: drop-shadow(0 0 6px var(--neon-teal-glow));
+  }
+  25%, 95% {
+    opacity: 1;
+    color: var(--neon-teal-on);
+    filter: drop-shadow(0 0 8px var(--neon-teal-glow));
+  }
+} 
