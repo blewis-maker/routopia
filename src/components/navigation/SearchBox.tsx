@@ -7,85 +7,6 @@ import { baseStyles, roundedStyles, glassStyles, inputStyles } from '@/styles/co
 import { cn } from '@/lib/utils';
 import { NeonIcon } from '@/components/ui/NeonIcon';
 
-// Add custom styles for Google Places Autocomplete dropdown
-const style = document.createElement('style');
-style.textContent = `
-  .pac-container {
-    background: rgba(28, 28, 28, 0.95) !important;
-    backdrop-filter: blur(12px) !important;
-    border: 1px solid rgba(68, 68, 68, 0.5) !important;
-    border-radius: 8px !important;
-    font-family: var(--font-sans) !important;
-    margin-top: 8px !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 
-                0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-    padding: 4px !important;
-    z-index: 1000 !important;
-    max-width: calc(100% - 24px) !important;
-    text-rendering: optimizeLegibility !important;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11" !important;
-  }
-  
-  .pac-item {
-    padding: 8px 12px !important;
-    color: var(--color-stone-50) !important;
-    border: none !important;
-    font-family: inherit !important;
-    font-size: 13px !important;
-    line-height: 1.4 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 0 !important;
-    margin: 2px !important;
-    border-radius: 6px !important;
-    transition: all 150ms ease-out !important;
-    font-weight: 400 !important;
-  }
-  
-  .pac-item:hover {
-    background-color: rgba(45, 45, 45, 0.95) !important;
-    cursor: pointer !important;
-  }
-  
-  .pac-item-query {
-    color: var(--color-stone-50) !important;
-    font-family: inherit !important;
-    font-size: 13px !important;
-    padding-right: 6px !important;
-    font-weight: 500 !important;
-  }
-  
-  .pac-matched {
-    color: var(--color-primary) !important;
-    font-weight: 600 !important;
-  }
-  
-  /* Hide the location marker icon */
-  .pac-icon {
-    display: none !important;
-  }
-  
-  /* Hide the Powered by Google element */
-  .pac-container:after {
-    display: none !important;
-  }
-  
-  /* Additional refinements */
-  .pac-item span:not(.pac-item-query) {
-    color: var(--color-stone-400) !important;
-    font-size: 12px !important;
-    opacity: 0.8 !important;
-  }
-  
-  /* Improve focus states */
-  .pac-item.pac-item-selected,
-  .pac-item:focus {
-    background-color: rgba(43, 175, 157, 0.15) !important;
-    outline: none !important;
-  }
-`;
-document.head.appendChild(style);
-
 interface SearchResult {
   coordinates: [number, number];
   formatted_address: string;
@@ -193,6 +114,91 @@ export function SearchBox({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
   };
+
+  useEffect(() => {
+    // Add custom styles for Google Places Autocomplete dropdown
+    const style = document.createElement('style');
+    style.textContent = `
+      .pac-container {
+        background: rgba(28, 28, 28, 0.95) !important;
+        backdrop-filter: blur(12px) !important;
+        border: 1px solid rgba(68, 68, 68, 0.5) !important;
+        border-radius: 8px !important;
+        font-family: var(--font-sans) !important;
+        margin-top: 8px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+                    0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        padding: 4px !important;
+        z-index: 1000 !important;
+        max-width: calc(100% - 24px) !important;
+        text-rendering: optimizeLegibility !important;
+        font-feature-settings: "cv02", "cv03", "cv04", "cv11" !important;
+      }
+      
+      .pac-item {
+        padding: 8px 12px !important;
+        color: var(--color-stone-50) !important;
+        border: none !important;
+        font-family: inherit !important;
+        font-size: 13px !important;
+        line-height: 1.4 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 0 !important;
+        margin: 2px !important;
+        border-radius: 6px !important;
+        transition: all 150ms ease-out !important;
+        font-weight: 400 !important;
+      }
+      
+      .pac-item:hover {
+        background-color: rgba(45, 45, 45, 0.95) !important;
+        cursor: pointer !important;
+      }
+      
+      .pac-item-query {
+        color: var(--color-stone-50) !important;
+        font-family: inherit !important;
+        font-size: 13px !important;
+        padding-right: 6px !important;
+        font-weight: 500 !important;
+      }
+      
+      .pac-matched {
+        color: var(--color-primary) !important;
+        font-weight: 600 !important;
+      }
+      
+      /* Hide the location marker icon */
+      .pac-icon {
+        display: none !important;
+      }
+      
+      /* Hide the Powered by Google element */
+      .pac-container:after {
+        display: none !important;
+      }
+      
+      /* Additional refinements */
+      .pac-item span:not(.pac-item-query) {
+        color: var(--color-stone-400) !important;
+        font-size: 12px !important;
+        opacity: 0.8 !important;
+      }
+      
+      /* Improve focus states */
+      .pac-item.pac-item-selected,
+      .pac-item:focus {
+        background-color: rgba(43, 175, 157, 0.15) !important;
+        outline: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   return (
     <div className={cn("w-full", className)}>

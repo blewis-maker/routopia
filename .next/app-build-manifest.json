@@ -1,5 +1,10 @@
 {
   "pages": {
+    "/(protected)/route-planner/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(protected)/route-planner/loading.js"
+    ],
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -21,11 +26,6 @@
       "static/chunks/main-app.js",
       "static/css/app/(protected)/route-planner/page.css",
       "static/chunks/app/(protected)/route-planner/page.js"
-    ],
-    "/(protected)/route-planner/loading": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(protected)/route-planner/loading.js"
     ]
   }
 }

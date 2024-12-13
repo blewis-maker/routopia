@@ -1,8 +1,8 @@
 {
   "/icon/[[...__metadata_id__]]/route": "app/icon/[[...__metadata_id__]]/route.js",
   "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
-  "/api/weather/route": "app/api/weather/route.js",
-  "/api/routes/saved/route": "app/api/routes/saved/route.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/routes/saved/route": "app/api/routes/saved/route.js",
+  "/api/weather/route": "app/api/weather/route.js",
   "/(protected)/route-planner/page": "app/(protected)/route-planner/page.js"
 }

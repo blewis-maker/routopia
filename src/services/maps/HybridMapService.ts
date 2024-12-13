@@ -30,62 +30,70 @@ export class HybridMapService {
       return this.initializationPromise;
     }
 
-    this.initializationPromise = (async () => {
-      if (!mapboxgl.accessToken) {
-        mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
-        console.log('Setting Mapbox token:', mapboxgl.accessToken.substring(0, 10) + '...');
-      }
+    // Add a timeout promise
+    const timeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Map initialization timed out')), 15000);
+    });
 
-      try {
-        const initialStyle = 'mapbox://styles/routopia-ai/cm4jwk0xv014s01rcdrkp68lr';
-        console.log('Initializing map with style:', initialStyle);
+    this.initializationPromise = Promise.race([
+      (async () => {
+        if (!mapboxgl.accessToken) {
+          mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+          console.log('Setting Mapbox token:', mapboxgl.accessToken.substring(0, 10) + '...');
+        }
 
-        // Set default center and zoom if not provided
-        const defaultCenter: [number, number] = [-105.0749801, 40.5852602]; // Fort Collins
-        const defaultZoom = 12;
+        try {
+          const initialStyle = 'mapbox://styles/routopia-ai/cm4jwk0xv014s01rcdrkp68lr';
+          console.log('Initializing map with style:', initialStyle);
 
-        this.mapbox = new mapboxgl.Map({
-          container: container || document.createElement('div'),
-          style: initialStyle,
-          center: options.center || defaultCenter,
-          zoom: options.zoom || defaultZoom,
-          preserveDrawingBuffer: true,
-          antialias: true,
-          trackResize: true
-        });
+          // Set default center and zoom if not provided
+          const defaultCenter: [number, number] = [-105.0749801, 40.5852602]; // Fort Collins
+          const defaultZoom = 12;
 
-        // Wait for both map and style to be fully loaded
-        await Promise.all([
-          new Promise<void>((resolve, reject) => {
-            this.mapbox!.once('load', () => {
-              console.log('Map loaded');
-              resolve();
-            });
-            setTimeout(() => reject(new Error('Map load timeout')), 10000);
-          }),
-          new Promise<void>((resolve, reject) => {
-            this.mapbox!.once('style.load', () => {
-              console.log('Style loaded');
-              resolve();
-            });
-            setTimeout(() => reject(new Error('Style load timeout')), 10000);
-          })
-        ]);
+          this.mapbox = new mapboxgl.Map({
+            container: container || document.createElement('div'),
+            style: initialStyle,
+            center: options.center || defaultCenter,
+            zoom: options.zoom || defaultZoom,
+            preserveDrawingBuffer: true,
+            antialias: true,
+            trackResize: true
+          });
 
-        // Add a small delay to ensure everything is settled
-        await new Promise(resolve => setTimeout(resolve, 100));
+          // Wait for both map and style to be fully loaded
+          await Promise.all([
+            new Promise<void>((resolve, reject) => {
+              this.mapbox!.once('load', () => {
+                console.log('Map loaded');
+                resolve();
+              });
+              setTimeout(() => reject(new Error('Map load timeout')), 10000);
+            }),
+            new Promise<void>((resolve, reject) => {
+              this.mapbox!.once('style.load', () => {
+                console.log('Style loaded');
+                resolve();
+              });
+              setTimeout(() => reject(new Error('Style load timeout')), 10000);
+            })
+          ]);
 
-        this.isInitialized = true;
-        this.fullyInitialized = true;
-        console.log('Map initialization complete');
-      } catch (error) {
-        this.isInitialized = false;
-        this.fullyInitialized = false;
-        this.initializationPromise = null;
-        console.error('Failed to initialize map:', error);
-        throw error;
-      }
-    })();
+          // Add a small delay to ensure everything is settled
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          this.isInitialized = true;
+          this.fullyInitialized = true;
+          console.log('Map initialization complete');
+        } catch (error) {
+          this.isInitialized = false;
+          this.fullyInitialized = false;
+          this.initializationPromise = null;
+          console.error('Failed to initialize map:', error);
+          throw error;
+        }
+      })(),
+      timeout
+    ]);
 
     return this.initializationPromise;
   }

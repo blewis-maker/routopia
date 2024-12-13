@@ -1,8 +1,8 @@
 import '@/styles/globals.css';
 import '@/styles/main.css';
-import '@/styles/mapbox-gl.css';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { Providers } from '@/app/providers';
-import { Metadata } from 'next';
+import { Metadata, Viewport } from 'next';
 import { inter } from './fonts';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -11,9 +11,13 @@ import { TooltipProvider } from '@/components/ui/Tooltip';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AuthProvider } from '@/components/AuthProvider';
 
+export const viewport: Viewport = {
+  themeColor: '#1B1B1B',
+};
+
 export const metadata: Metadata = {
-  title: 'Routopia - AI-Powered Route Planning',
-  description: 'Plan your next adventure with AI-powered inspiration.',
+  title: 'Routopia',
+  description: 'Plan your routes intelligently',
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },

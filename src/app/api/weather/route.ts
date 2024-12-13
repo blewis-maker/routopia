@@ -1,51 +1,46 @@
 import { NextResponse } from 'next/server';
 
+const WEATHER_API_KEY = process.env.NEXT_PUBLIC_OPENWEATHERMAP_API_KEY;
+const WEATHER_API_URL = 'https://api.openweathermap.org/data/2.5/weather';
+
 export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const lat = searchParams.get('lat');
+  const lng = searchParams.get('lng');
+
+  if (!lat || !lng) {
+    return NextResponse.json(
+      { error: 'Missing coordinates' },
+      { status: 400 }
+    );
+  }
+
   try {
-    const { searchParams } = new URL(request.url);
-    const lat = parseFloat(searchParams.get('lat') || '');
-    const lng = parseFloat(searchParams.get('lng') || '');
-
-    if (isNaN(lat) || isNaN(lng)) {
-      return NextResponse.json(
-        { error: 'Invalid coordinates' },
-        { status: 400 }
-      );
-    }
-
-    const OPENWEATHER_API_KEY = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
-    if (!OPENWEATHER_API_KEY) {
-      throw new Error('OpenWeather API key not configured');
-    }
-
-    console.log('Fetching weather for:', { lat, lng }); // Debug log
-
     const response = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${OPENWEATHER_API_KEY}&units=imperial`,
-      { cache: 'no-store' } // Ensure fresh data
+      `${WEATHER_API_URL}?lat=${lat}&lon=${lng}&appid=${WEATHER_API_KEY}&units=imperial`
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OpenWeather API error:', errorText);
-      throw new Error('Weather API request failed');
+      throw new Error('Weather API error');
     }
 
     const data = await response.json();
-    console.log('Weather data received:', data); // Debug log
-
+    
     return NextResponse.json({
       temperature: Math.round(data.main.temp),
-      conditions: data.weather[0].description,
+      conditions: data.weather[0].main,
       windSpeed: Math.round(data.wind.speed),
+      windDirection: data.wind.deg,
+      windGust: data.wind.gust,
       humidity: data.main.humidity,
-      icon: data.weather[0].icon
+      icon: data.weather[0].icon,
+      location: data.name
     });
 
   } catch (error) {
-    console.error('Weather API error:', error);
+    console.error('Weather fetch error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch weather data' },
+      { error: 'Failed to fetch weather data' },
       { status: 500 }
     );
   }

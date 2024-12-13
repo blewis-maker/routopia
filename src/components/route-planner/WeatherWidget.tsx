@@ -1,7 +1,6 @@
 'use client';
 
 import { Cloud, CloudRain, CloudSnow, Sun, Wind, Droplets } from 'lucide-react';
-import { WeatherData } from '@/types/weather';
 import { cn } from '@/lib/utils';
 import { styleGuide as sg } from '@/styles/theme/styleGuide';
 import {
@@ -11,7 +10,16 @@ import {
 } from "@/components/ui/Tooltip";
 
 interface WeatherWidgetProps {
-  data: WeatherData;
+  data: {
+    temperature: number;
+    conditions: string;
+    windSpeed: number;
+    windDirection: number;
+    windGust?: number;
+    humidity: number;
+    icon: string;
+    location?: string;
+  };
 }
 
 export function WeatherWidget({ data }: WeatherWidgetProps) {
@@ -73,17 +81,30 @@ export function WeatherWidget({ data }: WeatherWidgetProps) {
   const formatLocation = (location?: string) => {
     if (!location) return '';
     
+    // Special case for "Current Location"
+    if (location === 'Current Location') return location;
+    
     // Split by commas and clean up whitespace
     const parts = location.split(',').map(part => part.trim());
     
-    // For "Current Location" special case
-    if (location === 'Current Location') return location;
+    // For addresses like "878 Wagon Bend Rd, Berthoud, CO 80513, USA"
+    // or "Berthoud, CO 80513, USA"
+    // We want to extract just "Berthoud, CO"
     
-    // Try to get city and state
-    const city = parts[0]; // Take first part as city
-    const state = parts[1]?.split(' ')[0]; // Take first word of second part as state
+    // Find the city and state parts
+    let cityIndex = parts.length > 2 ? parts.length - 3 : 0; // City is usually third from last or first
+    let stateWithZipIndex = parts.length > 1 ? parts.length - 2 : 1; // State+ZIP is usually second from last
     
-    return state ? `${city}, ${state}` : city;
+    const city = parts[cityIndex];
+    // Extract just the state from "CO 80513"
+    const state = parts[stateWithZipIndex]?.split(' ')[0];
+    
+    if (city && state) {
+      return `${city}, ${state}`;
+    }
+    
+    // Fallback to just the first part if we can't parse it properly
+    return parts[0];
   };
 
   return (

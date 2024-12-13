@@ -51,13 +51,14 @@ export function MapView({
 
         const service = new HybridMapService();
         
+        // Wait for full initialization
         await service.initialize(mapContainer, {
           center,
           zoom: options.zoom ?? 12,
           darkMode
         });
 
-        // Wait for both map and style to be loaded
+        // Ensure map and style are fully loaded
         await new Promise<void>((resolve) => {
           const checkReady = () => {
             if (service.isReady()) {
@@ -69,14 +70,15 @@ export function MapView({
           checkReady();
         });
 
+        // Add a small delay for smooth transition
+        await new Promise(resolve => setTimeout(resolve, 200));
+
         serviceRef.current = service;
-        setTimeout(() => {
-          mapContainer.style.opacity = '1';
-        }, 500);
+        mapContainer.style.opacity = '1';
         setIsMapReady(true);
         
         if (onMapInit) {
-          onMapInit(service);
+          await onMapInit(service);
         }
       } catch (error) {
         console.error('Failed to initialize map:', error);

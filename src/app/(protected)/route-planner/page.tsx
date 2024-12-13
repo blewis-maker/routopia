@@ -139,6 +139,7 @@ export default function RoutePlannerPage() {
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
   const [isMovingMap, setIsMovingMap] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(true);
+  const [isPageReady, setIsPageReady] = useState(false);
 
   // 3. All context hooks
   const { theme } = useTheme();
@@ -150,19 +151,19 @@ export default function RoutePlannerPage() {
       if (initializationRef.current || !isLoaded || error) return;
       
       try {
-        setIsMapLoading(true); // Ensure loading is shown at start
+        setIsMapLoading(true);
         
-        // Initialize map service with default center
+        // Step 1: Initialize map service
         const mapService = new HybridMapService();
         await mapService.initialize(undefined, {
-          center: [-105.0749801, 40.5852602], // Fort Collins as default
+          center: [-105.0749801, 40.5852602],
           zoom: 12
         });
         
         mapServiceRef.current = mapService;
         setMapService(mapService);
-        
-        // Get user's location with better error handling
+
+        // Step 2: Get user location and initialize everything else
         try {
           const position = await getCurrentPosition();
           const geocoder = new google.maps.Geocoder();
@@ -180,47 +181,64 @@ export default function RoutePlannerPage() {
               isCurrentLocation: true
             };
 
-            // Update user location and search box
-            setUserLocation(location);
-            
-            // Center and zoom map on user location
-            mapService.setCenter([location.lng, location.lat]);
-            mapService.setZoom(14); 
-
-            // Add marker for user location
-            await mapService.addUserLocationMarker({
-              lat: location.lat,
-              lng: location.lng
-            });
-
-            // Fetch weather for initial location
-            await fetchWeatherData(location.lat, location.lng, location.address);
+            // Step 3: Set up all states in sequence
+            await Promise.all([
+              // Set user location
+              new Promise<void>(resolve => {
+                setUserLocation(location);
+                resolve();
+              }),
+              // Center and zoom map
+              mapService.setCenter([location.lng, location.lat]),
+              mapService.setZoom(14),
+              // Add marker
+              mapService.addUserLocationMarker({
+                lat: location.lat,
+                lng: location.lng
+              }),
+              // Fetch weather
+              fetchWeatherData(location.lat, location.lng, location.address)
+            ]);
           }
         } catch (locationError) {
           console.error('Error getting user location:', locationError);
-          // Set default location (Fort Collins) if user location fails
+          // Fallback to default location
           const defaultLocation = {
             lat: 40.5852602,
             lng: -105.0749801,
             address: 'Fort Collins, CO',
             isCurrentLocation: false
           };
-          setUserLocation(defaultLocation);
-          mapService.setCenter([defaultLocation.lng, defaultLocation.lat]);
-          mapService.setZoom(12);
-          
-          // Add marker for default location
-          await mapService.addUserLocationMarker({
-            lat: defaultLocation.lat,
-            lng: defaultLocation.lng
-          });
+
+          await Promise.all([
+            new Promise<void>(resolve => {
+              setUserLocation(defaultLocation);
+              resolve();
+            }),
+            mapService.setCenter([defaultLocation.lng, defaultLocation.lat]),
+            mapService.setZoom(12),
+            mapService.addUserLocationMarker({
+              lat: defaultLocation.lat,
+              lng: defaultLocation.lng
+            })
+          ]);
         }
 
+        // Step 4: Final initialization
+        await new Promise(resolve => setTimeout(resolve, 500));
         initializationRef.current = true;
         setIsMapInitialized(true);
+        
+        // Step 5: Mark page as ready and hide loading
+        setTimeout(() => {
+          setIsPageReady(true);
+          setIsMapLoading(false);
+        }, 300);
+
       } catch (error) {
         console.error('Failed to initialize map:', error);
-        setIsMapLoading(false); // Hide loading on error
+        setIsMapLoading(false);
+        toast.error('Failed to initialize map. Please refresh the page.');
       }
     };
 
@@ -233,6 +251,7 @@ export default function RoutePlannerPage() {
     mapServiceRef.current = service;
     
     try {
+      // Wait for the map to be fully ready
       let attempts = 0;
       const maxAttempts = 10;
       
@@ -253,19 +272,15 @@ export default function RoutePlannerPage() {
             }
           }
 
-          // Wait longer for any final initialization and visual settling
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Wait a bit for any final initialization
+          await new Promise(resolve => setTimeout(resolve, 500));
 
           // Update states in the correct order
           setIsMapInitialized(true);
-          
-          // Wait for next frame to ensure map is painted before hiding loading
-          requestAnimationFrame(() => {
-            // Only hide loading after a delay to ensure smooth transition
-            setTimeout(() => {
-              setIsMapLoading(false);
-            }, 1000);
-          });
+          // Small delay before hiding loading to ensure smooth transition
+          setTimeout(() => {
+            setIsMapLoading(false);
+          }, 300);
           
           return;
         }
@@ -562,35 +577,32 @@ export default function RoutePlannerPage() {
   const fetchWeatherData = async (lat: number, lng: number, location?: string) => {
     console.log('Fetching weather:', { lat, lng, location });
     try {
-      console.log('Fetching weather for:', { lat, lng, location });
-      
       const response = await fetch(`/api/weather?lat=${lat}&lng=${lng}`);
       const data = await response.json();
 
       if (!response.ok) {
-        console.error('Weather API error response:', data);
         throw new Error(data.error || 'Failed to fetch weather');
       }
 
-      if (!data.temperature) {
-        console.error('Invalid weather data received:', data);
-        throw new Error('Invalid weather data received');
-      }
-
-      // Make sure to include the location in the weather data
       setWeatherData({
-        ...data,
-        location: location || data.location || 'Unknown Location'
+        temperature: data.temperature,
+        conditions: data.conditions,
+        windSpeed: data.windSpeed,
+        windDirection: data.windDirection,
+        windGust: data.windGust,
+        humidity: data.humidity,
+        icon: data.icon,
+        location: location || data.location
       });
-      console.log('Weather data set:', data);
 
+      console.log('Weather data set:', data);
     } catch (error) {
-      console.error('Failed to fetch weather:', error);
-      // Set a default state instead of null
+      console.error('Weather fetch error:', error);
       setWeatherData({
         temperature: 0,
         conditions: 'Weather unavailable',
         windSpeed: 0,
+        windDirection: 0,
         humidity: 0,
         icon: '01d',
         location: location || 'Location unavailable'
@@ -1038,6 +1050,11 @@ export default function RoutePlannerPage() {
       console.error('Failed to generate route:', error);
     }
   };
+
+  // Update the return statement to show loading until everything is ready
+  if (!isPageReady) {
+    return <MapLoadingOverlay />;
+  }
 
   return (
     <ProgressProvider>
